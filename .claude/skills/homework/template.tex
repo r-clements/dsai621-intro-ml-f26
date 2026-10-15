@@ -1,0 +1,56 @@
+%% DSAI 621 accessible assignment template (tagged PDF/UA-2, LuaLaTeX).
+%% Build: tools/build_pdf.sh source/homeworks/HWn.tex
+%%
+%% Kernel 2024-11-01 on this machine needs `testphase`. After a TeX Live
+%% update to kernel >= 2025-11-01, replace the testphase line with:
+%%     tagging = on, tagging-setup = {math/setup={mathml-SE,mathml-AF}},
+
+\DocumentMetadata{
+  lang        = en,
+  pdfversion  = 2.0,
+  pdfstandard = ua-2,
+  testphase   = {phase-III, math},
+}
+
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{unicode-math}   % required for MathML generation
+\usepackage{graphicx}       % every \includegraphics needs alt={...}
+
+\newcommand{\E}{\operatorname{E}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Err}{\mathrm{Err}}
+
+\newif\ifsolutions
+%% \solutionstrue   % uncomment in HWn_sol.tex
+\newcommand{\solution}[1]{\ifsolutions\par\medskip\noindent\textbf{Solution.} #1\par\medskip\fi}
+
+\usepackage[
+  colorlinks, linkcolor=blue, urlcolor=blue,
+  pdfdisplaydoctitle=true,
+  pdftitle={Intro to Machine Learning -- HW N},
+  pdfauthor={Robert Clements},
+  pdflang={en},
+]{hyperref}
+
+\title{Intro to Machine Learning\\ HW N\\ Due DATE at 11:59pm}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\textbf{Directions:} Submit a .pdf file containing your responses to Gradescope. The .pdf can be
+converted from a LaTeX file, pictures of your handwritten solutions, Word files, markdown files,
+etc. (anything that can be converted into .pdf).
+
+\begin{enumerate}
+  \item Show that the expected test error at $x_0$ decomposes as
+  \[
+    \E\big[(Y - \hat f(x_0))^2\big] = \sigma^2 + \big[\mathrm{Bias}\,\hat f(x_0)\big]^2 + \Var\big(\hat f(x_0)\big).
+  \]
+  \solution{Add and subtract $f(x_0)$ and $\E\hat f(x_0)$; the cross terms vanish.}
+\end{enumerate}
+
+\end{document}

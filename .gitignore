@@ -1,0 +1,18 @@
+.DS_Store
+node_modules/
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.claude/settings.local.json
+
+# private: solutions, exams, drafts, raw scans
+source/
+seating/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.toc
+*-luamml-mathml.html
