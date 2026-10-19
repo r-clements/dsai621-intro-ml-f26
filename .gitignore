@@ -16,3 +16,9 @@ seating/
 *.synctex.gz
 *.toc
 *-luamml-mathml.html
+
+# instructor-only: Claude Code config/skills and build tooling
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+tools/
