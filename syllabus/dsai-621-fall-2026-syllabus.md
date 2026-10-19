@@ -62,7 +62,7 @@ By the end of this course you should understand fundamental machine learning con
 - A hand-written cheat sheet, 8.5x11, one side only, is allowed. No digitally typed or printed cheat sheets are permitted. Cheat sheets will be collected with your quiz and returned before the next quiz. Be sure to include your name on the cheat sheet.   
 - Quizzes will be administered on paper. No phones, smartwatches, calculators, other devices, or internet access are permitted.  
 - I will not be able to answer content questions during the quiz, to keep the testing environment consistent for everyone. If you believe a question is unclear or contains an error, note it on your quiz and I will review it afterward.  
-- Please use the restroom before the quiz — quizzes are timed and *very* short, and you will not have time to leave and return.
+- Please use the restroom before the quiz — quizzes are timed and *very* short, and you will not have time to leave and return. However, if you absolutely need to go, let me know, and leave all devices behind.
 
 
 ## Course Website
