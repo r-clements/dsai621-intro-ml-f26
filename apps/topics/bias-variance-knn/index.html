@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bias–Variance Tradeoff with KNN — DSAI 621</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      max-width: 760px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #222;
+    }
+    a.back { font-size: 0.9rem; color: #1a5fb4; text-decoration: none; }
+    a.back:hover { text-decoration: underline; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1rem; margin: 1rem 0 0.25rem; }
+    p.instructions { color: #555; font-size: 0.95rem; margin-top: 0; }
+    p.a11y-instructions {
+      border-left: 3px solid #1a5fb4;
+      padding-left: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .controls {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem;
+      margin: 0.75rem 0;
+    }
+    .controls label { font-weight: 600; }
+    .controls input[type=range] { flex: 1 1 220px; min-width: 160px; accent-color: #1a5fb4; }
+    .controls output { font-variant-numeric: tabular-nums; min-width: 9ch; }
+    button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
+    :focus-visible { outline: 3px solid #1a5fb4; outline-offset: 2px; }
+    .panel { border: 1px solid #ddd; border-radius: 4px; padding: 0.25rem; }
+    .panel svg { display: block; width: 100%; height: auto; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .row > figure { flex: 1 1 300px; margin: 0; }
+    figure { margin: 0; }
+    figcaption { font-size: 0.85rem; color: #555; margin-top: 0.25rem; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.85rem; margin: 0.35rem 0; padding: 0; list-style: none; }
+    .legend li { display: flex; align-items: center; gap: 0.35rem; }
+    #stats { font-size: 0.95rem; margin-top: 0.75rem; font-variant-numeric: tabular-nums; }
+    #stats .stat { margin-right: 0.5rem; white-space: nowrap; }
+    #stats .stat:not(:last-child)::after { content: " | "; color: #999; font-weight: 400; }
+    #stats .stat-value { font-weight: 600; }
+    .axis text { font-size: 11px; }
+    .axis-label { font-size: 12px; fill: #333; }
+    .bar-label, .bar-value { font-size: 12px; fill: #222; }
+    details { margin-top: 1rem; font-size: 0.9rem; }
+    table { border-collapse: collapse; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+    th, td { border: 1px solid #ccc; padding: 0.2rem 0.5rem; text-align: right; }
+    th { background: #f4f4f4; }
+    tr.current td { font-weight: 700; background: #e8f0fb; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <a class="back" href="../../">&larr; All topics</a>
+  <h1>Bias–Variance Tradeoff with KNN Regression</h1>
+  <p id="instructions" class="instructions">
+    The true function is f(x) = sin(2πx) with noise σ = 0.3, and the n = 100 training inputs x are fixed.
+    Each thin curve is a K-nearest-neighbour fit to a different simulated training set.
+    Drag the slider: small K gives jagged fits that scatter around f (variance); large K gives smooth fits
+    that all miss the peaks in the same way (bias). The bars and the error curves show the exact
+    decomposition, averaged over 2001 test points on [0, 1]. (Lecture notes §4.3; ISL 2.2.2, ESL 7.3.)
+  </p>
+  <p id="a11y-instructions" class="instructions a11y-instructions">
+    Keyboard and screen reader users: Tab to the K slider and use the arrow keys to change K by 1,
+    Shift+arrow or Page Up/Page Down to change it by 10, and Home/End for K = 1 and K = 100.
+    The current numbers are announced in the statistics line below the slider, and each chart's
+    description also contains its numbers. The table under "Show the numbers" lists every value.
+  </p>
+
+  <div class="controls">
+    <label for="k-slider">K (neighbours)</label>
+    <input type="range" id="k-slider" min="1" max="100" step="1" value="10"
+           aria-describedby="instructions a11y-instructions">
+    <output id="k-out" for="k-slider">K = 10</output>
+    <button id="resample" type="button">New training sets</button>
+    <button id="reset" type="button">Reset</button>
+  </div>
+
+  <div id="stats" aria-live="polite" aria-atomic="true">
+    <span class="stat">K = <span id="s-k" class="stat-value">10</span></span>
+    <span class="stat">df = n/K = <span id="s-df" class="stat-value">10</span></span>
+    <span class="stat">bias² = <span id="s-bias" class="stat-value">–</span></span>
+    <span class="stat">variance = <span id="s-var" class="stat-value">–</span></span>
+    <span class="stat">σ² = <span id="s-noise" class="stat-value">0.090</span></span>
+    <span class="stat">test error = <span id="s-test" class="stat-value">–</span></span>
+    <span class="stat">training error = <span id="s-train" class="stat-value">–</span></span>
+  </div>
+
+  <h2>Twenty KNN fits from twenty training sets</h2>
+  <ul class="legend" aria-hidden="true">
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="3"/></svg>true f(x)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="1.2" stroke-opacity="0.6"/></svg>20 fits (thin)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c64600" stroke-width="2.5" stroke-dasharray="6 4"/></svg>average fit E[f̂(x)] (dashed)</li>
+    <li><svg width="30" height="10"><circle cx="15" cy="5" r="3" fill="none" stroke="#555"/></svg>training set 1 (open circles)</li>
+  </ul>
+  <figure class="panel">
+    <div id="fits"></div>
+  </figure>
+
+  <div class="row">
+    <figure>
+      <h2>Error decomposition at this K</h2>
+      <div class="panel" id="bars"></div>
+      <figcaption>Test error = bias² + variance + σ². Each bar is labelled with its value.</figcaption>
+    </figure>
+    <figure>
+      <h2>Test and training error against df = n/K</h2>
+      <ul class="legend" aria-hidden="true">
+        <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c01c28" stroke-width="2.5"/></svg>test error (solid)</li>
+        <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="2.5" stroke-dasharray="6 4"/></svg>training error (dashed)</li>
+        <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#777" stroke-width="1.5" stroke-dasharray="2 3"/></svg>σ² (dotted)</li>
+      </ul>
+      <div class="panel" id="errors"></div>
+      <figcaption>Flexibility increases to the right (log scale). The vertical line marks the current K.</figcaption>
+    </figure>
+  </div>
+
+  <details id="numbers">
+    <summary>Show the numbers</summary>
+    <p>Exact expected values, with the training inputs held fixed. Rows from the lecture table are included; the current K is highlighted.</p>
+    <table>
+      <caption class="sr-only">Bias squared, variance, test error and training error for selected K</caption>
+      <thead><tr><th scope="col">K</th><th scope="col">df = n/K</th><th scope="col">bias²</th><th scope="col">variance σ²/K</th><th scope="col">test error</th><th scope="col">training error</th></tr></thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </details>
+
+  <script src="app.js"></script>
+</body>
+</html>
