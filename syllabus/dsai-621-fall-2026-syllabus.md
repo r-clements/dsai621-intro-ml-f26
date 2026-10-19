@@ -5,27 +5,29 @@
 **Instructor**: Robert Clements  
 **Email**: rclements [at] usfca [dot] edu  
 **Office Hours**: Mon 9:00-9:50; Thurs 3:00-3:50  
-**Required Textbooks (both free!!)**: [Introduction to Statistical Learning](https://www.statlearning.com)(ISL) and [Elements of Statistical Learning](https://hastie.su.domains/ElemStatLearn/)(ESL) 
+**Required Textbooks (both free!!)**: [Introduction to Statistical Learning](https://www.statlearning.com)(ISL) and [Elements of Statistical Learning](https://hastie.su.domains/ElemStatLearn/)(ESL).  
 
 ## Material Covered 
 
 We will cover the following topics, time permitting: 
 
-### Intro to ML — Topics with ESL and ISL Chapters
+### Intro to ML — Topics with ESL and ISL Sections
 
-| # | Topic | ESL Ch. | ISL Ch. |
+Section numbers are from ESL (2nd ed., 12th printing) and ISL (Python edition, ISLP).
+
+| # | Topic | ESL Sections | ISL Sections |
 |---|---|---|---|
-| 1 | Bias-variance tradeoff, curse of dimensionality | 2 | 2 |
-| 2 | Ridge, lasso, elastic net | 3 | 6 |
-| 3 | LDA, QDA, naive Bayes vs. logistic regression | 4 | 4 |
-| 4 | Basis expansions: polynomial regression, splines | 5 | 7 |
-| 5 | Kernel smoothing / local regression | 6 | 7 |
-| 6 | Trees (CART) | 9.2 | 8 |
-| 7 | Bagging and Random Forests | 8.7, 15 | 8 |
-| 8 | Boosting | 10 | 8 |
+| 1 | Bias-variance tradeoff, curse of dimensionality | 2.3–2.5, 2.9, 7.2–7.3 | 2.1–2.2, 3.5 |
+| 2 | Ridge, lasso, elastic net | 3.4.1–3.4.3, 18.4 (elastic net) | 6.2 (elastic net in lab 6.5.2 only) |
+| 3 | LDA, QDA, naive Bayes vs. logistic regression | 4.3, 4.4.5, 6.6.3 | 4.4–4.5 |
+| 4 | Basis expansions: polynomial regression, splines | 5.1–5.5 | 7.1–7.5 |
+| 5 | Kernel smoothing / local regression | 6.1–6.3 | 7.6 |
+| 6 | Trees (CART) | 9.2 | 8.1 |
+| 7 | Bagging and Random Forests | 8.7, 15.1–15.4 | 8.2.1–8.2.2 |
+| 8 | Boosting | 10.1–10.12 | 8.2.3 |
 | 9 | Probability calibration | not covered | not covered |
-| 10 | Clustering: k-means, hierarchical | 14.3 | 12 |
-| 11 | PCA + recommender systems intro | 14.5 | 12 (recommenders not covered) |
+| 10 | Clustering: k-means, hierarchical | 14.3 (14.3.6, 14.3.12) | 12.4 |
+| 11 | PCA + recommender systems intro | 14.5.1 | 12.2, 12.3 (matrix completion and recommender systems) |
 
 
 ## Course Learning Outcomes
@@ -34,7 +36,8 @@ By the end of this course you should understand fundamental machine learning con
 
 ## Attendance and Professionalism
 
-- Attendance is expected and required. If you are sick, you should **not** attend class. Let me know as soon as possible, before class, so that I can excuse you. If you wait until during or after class, you will not be excused. If you are sick multiple days and need to miss class, you must get a doctor's note for those absences to be excused. Assignments still must be turned in on-time. 
+- Obviously, attendance is encouraged in order to participate and engage with the material, and to complete the quizzes on quiz days.  
+- If you are sick, you should **not** attend class or the quiz. There will be an opportunity to replace your lowest quiz grade during finals week. More information about quizzes below.
 
 ### Professionalism
 
@@ -46,58 +49,33 @@ By the end of this course you should understand fundamental machine learning con
 - Cheating on quizzes, in any way, will result in automatically failing the course.  
 - Being unprofessional may result in a written warning. According to official program policy, two written warnings may result in expulsion from the program.
 
-## Homework
+## Problem Sets
 
-- You will be assigned computational and theoretical homework assignments to be completed and turned in on Canvas every Sunday before midnight at 11:59pm Pacific time.  
-- Any homework turned in after the due date and time, but within 24 hours, will have 10% deducted from the grade. Homework turned in between 24 and 48 hours after the due date will have 20% deducted. Assignments turned in after 48 hours after the due date will not be graded and will earn a 0.  
-- Students are encouraged to work together on the assignments, but each student must turn in their own original work. If there is evidence that the work turned in is not original work, which includes copying another student’s homework or using any solutions found online, all credit for that homework set will be forfeited.
+- I will release practice problems and solutions each week which can be worked on and studied to help with the quizzes. They are not required to be turned in, but I highly recommend working through each problem.        
+- Students are encouraged to work together on the problem sets, and use AI whenever it may be helpful. 
 
-## Exams
+## Quizzes
 
-- There will be 2 written exams, tentatively scheduled for: Monday, Nov 16 and Thursday, Dec 10. Details will be discussed in classes leading up to exam dates.
-- No make-up or early exams will be given in order to ensure fairness and integrity of the class. Missing an exam without proper documentation of a personal illness or family emergency will result in a score of zero for that exam. However, if documentation is submitted to the instructor before the exam in question at the student’s earliest convenience, we can arrange to take the midterm remotely at the scheduled time. If the final exam score is higher than the midterm, the midterm grade is replaced by the final exam grade.  
-- Final exams cannot be made up unless due to an emergency. Notify me and the program Director as soon as possible before exam start time, and you will need to provide documentation (such as a doctor's note) and a makeup will be scheduled. Note that the makeup exam may be different in questions and format.
-
-Closed book:
-
-A single 8.5x11 page, front and back, is allowed.
-
-Use of technology:
-
-No technology is allowed. 
-
-On your desk:
-
-Allowed on your desk: the quiz, pencil/pen/eraser, non-alcoholic drink.
-
-Seating:
-
-Seating will be assigned.
-
-Leaving the room:
-
-Bathroom breaks are allowed for one person at a time. You must raise your hand and get approval to go to the bathroom, and leave your devices (phone, laptop, smart watch) on the table. If I see that you are missing and I did not excuse you, I will take your quiz from your desk and grade it as-is.
-
-Questions:
-
-I do not answer any questions during the exam. If you are confused by a question, you must simply do your best. If you run out of space for your answer and need to write on the back or something of that sort, make sure to clearly label your paper.
+- There will be 6 weekly quizzes, plus one optional cumulative bonus quiz during finals week (see below).  
+- Quizzes are to be completed in-person. Tentative quiz dates are Thursday 10/29, Thursday 11/5, Thursday 11/12, Thursday 11/19, Monday 11/30, and Monday 12/7. Bonus quiz date is TBD.  
+- Quizzes cannot be made up, even in cases of illness or emergency. If you miss a quiz, you will receive a 0 for that quiz. A bonus quiz will be offered during finals week. Bonus quiz will be similar in length to the weekly quizzes, but cumulative, and optional. Your score on the bonus quiz will replace your lowest quiz score (including a 0 from a missed quiz), if it is higher.  
+- A hand-written cheat sheet, 8.5x11, one side only, is allowed. No digitally typed or printed cheat sheets are permitted. Cheat sheets will be collected with your quiz and returned before the next quiz. Be sure to include your name on the cheat sheet.   
+- Quizzes will be administered on paper. No phones, smartwatches, calculators, other devices, or internet access are permitted.  
+- I will not be able to answer content questions during the quiz, to keep the testing environment consistent for everyone. If you believe a question is unclear or contains an error, note it on your quiz and I will review it afterward.  
+- Please use the restroom before the quiz — quizzes are timed and *very* short, and you will not have time to leave and return.
 
 
 ## Course Website
 
-The class will be using Github to distribute all resources and Gradescope (https://gradescope.com/) to collect homework assignments. Exams will be uploaded to Gradescope. You will receive an email from the site allowing you to register. Please do not try to register on your own.
+The class will be using Github to distribute all resources and Gradescope (https://gradescope.com/) for grading quizzes. Quizzes will be uploaded to Gradescope. 
 
 ## Grades
 
 The grade breakdown is as follows:
 
-Participation/professionalism (5%)
+Quizzes (best 6 out of 7 quiz scores) - 100%
 
-Homework (20%)
-
-Midterm Exam (30%)
-
-Final Exam (45%)
+Each quiz has equal weight (~16.7%).
 
 Course Grade Cutoffs***:
 
@@ -118,7 +96,7 @@ F 0 - 70
 
 ### Regrades
 
-If you have a legitimate appeal about a grade on an exam, please send me an email, with justification, within 5 days of receiving the graded exam. Do not approach me to verbally discuss it, I will not. Do not simply submit a regrade request in Gradescope, I may not even see it. If your appeal has merit, your entire exam will be completely re-graded, which means that your final grade on the exam may end up being lower, the same, or higher than the initial grade given. For simple mistakes your exam will not be re-graded, I'll just fix the issue.
+If you have a legitimate appeal about a grade on a quiz, please send me an email, with justification, within 5 days of receiving the graded quiz. Do not approach me to verbally discuss it, I will not. Do not simply submit a regrade request in Gradescope, I may not even see it. If your appeal has merit, your entire quiz will be completely re-graded, which means that your final grade on the quiz may end up being lower, the same, or higher than the initial grade given. For simple mistakes your quiz will not be re-graded, I'll just fix the issue.
 
 ## Program Learning Outcomes
 
