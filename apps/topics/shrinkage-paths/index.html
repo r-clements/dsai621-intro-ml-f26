@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Shrinkage: Ridge, Lasso and Elastic Net — DSAI 621</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    :root { color-scheme: light; }
+    [hidden] { display: none !important; }
+    .controls.off label, .controls.off output { color: #999; }
+    body {
+      background: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      max-width: 760px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #222;
+    }
+    a.back { font-size: 0.9rem; color: #1a5fb4; text-decoration: none; }
+    a.back:hover { text-decoration: underline; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1rem; margin: 1rem 0 0.25rem; }
+    p.instructions { color: #555; font-size: 0.95rem; margin-top: 0; }
+    p.a11y-instructions {
+      border-left: 3px solid #1a5fb4;
+      padding-left: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    [role=tablist] { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 2px solid #1a5fb4; margin-top: 1rem; }
+    [role=tab] {
+      padding: 0.45rem 0.8rem; font-size: 0.95rem; cursor: pointer;
+      border: 1px solid #ccc; border-bottom: none; border-radius: 4px 4px 0 0; background: #f4f4f4; color: #222;
+    }
+    [role=tab][aria-selected=true] { background: #1a5fb4; color: #fff; border-color: #1a5fb4; font-weight: 600; }
+    [role=tabpanel] { padding-top: 0.5rem; }
+    .controls {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem;
+      margin: 0.6rem 0;
+    }
+    .controls label, .controls legend { font-weight: 600; }
+    .controls input[type=range] { flex: 1 1 200px; min-width: 150px; accent-color: #1a5fb4; }
+    .controls output { font-variant-numeric: tabular-nums; min-width: 10ch; }
+    fieldset { border: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; align-items: center; }
+    fieldset label { font-weight: 400; }
+    button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
+    :focus-visible { outline: 3px solid #1a5fb4; outline-offset: 2px; }
+    .panel { border: 1px solid #ddd; border-radius: 4px; padding: 0.25rem; }
+    .panel svg { display: block; width: 100%; height: auto; }
+    figure { margin: 0.25rem 0 0; }
+    figcaption { font-size: 0.85rem; color: #555; margin-top: 0.25rem; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.85rem; margin: 0.35rem 0; padding: 0; list-style: none; }
+    .legend li { display: flex; align-items: center; gap: 0.35rem; }
+    .stats { font-size: 0.95rem; margin-top: 0.6rem; font-variant-numeric: tabular-nums; }
+    .stats .stat { margin-right: 0.5rem; white-space: nowrap; }
+    .stats .stat:not(:last-child)::after { content: " | "; color: #999; font-weight: 400; }
+    .stats .stat-value { font-weight: 600; }
+    .axis text { font-size: 11px; }
+    .axis-label { font-size: 12px; fill: #333; }
+    .line-label { font-size: 11px; }
+    .ols-point { cursor: grab; }
+    .ols-point:focus { outline: none; }
+    .ols-point:focus .ring { stroke: #000; stroke-width: 2.5px; }
+    details { margin-top: 1rem; font-size: 0.9rem; }
+    table { border-collapse: collapse; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+    th, td { border: 1px solid #ccc; padding: 0.2rem 0.5rem; text-align: right; }
+    th { background: #f4f4f4; }
+    td.zero { font-weight: 700; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <a class="back" href="../../">&larr; All topics</a>
+  <h1>Shrinkage: Ridge, Lasso and Elastic Net</h1>
+  <p id="instructions" class="instructions">
+    Penalize the size of the coefficients and they shrink toward zero. (Lecture notes §2–§5; ISL 6.2, ESL 3.4.)
+  </p>
+  <p id="a11y-instructions" class="instructions a11y-instructions">
+    Keyboard: Left/Right arrow switches tabs. Sliders step with the arrow keys (Shift for ×10).
+    In Geometry, Tab to the OLS point and move it with the arrow keys. Each chart's description lists its numbers.
+  </p>
+
+  <div role="tablist" aria-label="Views">
+    <button role="tab" id="tab-paths" aria-controls="panel-paths" aria-selected="true">Paths</button>
+    <button role="tab" id="tab-geom" aria-controls="panel-geom" aria-selected="false" tabindex="-1">Geometry</button>
+  </div>
+
+  <!-- ================= Paths ================= -->
+  <section role="tabpanel" id="panel-paths" aria-labelledby="tab-paths">
+    <p class="instructions" id="paths-help">
+      Move λ; large λ is on the left. Simulated data, n = 60, six standardized predictors; true coefficients (3, −2, 1.5, 0, 0, 0.5).
+    </p>
+    <div class="controls">
+      <fieldset>
+        <legend>Method</legend>
+        <label><input type="radio" name="method" value="ridge"> Ridge</label>
+        <label><input type="radio" name="method" value="lasso" checked> Lasso</label>
+        <label><input type="radio" name="method" value="enet"> Elastic net</label>
+      </fieldset>
+    </div>
+    <div class="controls">
+      <label for="lam-slider">λ</label>
+      <input type="range" id="lam-slider" min="0" max="120" step="1" value="60" aria-describedby="paths-help">
+      <output id="lam-out" for="lam-slider">λ = –</output>
+    </div>
+    <div class="controls" id="rho-row">
+      <label for="rho-slider">mix ρ</label>
+      <input type="range" id="rho-slider" min="0.05" max="0.95" step="0.05" value="0.5" disabled>
+      <output id="rho-out" for="rho-slider">ρ = 0.5</output>
+    </div>
+    <div class="controls">
+      <label><input type="checkbox" id="dup-toggle"> Add x7, a near-copy of x1</label>
+      <button id="best-lam" type="button">Best λ</button>
+      <button id="new-data" type="button">New data</button>
+      <button id="reset-paths" type="button">Reset</button>
+    </div>
+
+    <div id="paths-stats" class="stats" aria-live="polite" aria-atomic="true">
+      <span class="stat">non-zero = <span id="s-nz" class="stat-value">–</span></span>
+      <span class="stat">training MSE = <span id="s-train" class="stat-value">–</span></span>
+      <span class="stat">test MSE = <span id="s-test" class="stat-value">–</span></span>
+    </div>
+
+    <figure class="panel"><div id="paths"></div></figure>
+    <figure class="panel"><div id="errors"></div></figure>
+
+    <details>
+      <summary>Show the numbers</summary>
+      <p id="paths-extra"></p>
+      <table>
+        <caption class="sr-only">Coefficients at the current λ</caption>
+        <thead><tr><th scope="col">predictor</th><th scope="col">true</th><th scope="col">OLS</th><th scope="col">current fit</th></tr></thead>
+        <tbody id="coef-body"></tbody>
+      </table>
+    </details>
+  </section>
+
+  <!-- ================= Geometry ================= -->
+  <section role="tabpanel" id="panel-geom" aria-labelledby="tab-geom" hidden>
+    <p class="instructions" id="geom-help">
+      Drag the OLS point. The solution is where the RSS contours first touch the shaded region.
+    </p>
+    <div class="controls">
+      <fieldset>
+        <legend>Region</legend>
+        <label><input type="radio" name="gmethod" value="ridge"> Ridge</label>
+        <label><input type="radio" name="gmethod" value="lasso" checked> Lasso</label>
+        <label><input type="radio" name="gmethod" value="enet"> Elastic net</label>
+      </fieldset>
+    </div>
+    <div class="controls">
+      <label for="t-slider">budget t</label>
+      <input type="range" id="t-slider" min="0.1" max="3" step="0.05" value="1.2" aria-describedby="geom-help">
+      <output id="t-out" for="t-slider">t = 1.20</output>
+    </div>
+    <div class="controls">
+      <label for="r-slider">correlation r</label>
+      <input type="range" id="r-slider" min="-0.99" max="0.99" step="0.01" value="0.5" aria-describedby="geom-help">
+      <output id="r-out" for="r-slider">r = 0.50</output>
+    </div>
+    <div class="controls" id="grho-row">
+      <label for="grho-slider">mix ρ</label>
+      <input type="range" id="grho-slider" min="0.05" max="0.95" step="0.05" value="0.5" disabled>
+      <output id="grho-out" for="grho-slider">ρ = 0.5</output>
+    </div>
+    <div class="controls"><button id="reset-geom" type="button">Reset</button></div>
+    <div id="geom-stats" class="stats" aria-live="polite" aria-atomic="true">
+      <span class="stat">solution = <span id="g-sol" class="stat-value">–</span></span>
+      <span class="stat"><span id="g-msg" class="stat-value">–</span></span>
+    </div>
+    <figure class="panel"><div id="geom"></div></figure>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
