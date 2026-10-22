@@ -68,4 +68,4 @@ uv sync
 
 ## Quizzes
 
-Six in-class quizzes (tentative): Thu 10/29, Thu 11/5, Thu 11/12, Thu 11/19, Mon 11/30 and Mon 12/7, plus an optional cumulative bonus quiz during finals week. See the [syllabus](syllabus/dsai-621-fall-2026-syllabus.md) for details.
+Six in-class quizzes (tentative): Quiz 1 TBD, then Thu 11/5, Thu 11/12, Thu 11/19, Mon 11/30 and Mon 12/7, plus an optional cumulative bonus quiz during finals week. See the [syllabus](syllabus/dsai-621-fall-2026-syllabus.md) for details.

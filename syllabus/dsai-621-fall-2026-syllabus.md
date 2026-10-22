@@ -57,7 +57,7 @@ By the end of this course you should understand fundamental machine learning con
 ## Quizzes
 
 - There will be 6 weekly quizzes, plus one optional cumulative bonus quiz during finals week (see below).  
-- Quizzes are to be completed in-person. Tentative quiz dates are Thursday 10/29, Thursday 11/5, Thursday 11/12, Thursday 11/19, Monday 11/30, and Monday 12/7. Bonus quiz date is TBD.  
+- Quizzes are to be completed in-person. Tentative quiz dates are TBD (Quiz 1), Thursday 11/5, Thursday 11/12, Thursday 11/19, Monday 11/30, and Monday 12/7. Bonus quiz date is TBD.  
 - Quizzes cannot be made up, even in cases of illness or emergency. If you miss a quiz, you will receive a 0 for that quiz. A bonus quiz will be offered during finals week. Bonus quiz will be similar in length to the weekly quizzes, but cumulative, and optional. Your score on the bonus quiz will replace your lowest quiz score (including a 0 from a missed quiz), if it is higher.  
 - A hand-written cheat sheet, 8.5x11, one side only, is allowed. No digitally typed or printed cheat sheets are permitted. Cheat sheets will be collected with your quiz and returned before the next quiz. Be sure to include your name on the cheat sheet.   
 - Quizzes will be administered on paper. No phones, smartwatches, calculators, other devices, or internet access are permitted.  
