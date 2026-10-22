@@ -1,5 +1,24 @@
 # Introduction to Machine Learning - DSAI 621
 
+## This Week: Week 1 (Thu 10/22)
+
+**Topic:** What is machine learning? The bias-variance tradeoff and the curse of dimensionality.
+
+**Read:** ISL 2.1–2.2 and 3.5; ESL 2.1–2.5 and 7.2–7.3.
+
+**Work on:**
+- [Practice Problems 1](problem_sets/PP1.pdf) ([solutions](problem_sets/PP1_sol.pdf)). These aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
+- Interactive demo: [Bias–Variance Tradeoff with KNN Regression](https://robertclements.org/dsai621-intro-ml-f26/topics/bias-variance-knn/)
+
+**Coming up:** Quiz 1 is in class on **TBD**. Bring your hand-written cheat sheet (8.5x11, one side).
+
+<details>
+<summary>Past weeks</summary>
+
+*Nothing yet.*
+
+</details>
+
 ## Robert Clements
 
 **Email**: rclements [at] usfca [dot] edu
@@ -26,6 +45,7 @@ uv sync
 ## What's Here
 
 - `notes/`: class notes (handwritten scans plus accessible HTML versions)
+- `problem_sets/`: weekly practice problems and solutions
 - `notebooks/`: lab notebooks
 - `data/`: datasets
 - `apps/`: interactive demos, also published on GitHub Pages
@@ -46,6 +66,6 @@ uv sync
 | 10 | Clustering: k-means, hierarchical | 14.3 | 12 |
 | 11 | PCA + recommender systems intro | 14.5 | 12 |
 
-## Exams
+## Quizzes
 
-Midterm: Monday, Nov 16. Final: Thursday, Dec 10.
+Six in-class quizzes (tentative): Thu 10/29, Thu 11/5, Thu 11/12, Thu 11/19, Mon 11/30 and Mon 12/7, plus an optional cumulative bonus quiz during finals week. See the [syllabus](syllabus/dsai-621-fall-2026-syllabus.md) for details.
