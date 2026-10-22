@@ -12,6 +12,8 @@
       margin: 2rem auto;
       padding: 0 1rem;
       color: #222;
+      background: #fff;
+      color-scheme: light;
     }
     a.back { font-size: 0.9rem; color: #1a5fb4; text-decoration: none; }
     a.back:hover { text-decoration: underline; }
@@ -47,15 +49,10 @@
     .axis text { font-size: 11px; }
     .axis-label { font-size: 12px; fill: #333; }
     .bar-label, .bar-value { font-size: 12px; fill: #222; }
-    details { margin-top: 1rem; font-size: 0.9rem; }
-    table { border-collapse: collapse; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
-    th, td { border: 1px solid #ccc; padding: 0.2rem 0.5rem; text-align: right; }
-    th { background: #f4f4f4; }
-    tr.current td { font-weight: 700; background: #e8f0fb; }
-    .sr-only {
-      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-    }
+    fieldset.view { border: none; padding: 0; margin: 0 0 0.75rem; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; align-items: center; }
+    fieldset.view legend { font-weight: 600; float: left; margin-right: 0.5rem; padding: 0; }
+    fieldset.view label { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+    .legend li[hidden] { display: none; }
   </style>
 </head>
 <body>
@@ -63,7 +60,8 @@
   <h1>Bias–Variance Tradeoff with KNN Regression</h1>
   <p id="instructions" class="instructions">
     The true function is f(x) = sin(2πx) with noise σ = 0.3, and the n = 100 training inputs x are fixed.
-    Each thin curve is a K-nearest-neighbour fit to a different simulated training set.
+    Each thin curve is a K-nearest-neighbour fit to a different simulated training set; choose
+    "One fit" to see a single fit drawn through its training data.
     Drag the slider: small K gives jagged fits that scatter around f (variance); large K gives smooth fits
     that all miss the peaks in the same way (bias). The bars and the error curves show the exact
     decomposition, averaged over 2001 test points on [0, 1]. (Lecture notes §4.3; ISL 2.2.2, ESL 7.3.)
@@ -71,8 +69,9 @@
   <p id="a11y-instructions" class="instructions a11y-instructions">
     Keyboard and screen reader users: Tab to the K slider and use the arrow keys to change K by 1,
     Shift+arrow or Page Up/Page Down to change it by 10, and Home/End for K = 1 and K = 100.
+    Use the arrow keys in the "Show" group to switch between one fit and 20 fits.
     The current numbers are announced in the statistics line below the slider, and each chart's
-    description also contains its numbers. The table under "Show the numbers" lists every value.
+    description also contains its numbers.
   </p>
 
   <div class="controls">
@@ -94,12 +93,18 @@
     <span class="stat">training error = <span id="s-train" class="stat-value">–</span></span>
   </div>
 
-  <h2>Twenty KNN fits from twenty training sets</h2>
+  <h2 id="fits-heading">Twenty KNN fits from twenty training sets</h2>
+  <fieldset class="view">
+    <legend>Show:</legend>
+    <label><input type="radio" name="view" value="one"> One fit</label>
+    <label><input type="radio" name="view" value="many" checked> 20 fits</label>
+  </fieldset>
   <ul class="legend" aria-hidden="true">
     <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="3"/></svg>true f(x)</li>
-    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="1.2" stroke-opacity="0.6"/></svg>20 fits (thin)</li>
-    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c64600" stroke-width="2.5" stroke-dasharray="6 4"/></svg>average fit E[f̂(x)] (dashed)</li>
-    <li><svg width="30" height="10"><circle cx="15" cy="5" r="3" fill="none" stroke="#555"/></svg>training set 1 (open circles)</li>
+    <li data-view="many"><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="1.2" stroke-opacity="0.6"/></svg>20 fits (thin)</li>
+    <li data-view="one" hidden><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="2.5"/></svg>KNN fit (step curve)</li>
+    <li data-view="many"><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c64600" stroke-width="2.5" stroke-dasharray="6 4"/></svg>average fit E[f̂(x)] (dashed)</li>
+    <li><svg width="30" height="10"><circle cx="15" cy="5" r="3" fill="none" stroke="#555"/></svg><span id="points-legend">training set 1 (open circles)</span></li>
   </ul>
   <figure class="panel">
     <div id="fits"></div>
@@ -123,15 +128,6 @@
     </figure>
   </div>
 
-  <details id="numbers">
-    <summary>Show the numbers</summary>
-    <p>Exact expected values, with the training inputs held fixed. Rows from the lecture table are included; the current K is highlighted.</p>
-    <table>
-      <caption class="sr-only">Bias squared, variance, test error and training error for selected K</caption>
-      <thead><tr><th scope="col">K</th><th scope="col">df = n/K</th><th scope="col">bias²</th><th scope="col">variance σ²/K</th><th scope="col">test error</th><th scope="col">training error</th></tr></thead>
-      <tbody id="table-body"></tbody>
-    </table>
-  </details>
 
   <script src="app.js"></script>
 </body>

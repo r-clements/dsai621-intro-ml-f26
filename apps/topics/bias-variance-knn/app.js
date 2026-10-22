@@ -44,7 +44,6 @@ const SIGMA2 = SIGMA * SIGMA;
 const N_SETS = 20;
 const N_TEST = 2001;      // test grid for bias² and test error, as in the lecture table
 const N_PLOT = 501;       // grid for drawing the fitted curves
-const TABLE_KS = [1, 3, 5, 10, 25, 50, 100];
 const f = x => Math.sin(2 * Math.PI * x);
 
 // ---------- seeded RNG (mulberry32 + Box–Muller) ----------
@@ -297,16 +296,6 @@ const markerTrain = marker.append("rect").attr("width", 9).attr("height", 9)
   .attr("fill", "#1a5fb4").attr("stroke", "#fff").attr("stroke-width", 1.5);
 const markerLabel = marker.append("text").attr("class", "bar-label").attr("y", me.top + 10);
 
-// ---------- table ----------
-function renderTable(K) {
-  const rows = Array.from(new Set([...TABLE_KS, K])).sort((a, b) => a - b);
-  d3.select("#table-body").selectAll("tr").data(rows, d => d).join("tr")
-    .classed("current", d => d === K)
-    .html(d => `<th scope="row">${d}${d === K ? " (current)" : ""}</th>` +
-      `<td>${fmtDf(N / d)}</td><td>${fmt3(bias2[d])}</td><td>${fmt3(variance(d))}</td>` +
-      `<td>${fmt3(testErr(d))}</td><td>${fmt3(trainErr[d])}</td>`);
-}
-
 // ---------- update ----------
 const slider = document.getElementById("k-slider");
 const statsEl = document.getElementById("stats");
@@ -319,14 +308,18 @@ function update() {
     bias: bias2[K], var: variance(K), noise: SIGMA2, test: testErr(K), train: trainErr[K],
   };
 
-  // Main panel
+  // Main panel. "One fit" shows training set 1 and its fit alone; "20 fits" adds the rest
+  // and the average fit.
+  const one = viewMode() === "one";
   pointLayer.selectAll("circle").data(ySets[0]).join("circle")
-    .attr("cx", (d, i) => xS(X_FIXED[i])).attr("cy", d => yS(d)).attr("r", 2.6)
-    .attr("fill", "none").attr("stroke", "#555").attr("stroke-width", 1);
-  fitLayer.selectAll("path").data(fitsByK).join("path")
-    .attr("fill", "none").attr("stroke", "#1a5fb4").attr("stroke-width", 1.1).attr("stroke-opacity", 0.55)
+    .attr("cx", (d, i) => xS(X_FIXED[i])).attr("cy", d => yS(d)).attr("r", one ? 3.2 : 2.6)
+    .attr("fill", "none").attr("stroke", one ? "#333" : "#555").attr("stroke-width", one ? 1.3 : 1);
+  fitLayer.selectAll("path").data(one ? fitsByK.slice(0, 1) : fitsByK).join("path")
+    .attr("fill", "none").attr("stroke", "#1a5fb4")
+    .attr("stroke-width", one ? 2.5 : 1.1).attr("stroke-opacity", one ? 1 : 0.55)
     .attr("d", set => stepLine(set.map(m => m[K - 1])));
-  meanPath.attr("d", stepLine(meanFitByK.map(m => m[K - 1])));
+  meanPath.attr("d", stepLine(meanFitByK.map(m => m[K - 1])))
+    .attr("display", one ? "none" : null);
   // Spread of the 20 fits, averaged over x: an empirical check on σ²/K.
   let spread = 0;
   for (let j = 0; j < N_PLOT; j++) {
@@ -334,6 +327,22 @@ function update() {
     spread += d3.variance(vals);
   }
   spread /= N_PLOT;
+  if (one) {
+    const fit = fitsByK[0];
+    let mse = 0;
+    for (let j = 0; j < N_PLOT; j++) mse += (fit[j][K - 1] - f(plotX[j])) ** 2;
+    mse /= N_PLOT;
+    fitsTitle.text(`One KNN fit with K = ${K}, and the true function f(x) = sin(2πx)`);
+    fitsDesc.text(
+      `x from 0 to 1, y from −2 to 2. The thick black curve is sin(2πx), one full wave peaking at 1 near x = 0.25 ` +
+      `and bottoming at −1 near x = 0.75. Open circles are the ${N} training points. The blue step curve is the ` +
+      `KNN fit with K = ${K}: at each x it is the average y of the ${K} nearest training point${K === 1 ? "" : "s"}, so it is flat ` +
+      `between jumps. ` +
+      (K === 1 ? "With K = 1 it passes through every training point. "
+        : K >= 40 ? "With this many neighbours it is nearly flat and misses the peak and trough. "
+        : "") +
+      `Average squared gap between this fit and the true curve: ${fmt3(mse)}.`);
+  } else {
   fitsTitle.text(`Twenty KNN fits with K = ${K}, and the true function f(x) = sin(2πx)`);
   fitsDesc.text(
     `x from 0 to 1, y from −2 to 2. The thick black curve is sin(2πx), one full wave peaking at 1 near x = 0.25 ` +
@@ -344,6 +353,7 @@ function update() {
       : "The fits follow the wave with moderate scatter. ") +
     `Average squared gap between the dashed curve and the true curve (bias squared): ${fmt3(v.bias)}. ` +
     `Variance of the 20 fits around each other, averaged over x: ${fmt3(spread)} (theory: ${fmt3(v.var)}).`);
+  }
 
   // Bars
   barRects.attr("width", b => barX(v[b.key]) - barX(0));
@@ -373,7 +383,6 @@ function update() {
   // Stats line and slider text
   document.getElementById("k-out").textContent = `K = ${K}`;
   slider.setAttribute("aria-valuetext", `K = ${K}, df ${fmtDf(df)}`);
-  renderTable(K);
 
   // Debounce the live region so dragging doesn't flood a screen reader.
   clearTimeout(liveTimer);
@@ -389,6 +398,23 @@ function update() {
   statsEl.dataset.ready = "1";
 }
 
+function viewMode() {
+  return document.querySelector('input[name="view"]:checked').value;
+}
+function setView() {
+  const one = viewMode() === "one";
+  document.getElementById("fits-heading").textContent =
+    one ? "One KNN fit to one training set" : "Twenty KNN fits from twenty training sets";
+  document.querySelectorAll(".legend li[data-view]").forEach(li => {
+    li.hidden = li.dataset.view !== (one ? "one" : "many");
+  });
+  document.getElementById("points-legend").textContent =
+    one ? "training data (open circles)" : "training set 1 (open circles)";
+  document.getElementById("resample").textContent = one ? "New training set" : "New training sets";
+  update();
+}
+document.querySelectorAll('input[name="view"]').forEach(r => r.addEventListener("change", setView));
+
 slider.addEventListener("input", update);
 // Shift+arrow moves K by 10 (Page Up/Down, Home/End work natively).
 slider.addEventListener("keydown", event => {
@@ -401,7 +427,9 @@ slider.addEventListener("keydown", event => {
 });
 document.getElementById("resample").addEventListener("click", () => { seed += 1; simulate(); update(); });
 document.getElementById("reset").addEventListener("click", () => {
-  seed = 1; slider.value = 10; simulate(); update();
+  seed = 1; slider.value = 10;
+  document.querySelector('input[name="view"][value="many"]').checked = true;
+  simulate(); setView();
 });
 
 simulate();
