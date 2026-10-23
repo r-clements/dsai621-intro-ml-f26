@@ -464,18 +464,20 @@ const rSlider = document.getElementById("r-slider");
 const gRhoOf = () => ({ ridge: 0, lasso: 1, enet: +grhoSlider.value }[gMethodOf()]);
 
 const penalty = (b, rho) => rho * (Math.abs(b[0]) + Math.abs(b[1])) + (1 - rho) / 2 * (b[0] ** 2 + b[1] ** 2);
-const quad = (b, r) => {
-  const d0 = b[0] - bhat[0], d1 = b[1] - bhat[1];
+const quadAt = (b, bh, r) => {
+  const d0 = b[0] - bh[0], d1 = b[1] - bh[1];
   return d0 * d0 + 2 * r * d0 * d1 + d1 * d1;
 };
+const quad = (b, r) => quadAt(b, bhat, r);
 
-// Exact minimizer of ½(β−b̂)ᵀA(β−b̂) + μ P(β) in 2-D: try every support and sign pattern, keep the
-// candidates whose signs agree, and take the one with the smallest objective (the problem is convex).
-function penalized2(mu, rho, r) {
+// Exact minimizer of ½(β−b̂)ᵀA(β−b̂) + μ P(β) in 2-D, for OLS point bh: try every support and sign
+// pattern, keep the candidates whose signs agree, and take the one with the smallest objective
+// (the problem is convex). Used by the Geometry view (with bisection on μ) and the Loss view.
+function penalized2(mu, rho, r, bh = bhat) {
   const A = [[1, r], [r, 1]];
-  const Ab = [bhat[0] + r * bhat[1], r * bhat[0] + bhat[1]];
+  const Ab = [bh[0] + r * bh[1], r * bh[0] + bh[1]];
   const l1 = mu * rho, l2 = mu * (1 - rho);
-  const obj = b => 0.5 * quad(b, r) + mu * penalty(b, rho);
+  const obj = b => 0.5 * quadAt(b, bh, r) + mu * penalty(b, rho);
   let best = [0, 0], bestVal = obj(best);
   for (const j of [0, 1]) {
     for (const s of [1, -1]) {
@@ -610,6 +612,151 @@ document.getElementById("reset-geom").addEventListener("click", () => {
 });
 
 // =====================================================================
+// Loss view: level curves of the penalized loss
+//   L(β) = ½(β − b̂)ᵀR(β − b̂) + λ[ρ|β|₁ + (1−ρ)/2 |β|²],   R = [[1, r], [r, 1]].
+// For two standardized predictors this is the Paths view's loss (1/2n)RSS + λ·penalty up to an
+// additive constant, so λ means the same thing in both views.
+// =====================================================================
+const LW = 520, LH = 520, LM = 34, LLIM = 3.2, LGRID = 161, LAM_MAX = 4;
+const L_OLS = [1.0, 2.6];
+const lossSvg = d3.select("#loss").append("svg").attr("viewBox", `0 0 ${LW} ${LH}`).attr("role", "img")
+  .style("max-width", "520px").style("margin", "0 auto");
+const lossTitle = lossSvg.append("title").attr("id", "loss-title");
+const lossDesc = lossSvg.append("desc").attr("id", "loss-desc");
+lossSvg.attr("aria-labelledby", "loss-title loss-desc");
+const lx = d3.scaleLinear().domain([-LLIM, LLIM]).range([LM, LW - LM]);
+const ly = d3.scaleLinear().domain([-LLIM, LLIM]).range([LH - LM, LM]);
+lossSvg.append("defs").append("clipPath").attr("id", "loss-clip").append("rect")
+  .attr("x", LM).attr("y", LM).attr("width", LW - 2 * LM).attr("height", LH - 2 * LM);
+const lossClip = lossSvg.append("g").attr("clip-path", "url(#loss-clip)");
+const fillLayer = lossClip.append("g");
+const lineLayer = lossClip.append("g");
+lossSvg.append("g").attr("class", "axis").attr("transform", `translate(0,${ly(0)})`)
+  .call(d3.axisBottom(lx).ticks(6).tickFormat(v => (v === 0 ? "" : minus(v))));
+lossSvg.append("g").attr("class", "axis").attr("transform", `translate(${lx(0)},0)`)
+  .call(d3.axisLeft(ly).ticks(6).tickFormat(v => (v === 0 ? "" : minus(v))));
+lossSvg.append("text").attr("class", "axis-label").attr("x", LW - LM).attr("y", ly(0) - 6).attr("text-anchor", "end").text("β₁");
+lossSvg.append("text").attr("class", "axis-label").attr("x", lx(0) + 6).attr("y", LM + 4).text("β₂");
+const lossPath = lossSvg.append("path").attr("fill", "none").attr("stroke", "#c64600").attr("stroke-width", 2)
+  .attr("stroke-dasharray", "6 4");
+lossSvg.append("circle").attr("cx", lx(L_OLS[0])).attr("cy", ly(L_OLS[1])).attr("r", 7)
+  .attr("fill", "#fff").attr("stroke", "#c01c28").attr("stroke-width", 2.5);
+lossSvg.append("text").attr("class", "line-label").style("font-weight", 600)
+  .attr("x", lx(L_OLS[0]) + 10).attr("y", ly(L_OLS[1]) - 10).text("OLS (λ = 0)");
+const lossMin = lossSvg.append("rect").attr("width", 11).attr("height", 11).attr("fill", "#111")
+  .attr("stroke", "#fff").attr("stroke-width", 1.5);
+const lossMinLabel = lossSvg.append("text").attr("class", "line-label").style("font-weight", 600).text("minimum");
+
+const lMethodOf = () => document.querySelector("input[name=lmethod]:checked").value;
+const lrhoSlider = document.getElementById("lrho-slider");
+const llamSlider = document.getElementById("llam-slider");
+const lrSlider = document.getElementById("lr-slider");
+const lRhoOf = () => ({ ridge: 0, lasso: 1, enet: +lrhoSlider.value }[lMethodOf()]);
+const lossAt = (b, lam, rho, r) => 0.5 * quadAt(b, L_OLS, r) + lam * penalty(b, rho);
+// One fixed colour scale for every λ, so a rising loss shows up as a lighter surface (not just a
+// shifted one). Levels 0, 0.25, 1, 2.25, … , 90.25 are evenly spaced on the square-root scale used
+// for the colours, so each band is one equal colour step. (The loss stays below about 91 on this
+// plot for every method, λ ≤ 4 and |r| ≤ 0.99.)
+const LVMAX = 90.25;
+const LLEVELS = d3.range(0, 20).map(k => 0.25 * k * k);
+const LCOLOR = v => d3.interpolateBlues(0.8 - 0.75 * Math.sqrt(Math.min(v, LVMAX) / LVMAX));   // darker = lower
+
+// Colour legend: a bar on the same square-root scale, with a marker at the current minimum loss.
+const KW = 520, KH = 72, KM = { left: 34, right: 34 };
+const keySvg = d3.select("#loss-legend").append("svg").attr("viewBox", `0 0 ${KW} ${KH}`).attr("role", "img")
+  .style("max-width", "520px").style("margin", "0 auto");
+const keyTitle = keySvg.append("title").attr("id", "key-title");
+keySvg.attr("aria-labelledby", "key-title");
+const kx = d3.scaleSqrt().domain([0, LVMAX]).range([KM.left, KW - KM.right]);
+keySvg.selectAll("rect.band").data(LLEVELS).join("rect").attr("class", "band")
+  .attr("x", v => kx(v)).attr("y", 20).attr("height", 14)
+  .attr("width", (v, i) => kx(i + 1 < LLEVELS.length ? LLEVELS[i + 1] : LVMAX) - kx(v))
+  .attr("fill", v => LCOLOR(v)).attr("stroke", "#334").attr("stroke-width", 0.4);
+keySvg.append("g").attr("class", "axis").attr("transform", "translate(0,34)")
+  .call(d3.axisBottom(kx).tickValues([0, 1, 4, 9, 16, 25, 36, 49, 64, 81]).tickSize(4));
+keySvg.append("text").attr("class", "axis-label").attr("x", KW / 2).attr("y", 68).attr("text-anchor", "middle")
+  .text("loss, square-root scale (darker = lower)");
+const keyMark = keySvg.append("path").attr("d", "M0,0 L-6,-9 L6,-9 Z").attr("fill", "#111");
+const keyMarkLabel = keySvg.append("text").attr("class", "line-label").style("font-weight", 600).attr("y", 12);
+
+let lossLive = null;
+function updateLoss() {
+  const method = lMethodOf(), rho = lRhoOf(), lam = +llamSlider.value, r = +lrSlider.value;
+  setMixControl("lrho", method);
+  document.getElementById("lrho-out").textContent = `ρ = ${rho}`;
+  document.getElementById("llam-out").textContent = `λ = ${fmt2(lam)}`;
+  document.getElementById("lr-out").textContent = `r = ${minus(fmt2(r))}`;
+
+  // Loss on a grid, then filled level sets at the fixed levels LLEVELS (absolute loss values).
+  const b = penalized2(lam, rho, r, L_OLS).map(v => (Math.abs(v) < 1e-9 ? 0 : v));
+  const lmin = lossAt(b, lam, rho, r);
+  const vals = new Float64Array(LGRID * LGRID);
+  for (let i = 0; i < LGRID; i++) {
+    const b2 = LLIM - (2 * LLIM * i) / (LGRID - 1);
+    for (let j = 0; j < LGRID; j++) {
+      const b1 = -LLIM + (2 * LLIM * j) / (LGRID - 1);
+      vals[i * LGRID + j] = lossAt([b1, b2], lam, rho, r);
+    }
+  }
+  const gscale = (LW - 2 * LM) / (LGRID - 1);
+  // d3.contours places sample j at grid coordinate j + 0.5, so shift back half a cell.
+  const proj = d3.geoTransform({ point(x, y) { this.stream.point(LM + (x - 0.5) * gscale, LM + (y - 0.5) * gscale); } });
+  const geoPath = d3.geoPath(proj);
+  // A filled contour at level v covers the region where loss ≥ v; drawing them in increasing order
+  // leaves each band [v_k, v_k+1) in the colour of v_k.
+  const conts = d3.contours().size([LGRID, LGRID]).thresholds(LLEVELS)(vals);
+  fillLayer.selectAll("path").data(conts).join("path")
+    .attr("d", geoPath).attr("fill", d => LCOLOR(d.value)).attr("stroke", "none");
+  lineLayer.selectAll("path").data(conts.slice(1)).join("path")
+    .attr("d", geoPath).attr("fill", "none").attr("stroke", "#334").attr("stroke-width", 0.8)
+    .attr("stroke-opacity", 0.55);
+
+  // Path of the minimizer as λ runs from 0 to LAM_MAX (recomputed each time; 201 tiny solves).
+  const pathPts = d3.range(0, 201).map(k => penalized2((LAM_MAX * k) / 200, rho, r, L_OLS));
+  lossPath.attr("d", d3.line().x(d => lx(d[0])).y(d => ly(d[1]))(pathPts));
+  lossMin.attr("x", lx(b[0]) - 5.5).attr("y", ly(b[1]) - 5.5);
+  lossMinLabel.attr("x", lx(b[0]) + (b[0] >= 0.3 ? 10 : -10)).attr("y", ly(b[1]) + 18)
+    .attr("text-anchor", b[0] >= 0.3 ? "start" : "end");
+  const mx = kx(lmin);
+  keyMark.attr("transform", `translate(${mx},20)`);
+  keyMarkLabel.attr("x", mx).attr("text-anchor", mx > KW - 120 ? "end" : mx < 150 ? "start" : "middle")
+    .text(`minimum loss ${fmt2(lmin)}`);
+  keyTitle.text(`Colour scale for loss from 0 (dark blue) to 90 (pale), on a square-root scale. ` +
+    `The current minimum loss, ${fmt2(lmin)}, is marked on it.`);
+
+  const pair = p => `(${signed(p[0])}, ${signed(p[1])})`;
+  const zeros = [0, 1].filter(j => b[j] === 0);
+  const name = { ridge: "Ridge", lasso: "Lasso", enet: `Elastic net (ρ = ${rho})` }[method];
+  let msg;
+  if (lam === 0) msg = "λ = 0: the minimum is OLS";
+  else if (zeros.length === 2) msg = "Both exactly 0";
+  else if (zeros.length === 1) msg = `β̂${zeros[0] === 0 ? "₁" : "₂"} = 0 exactly`;
+  else msg = "Both non-zero";
+  lossTitle.text(`${name} loss level curves at λ = ${fmt2(lam)}, correlation ${minus(fmt2(r))}`);
+  lossDesc.text(
+    `Contour plot of the penalized loss over β1 and β2 from −3.2 to 3.2, on a fixed colour scale from 0 (dark) to 90 (pale), so the surface gets paler as λ raises the loss. ` +
+    `OLS, the minimum at λ = 0, is at ${pair(L_OLS)}. ` +
+    (method === "ridge" ? "The ridge penalty is smooth, so the level curves stay smooth ellipses as they move toward the origin. "
+      : "The absolute-value penalty puts corners in the level curves where they cross the axes. ") +
+    `At λ = ${fmt2(lam)} the minimum is at ${pair(b)}, loss ${fmt2(lmin)}. ${msg}. ` +
+    `A dashed curve traces the minimum from OLS at λ = 0 to ${pair(pathPts[pathPts.length - 1])} at λ = ${LAM_MAX}.`);
+
+  clearTimeout(lossLive);
+  lossLive = setTimeout(() => {
+    document.getElementById("l-min").textContent = pair(b);
+    document.getElementById("l-loss").textContent = fmt2(lmin);
+    document.getElementById("l-msg").textContent = msg;
+  }, liveDelay());
+}
+document.querySelectorAll("input[name=lmethod]").forEach(el => el.addEventListener("change", updateLoss));
+[lrhoSlider, llamSlider, lrSlider].forEach(el => el.addEventListener("input", updateLoss));
+document.getElementById("reset-loss").addEventListener("click", () => {
+  llamSlider.value = 0.5; lrSlider.value = 0.5; lrhoSlider.value = 0.5;
+  document.querySelector("input[name=lmethod][value=lasso]").checked = true;
+  updateLoss();
+});
+
+// =====================================================================
 // Shared: Shift+arrow steps sliders by 10; tabs
 // =====================================================================
 document.querySelectorAll("input[type=range]").forEach(sl => sl.addEventListener("keydown", event => {
@@ -650,4 +797,5 @@ rebuildPaths();
 lamSlider.value = bestIndex();
 updatePaths();
 updateGeom();
+updateLoss();
 started = true;

@@ -58,6 +58,7 @@
     .axis text { font-size: 11px; }
     .axis-label { font-size: 12px; fill: #333; }
     .line-label { font-size: 11px; }
+    #loss .line-label { paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
     .ols-point { cursor: grab; }
     .ols-point:focus { outline: none; }
     .ols-point:focus .ring { stroke: #000; stroke-width: 2.5px; }
@@ -86,6 +87,7 @@
   <div role="tablist" aria-label="Views">
     <button role="tab" id="tab-paths" aria-controls="panel-paths" aria-selected="true">Paths</button>
     <button role="tab" id="tab-geom" aria-controls="panel-geom" aria-selected="false" tabindex="-1">Geometry</button>
+    <button role="tab" id="tab-loss" aria-controls="panel-loss" aria-selected="false" tabindex="-1">Loss</button>
   </div>
 
   <!-- ================= Paths ================= -->
@@ -172,6 +174,44 @@
       <span class="stat"><span id="g-msg" class="stat-value">–</span></span>
     </div>
     <figure class="panel"><div id="geom"></div></figure>
+  </section>
+
+  <!-- ================= Loss ================= -->
+  <section role="tabpanel" id="panel-loss" aria-labelledby="tab-loss" hidden>
+    <p class="instructions" id="loss-help">
+      Level curves of the loss ½(β − β̂<sub>OLS</sub>)ᵀR(β − β̂<sub>OLS</sub>) + λ·penalty (R = correlation matrix), with the same λ as in Paths.
+      Increase λ and watch the minimum move toward 0.
+    </p>
+    <div class="controls">
+      <fieldset>
+        <legend>Penalty</legend>
+        <label><input type="radio" name="lmethod" value="ridge"> Ridge</label>
+        <label><input type="radio" name="lmethod" value="lasso" checked> Lasso</label>
+        <label><input type="radio" name="lmethod" value="enet"> Elastic net</label>
+      </fieldset>
+    </div>
+    <div class="controls">
+      <label for="llam-slider">λ</label>
+      <input type="range" id="llam-slider" min="0" max="4" step="0.05" value="0.5" aria-describedby="loss-help">
+      <output id="llam-out" for="llam-slider">λ = 0.50</output>
+    </div>
+    <div class="controls">
+      <label for="lr-slider">correlation r</label>
+      <input type="range" id="lr-slider" min="-0.99" max="0.99" step="0.01" value="0.5" aria-describedby="loss-help">
+      <output id="lr-out" for="lr-slider">r = 0.50</output>
+    </div>
+    <div class="controls" id="lrho-row">
+      <label for="lrho-slider">mix ρ</label>
+      <input type="range" id="lrho-slider" min="0.05" max="0.95" step="0.05" value="0.5" disabled>
+      <output id="lrho-out" for="lrho-slider">ρ = 0.5</output>
+    </div>
+    <div class="controls"><button id="reset-loss" type="button">Reset</button></div>
+    <div id="loss-stats" class="stats" aria-live="polite" aria-atomic="true">
+      <span class="stat">minimum = <span id="l-min" class="stat-value">–</span></span>
+      <span class="stat">loss there = <span id="l-loss" class="stat-value">–</span></span>
+      <span class="stat"><span id="l-msg" class="stat-value">–</span></span>
+    </div>
+    <figure class="panel"><div id="loss"></div><div id="loss-legend"></div></figure>
   </section>
 
   <script src="app.js"></script>
