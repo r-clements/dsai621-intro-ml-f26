@@ -10,7 +10,7 @@
 - [Practice Problems 1](problem_sets/PP1.pdf) ([solutions](problem_sets/PP1_sol.pdf)). These aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
 - Interactive demo: [Bias–Variance Tradeoff with KNN Regression](https://robertclements.org/dsai621-intro-ml-f26/topics/bias-variance-knn/)
 
-**Coming up:** Quiz 1 is in class on **TBD**. Bring your hand-written cheat sheet (8.5x11, one side).
+**Coming up:** Quiz 1 is in class on **Thursday 10/29**. Bring your hand-written cheat sheet (8.5x11, one side).
 
 <details>
 <summary>Past weeks</summary>
@@ -68,4 +68,4 @@ uv sync
 
 ## Quizzes
 
-Six in-class quizzes (dates TBD), plus an optional cumulative bonus quiz during finals week. See the [syllabus](syllabus/dsai-621-fall-2026-syllabus.md) for details.
+Six in-class quizzes (check the Google calendar for most up-to-date quiz dates), plus an optional cumulative bonus quiz during finals week. See the [syllabus](syllabus/dsai-621-fall-2026-syllabus.md) for details.
