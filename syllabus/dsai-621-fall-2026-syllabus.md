@@ -57,9 +57,9 @@ By the end of this course you should understand fundamental machine learning con
 ## Quizzes
 
 - There will be 6 weekly quizzes, plus one optional cumulative bonus quiz during finals week (see below).  
-- Quizzes are to be completed in-person. Tentative quiz dates are TBD (Quiz 1), Thursday 11/5, Thursday 11/12, Thursday 11/19, Monday 11/30, and Monday 12/7. Bonus quiz date is TBD.  
+- Quizzes are to be completed in-person. Tentative quiz dates are Thursday 10/29 (Quiz 1), Thursday 11/5, Monday 11/16, Thursday 11/19, Monday 11/30, and Monday 12/7. Bonus quiz date is Friday 12/11.  
 - Quizzes cannot be made up, even in cases of illness or emergency. If you miss a quiz, you will receive a 0 for that quiz. A bonus quiz will be offered during finals week. Bonus quiz will be similar in length to the weekly quizzes, but cumulative, and optional. Your score on the bonus quiz will replace your lowest quiz score (including a 0 from a missed quiz), if it is higher.  
-- A hand-written cheat sheet, 8.5x11, one side only, is allowed. No digitally typed or printed cheat sheets are permitted. Cheat sheets will be collected with your quiz and returned before the next quiz. Be sure to include your name on the cheat sheet.   
+- A hand-written cheat sheet, 8.5x11, one side only, is allowed. No digitally typed or printed cheat sheets are permitted. Cheat sheets will be collected with your quiz and returned before the next quiz. Be sure to include your name on the cheat sheet. If you turn in your cheat sheet with your name on it you will get 2 points (out of 100) on the quiz.   
 - Quizzes will be administered on paper. No phones, smartwatches, calculators, other devices, or internet access are permitted.  
 - I will not be able to answer content questions during the quiz, to keep the testing environment consistent for everyone. If you believe a question is unclear or contains an error, note it on your quiz and I will review it afterward.  
 - Please use the restroom before the quiz — quizzes are timed and *very* short, and you will not have time to leave and return. However, if you absolutely need to go, let me know, and leave all devices behind.
