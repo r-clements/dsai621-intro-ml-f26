@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intro to ML: Notation, Bias–Variance, and the Curse of Dimensionality — Week 1, Day 1 | DSAI 621</title>
+<meta name="description" content="Accessible class notes introducing machine learning notation, prediction versus inference, reducible and irreducible error, types of learning, model flexibility, K-nearest neighbours, training and test error, the bias–variance decomposition, and the curse of dimensionality.">
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #4a4a4a;
+    --rule: #c9c9c9;
+    --accent: #0b4f8a;
+    --accent-bg: #eef4fa;
+    --focus: #0b4f8a;
+    --pop: #a4262c;   /* population / true  — 5.9:1 on white */
+    --est: #5b2d8e;   /* estimate / fitted  — 8.5:1 on white */
+    --err: #8a5000;   /* errors / residuals — 5.1:1 on white */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f2; --muted: #cfcfcf; --rule: #555;
+      --accent: #8ab8e0; --accent-bg: #182430; --focus: #8ab8e0;
+      --pop: #ff9f99; --est: #cbb0ff; --err: #f0b458;
+    }
+    body { background: #131313; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--ink);
+    background: #fff;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #131313; } }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 5rem; }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible, :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--accent); color: #fff;
+    padding: .75rem 1rem; z-index: 10; text-decoration: none;
+  }
+  .skip:focus { left: .5rem; top: .5rem; }
+  h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; line-height: 1.3; margin: 2.5rem 0 .5rem;
+       padding-top: .75rem; border-top: 2px solid var(--rule); }
+  h3 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  p, li { max-width: 42rem; }
+  .lede { color: var(--muted); margin-top: 0; }
+  nav.toc {
+    background: var(--accent-bg); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 1rem 1.25rem; margin: 2rem 0;
+  }
+  nav.toc h2 { font-size: 1.05rem; margin: 0 0 .5rem; border: 0; padding: 0; }
+  nav.toc ol { margin: 0; padding-left: 1.25rem; }
+  nav.toc li { margin: .3rem 0; }
+  nav.toc a { display: inline-block; min-height: 24px; padding: 2px 0; }
+  table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+  caption { text-align: left; font-weight: 600; padding-bottom: .5rem; }
+  th, td { border: 1px solid var(--rule); padding: .5rem .7rem; text-align: left; }
+  thead th { background: var(--accent-bg); }
+  figure { margin: 1.5rem 0; }
+  figcaption { font-size: .95rem; color: var(--muted); margin-top: .5rem; }
+  svg { max-width: 100%; height: auto; display: block; }
+  details {
+    border: 1px solid var(--rule); border-radius: 6px;
+    padding: .5rem .85rem; margin: .75rem 0; background: var(--accent-bg);
+  }
+  summary { cursor: pointer; font-weight: 600; min-height: 24px; padding: .25rem 0; }
+  details[open] summary { margin-bottom: .5rem; }
+  math { font-size: 1.15em; }
+  math[display="block"] { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }
+  .eq { margin: 1.25rem 0; }
+  .note {
+    border-left: 4px solid var(--accent); background: var(--accent-bg);
+    padding: .75rem 1rem; margin: 1.25rem 0; border-radius: 0 6px 6px 0;
+  }
+  .note > :first-child { margin-top: 0; }
+  .note > :last-child { margin-bottom: 0; }
+  .tag {
+    display: inline-block; font-size: .8rem; font-weight: 700;
+    letter-spacing: .02em; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 4px;
+    padding: 0 .4em; white-space: nowrap;
+  }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 2px solid var(--rule);
+           color: var(--muted); font-size: .95rem; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps > li { margin: .75rem 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<div class="wrap">
+<header>
+  <p class="lede"><strong>DSAI 621 — Intro to Machine Learning</strong> · Fall 2026 · Week 1, Day 1</p>
+  <h1>Introduction to Machine Learning: Notation, Bias–Variance, and the Curse of Dimensionality</h1>
+  <p class="lede">Accessible transcription of the handwritten class notes. All equations are marked up in MathML so they can be read by a screen reader, magnified, or rendered in braille. All figures have text descriptions. Annotations written in a second pen colour in the original are reproduced here as labelled callouts, so none of their meaning depends on colour.</p>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+  <h2 id="toc-h">On this page</h2>
+  <ol>
+    <li><a href="#agenda">Agenda</a></li>
+    <li><a href="#intro">1. Intro</a></li>
+    <li><a href="#notation">1.1 Notation</a></li>
+    <li><a href="#pred-inf">1.2 Prediction and inference</a></li>
+    <li><a href="#error">1.3 Error</a></li>
+    <li><a href="#estimating">1.4 Estimating <em>f</em></a></li>
+    <li><a href="#types">1.5 Types of learning</a></li>
+    <li><a href="#flexibility">1.6 Flexibility</a></li>
+    <li><a href="#what-is-f">2. What is <em>f</em>?</a></li>
+    <li><a href="#loss">2.1 Loss</a></li>
+    <li><a href="#approx">2.2 Approximating the conditional mean</a></li>
+    <li><a href="#knn">K-nearest neighbours</a></li>
+    <li><a href="#train-test">3. Training vs testing error</a></li>
+    <li><a href="#bias-var">4. Bias–variance decomposition</a></li>
+    <li><a href="#curse">5. Curse of dimensionality</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+
+<h2 id="agenda">Agenda</h2>
+<ul>
+  <li>Intro to ML + notation</li>
+  <li>Bias, variance</li>
+  <li>Curse of dimensionality</li>
+</ul>
+
+<h2 id="intro">1. Intro</h2>
+
+<h3 id="notation">1.1 Notation</h3>
+
+<ul>
+  <li><math alttext="Y"><mi>Y</mi></math>: random response / target</li>
+  <li><math alttext="X equals open paren X sub 1, X sub 2, dot dot dot, X sub p close paren"><mrow><mi>X</mi><mo>=</mo><mo>(</mo><msub><mi>X</mi><mn>1</mn></msub><mo>,</mo><msub><mi>X</mi><mn>2</mn></msub><mo>,</mo><mo>…</mo><mo>,</mo><msub><mi>X</mi><mi>p</mi></msub><mo>)</mo></mrow></math>: random predictor vector</li>
+  <li>
+    <math alttext="bold y equals the column vector y sub 1, y sub 2, through y sub n"><mrow><mi mathvariant="bold">y</mi><mo>=</mo>
+      <mrow><mo>(</mo><mtable><mtr><mtd><msub><mi>y</mi><mn>1</mn></msub></mtd></mtr><mtr><mtd><msub><mi>y</mi><mn>2</mn></msub></mtd></mtr><mtr><mtd><mo>⋮</mo></mtd></mtr><mtr><mtd><msub><mi>y</mi><mi>n</mi></msub></mtd></mtr></mtable><mo>)</mo></mrow></mrow></math>
+  </li>
+  <li><math alttext="bold X"><mi mathvariant="bold">X</mi></math>: <math alttext="n by p"><mrow><mi>n</mi><mo>×</mo><mi>p</mi></mrow></math> data matrix</li>
+  <li><math alttext="p"><mi>p</mi></math> = number of predictors (<strong>not</strong> <math alttext="beta"><mi>β</mi></math>s)</li>
+  <li><math alttext="n"><mi>n</mi></math> = number of observations (training set)</li>
+  <li><math alttext="x sub 0"><msub><mi>x</mi><mn>0</mn></msub></math>: test point</li>
+  <li><math alttext="x"><mi>x</mi></math>: a fixed data point</li>
+  <li><math alttext="x sub i"><msub><mi>x</mi><mi>i</mi></msub></math>: <math alttext="i-th"><msup><mi>i</mi><mtext>th</mtext></msup></math> training point</li>
+  <li>
+    <math alttext="beta equals the column vector beta sub 1 through beta sub p"><mrow><mi>β</mi><mo>=</mo>
+      <mrow><mo>(</mo><mtable><mtr><mtd><msub><mi>β</mi><mn>1</mn></msub></mtd></mtr><mtr><mtd><mo>⋮</mo></mtd></mtr><mtr><mtd><msub><mi>β</mi><mi>p</mi></msub></mtd></mtr></mtable><mo>)</mo></mrow></mrow></math>,
+    <math alttext="beta sub 0"><msub><mi>β</mi><mn>0</mn></msub></math> = intercept
+  </li>
+  <li><math alttext="script T"><mi>𝒯</mi></math>: training set
+    <math alttext="the set of pairs x sub 1 comma y sub 1 through x sub n comma y sub n"><mrow><mo>{</mo><mo>(</mo><msub><mi>x</mi><mn>1</mn></msub><mo>,</mo><msub><mi>y</mi><mn>1</mn></msub><mo>)</mo><mo>,</mo><mo>…</mo><mo>,</mo><mo>(</mo><msub><mi>x</mi><mi>n</mi></msub><mo>,</mo><msub><mi>y</mi><mi>n</mi></msub><mo>)</mo><mo>}</mo></mrow></math>
+  </li>
+</ul>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> Two differences from the DSAI 601 (Kutner) notation are worth flagging here, the first time they matter. In DSAI 601, <math alttext="p"><mi>p</mi></math> counted the parameters <em>including</em> the intercept; here <math alttext="p"><mi>p</mi></math> counts predictors only, so a linear model has <math alttext="p plus 1"><mrow><mi>p</mi><mo>+</mo><mn>1</mn></mrow></math> coefficients. And plain capitals were vectors in DSAI 601 (for example <math alttext="Y hat equals H Y"><mrow><mover><mi>Y</mi><mo>^</mo></mover><mo>=</mo><mi>H</mi><mi>Y</mi></mrow></math>); here plain capitals are random variables, and the bold letters <math alttext="bold y"><mi mathvariant="bold">y</mi></math> and <math alttext="bold X"><mi mathvariant="bold">X</mi></math> are the observed response vector and data matrix, so that equation is written <math alttext="bold y hat equals bold H bold y"><mrow><mover><mi mathvariant="bold">y</mi><mo>^</mo></mover><mo>=</mo><mi mathvariant="bold">H</mi><mi mathvariant="bold">y</mi></mrow></math>. In the handwritten notes the bold letters are written with a double stroke.</p>
+</div>
+
+<p><strong>Assumption:</strong></p>
+<div class="eq">
+<math display="block" alttext="Y equals f of X plus epsilon">
+  <mrow><mi>Y</mi><mo>=</mo><mi>f</mi><mo>(</mo><mi>X</mi><mo>)</mo><mo>+</mo><mi>ε</mi></mrow>
+</math>
+</div>
+<p>We want to estimate <math alttext="f"><mi>f</mi></math>.</p>
+
+<h3 id="pred-inf">1.2 Prediction and inference</h3>
+
+<p><strong>Prediction:</strong>
+  <math alttext="Y hat equals f hat of X"><mrow><mover><mi>Y</mi><mo>^</mo></mover><mo>=</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mi>X</mi><mo>)</mo></mrow></math>.
+  We want <math alttext="f hat"><mover><mi>f</mi><mo>^</mo></mover></math> to be close to <math alttext="Y"><mi>Y</mi></math>.</p>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> An arrow points to “Prediction” with the note: <strong>this class</strong>.</p>
+</div>
+
+<p><strong>Inference:</strong> how does <math alttext="Y"><mi>Y</mi></math> depend on <math alttext="X"><mi>X</mi></math>? <math alttext="f hat"><mover><mi>f</mi><mo>^</mo></mover></math> is the answer.</p>
+
+<h3 id="error">1.3 Error</h3>
+
+<p><math alttext="epsilon"><mi>ε</mi></math> is not predictable / observable, with <math alttext="the variance of epsilon equals sigma squared"><mrow><mi>Var</mi><mo>(</mo><mi>ε</mi><mo>)</mo><mo>=</mo><msup><mi>σ</mi><mn>2</mn></msup></mrow></math>.</p>
+
+<p>Take <math alttext="X equals x"><mrow><mi>X</mi><mo>=</mo><mi>x</mi></mrow></math> (i.e. for some observed point <math alttext="x"><mi>x</mi></math>). Then</p>
+
+<div class="eq">
+<math display="block" alttext="the expected value of the quantity Y minus Y hat, squared, given X equals x, equals the quantity f of x minus f hat of x, squared, plus sigma squared">
+  <mrow>
+    <mi>E</mi><mrow><mo>[</mo><msup><mrow><mo>(</mo><mi>Y</mi><mo>−</mo><mover><mi>Y</mi><mo>^</mo></mover><mo>)</mo></mrow><mn>2</mn></msup><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>]</mo></mrow>
+    <mo>=</mo>
+    <msup><mrow><mo>[</mo><mi>f</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>−</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mi>x</mi><mo>)</mo><mo>]</mo></mrow><mn>2</mn></msup>
+    <mo>+</mo><msup><mi>σ</mi><mn>2</mn></msup>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Under <math alttext="the quantity f of x minus f hat of x, squared"><msup><mrow><mo>[</mo><mi>f</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>−</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mi>x</mi><mo>)</mo><mo>]</mo></mrow><mn>2</mn></msup></math>: <strong>make this small</strong>.</p>
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> An arrow points to <math alttext="sigma squared"><msup><mi>σ</mi><mn>2</mn></msup></math>: <strong>can't measure (irreducible)</strong>.</p>
+</div>
+
+<h3 id="estimating">1.4 Estimating <em>f</em></h3>
+
+<ul>
+  <li><strong>Parametric:</strong> e.g.
+    <math alttext="f of X equals beta sub 0 plus beta sub 1 X sub 1 plus dot dot dot plus beta sub p X sub p"><mrow><mi>f</mi><mo>(</mo><mi>X</mi><mo>)</mo><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>X</mi><mn>1</mn></msub><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi>β</mi><mi>p</mi></msub><msub><mi>X</mi><mi>p</mi></msub></mrow></math>.
+    Goal: estimate the <math alttext="beta"><mi>β</mi></math>s.</li>
+  <li><strong>Non-parametric:</strong> no functional form assumption.</li>
+</ul>
+
+<h3 id="types">1.5 Types of learning</h3>
+
+<table>
+  <caption>Types of learning, with their response and example algorithms</caption>
+  <thead>
+    <tr><th scope="col">Type</th><th scope="col">Response / target</th><th scope="col">Algorithm / model</th></tr>
+  </thead>
+  <tbody>
+    <tr><th scope="row">Supervised: regression</th><td><math alttext="Y"><mi>Y</mi></math> is quantitative</td><td>ridge, lasso, splines, trees</td></tr>
+    <tr><th scope="row">Supervised: classification</th><td><math alttext="Y"><mi>Y</mi></math> is qualitative</td><td>logistic, trees, naive Bayes</td></tr>
+    <tr><th scope="row">Unsupervised</th><td>None</td><td>clustering (k-means), PCA</td></tr>
+  </tbody>
+</table>
+
+<h3 id="flexibility">1.6 Flexibility</h3>
+
+<figure>
+<svg viewBox="0 0 560 300" role="img" aria-labelledby="fig1-t fig1-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig1-t">Five fitted curves of increasing flexibility through the same scatter of points</title>
+  <desc id="fig1-d">Fourteen points rise from lower left to upper right with a wave in the middle. A straight line is the least flexible fit. Four more curves follow the wave more and more closely; the most flexible passes through every point. A legend on the right lists the five curves from most flexible to least flexible, each with its own line style.</desc>
+  <defs><clipPath id="fig1-clip"><rect x="62" y="40" width="310" height="228"/></clipPath></defs><line x1="60" y1="270" x2="370" y2="270" stroke="currentColor" stroke-width="2"/><line x1="60" y1="270" x2="60" y2="40" stroke="currentColor" stroke-width="2"/><polygon points="370,270 362,266 362,274" fill="currentColor"/><polygon points="60,40 56,48 64,48" fill="currentColor"/><text x="376" y="275" font-size="15" fill="currentColor">x₁</text><text x="42" y="42" font-size="15" fill="currentColor">Y</text><g clip-path="url(#fig1-clip)" fill="none" stroke-linecap="round"><path d="M70.0,206.4 L71.0,206.1 L71.9,205.8 L72.9,205.5 L73.8,205.1 L74.8,204.8 L75.7,204.5 L76.7,204.1 L77.6,203.8 L78.6,203.5 L79.5,203.2 L80.5,202.8 L81.4,202.5 L82.4,202.2 L83.3,201.8 L84.3,201.5 L85.3,201.2 L86.2,200.9 L87.2,200.5 L88.1,200.2 L89.1,199.9 L90.0,199.5 L91.0,199.2 L91.9,198.9 L92.9,198.6 L93.8,198.2 L94.8,197.9 L95.7,197.6 L96.7,197.2 L97.6,196.9 L98.6,196.6 L99.5,196.3 L100.5,195.9 L101.5,195.6 L102.4,195.3 L103.4,194.9 L104.3,194.6 L105.3,194.3 L106.2,194.0 L107.2,193.6 L108.1,193.3 L109.1,193.0 L110.0,192.6 L111.0,192.3 L111.9,192.0 L112.9,191.7 L113.8,191.3 L114.8,191.0 L115.8,190.7 L116.7,190.3 L117.7,190.0 L118.6,189.7 L119.6,189.3 L120.5,189.0 L121.5,188.7 L122.4,188.4 L123.4,188.0 L124.3,187.7 L125.3,187.4 L126.2,187.0 L127.2,186.7 L128.1,186.4 L129.1,186.1 L130.1,185.7 L131.0,185.4 L132.0,185.1 L132.9,184.7 L133.9,184.4 L134.8,184.1 L135.8,183.8 L136.7,183.4 L137.7,183.1 L138.6,182.8 L139.6,182.4 L140.5,182.1 L141.5,181.8 L142.4,181.5 L143.4,181.1 L144.3,180.8 L145.3,180.5 L146.3,180.1 L147.2,179.8 L148.2,179.5 L149.1,179.2 L150.1,178.8 L151.0,178.5 L152.0,178.2 L152.9,177.8 L153.9,177.5 L154.8,177.2 L155.8,176.9 L156.7,176.5 L157.7,176.2 L158.6,175.9 L159.6,175.5 L160.6,175.2 L161.5,174.9 L162.5,174.5 L163.4,174.2 L164.4,173.9 L165.3,173.6 L166.3,173.2 L167.2,172.9 L168.2,172.6 L169.1,172.2 L170.1,171.9 L171.0,171.6 L172.0,171.3 L172.9,170.9 L173.9,170.6 L174.8,170.3 L175.8,169.9 L176.8,169.6 L177.7,169.3 L178.7,169.0 L179.6,168.6 L180.6,168.3 L181.5,168.0 L182.5,167.6 L183.4,167.3 L184.4,167.0 L185.3,166.7 L186.3,166.3 L187.2,166.0 L188.2,165.7 L189.1,165.3 L190.1,165.0 L191.1,164.7 L192.0,164.4 L193.0,164.0 L193.9,163.7 L194.9,163.4 L195.8,163.0 L196.8,162.7 L197.7,162.4 L198.7,162.1 L199.6,161.7 L200.6,161.4 L201.5,161.1 L202.5,160.7 L203.4,160.4 L204.4,160.1 L205.4,159.8 L206.3,159.4 L207.3,159.1 L208.2,158.8 L209.2,158.4 L210.1,158.1 L211.1,157.8 L212.0,157.4 L213.0,157.1 L213.9,156.8 L214.9,156.5 L215.8,156.1 L216.8,155.8 L217.7,155.5 L218.7,155.1 L219.6,154.8 L220.6,154.5 L221.6,154.2 L222.5,153.8 L223.5,153.5 L224.4,153.2 L225.4,152.8 L226.3,152.5 L227.3,152.2 L228.2,151.9 L229.2,151.5 L230.1,151.2 L231.1,150.9 L232.0,150.5 L233.0,150.2 L233.9,149.9 L234.9,149.6 L235.9,149.2 L236.8,148.9 L237.8,148.6 L238.7,148.2 L239.7,147.9 L240.6,147.6 L241.6,147.3 L242.5,146.9 L243.5,146.6 L244.4,146.3 L245.4,145.9 L246.3,145.6 L247.3,145.3 L248.2,145.0 L249.2,144.6 L250.2,144.3 L251.1,144.0 L252.1,143.6 L253.0,143.3 L254.0,143.0 L254.9,142.6 L255.9,142.3 L256.8,142.0 L257.8,141.7 L258.7,141.3 L259.7,141.0 L260.6,140.7 L261.6,140.3 L262.5,140.0 L263.5,139.7 L264.4,139.4 L265.4,139.0 L266.4,138.7 L267.3,138.4 L268.3,138.0 L269.2,137.7 L270.2,137.4 L271.1,137.1 L272.1,136.7 L273.0,136.4 L274.0,136.1 L274.9,135.7 L275.9,135.4 L276.8,135.1 L277.8,134.8 L278.7,134.4 L279.7,134.1 L280.7,133.8 L281.6,133.4 L282.6,133.1 L283.5,132.8 L284.5,132.5 L285.4,132.1 L286.4,131.8 L287.3,131.5 L288.3,131.1 L289.2,130.8 L290.2,130.5 L291.1,130.2 L292.1,129.8 L293.0,129.5 L294.0,129.2 L294.9,128.8 L295.9,128.5 L296.9,128.2 L297.8,127.8 L298.8,127.5 L299.7,127.2 L300.7,126.9 L301.6,126.5 L302.6,126.2 L303.5,125.9 L304.5,125.5 L305.4,125.2 L306.4,124.9 L307.3,124.6 L308.3,124.2 L309.2,123.9 L310.2,123.6 L311.2,123.2 L312.1,122.9 L313.1,122.6 L314.0,122.3 L315.0,121.9 L315.9,121.6 L316.9,121.3 L317.8,120.9 L318.8,120.6 L319.7,120.3 L320.7,120.0 L321.6,119.6 L322.6,119.3 L323.5,119.0 L324.5,118.6 L325.5,118.3 L326.4,118.0 L327.4,117.7 L328.3,117.3 L329.3,117.0 L330.2,116.7 L331.2,116.3 L332.1,116.0 L333.1,115.7 L334.0,115.4 L335.0,115.0 L335.9,114.7 L336.9,114.4 L337.8,114.0 L338.8,113.7 L339.7,113.4 L340.7,113.1 L341.7,112.7 L342.6,112.4 L343.6,112.1 L344.5,111.7 L345.5,111.4 L346.4,111.1 L347.4,110.7 L348.3,110.4 L349.3,110.1 L350.2,109.8 L351.2,109.4 L352.1,109.1 L353.1,108.8 L354.0,108.4 L355.0,108.1" stroke="var(--accent)" stroke-width="3"/><path d="M70.0,165.5 L71.0,166.6 L71.9,167.7 L72.9,168.7 L73.8,169.7 L74.8,170.7 L75.7,171.7 L76.7,172.7 L77.6,173.6 L78.6,174.5 L79.5,175.4 L80.5,176.3 L81.4,177.1 L82.4,177.9 L83.3,178.8 L84.3,179.5 L85.3,180.3 L86.2,181.1 L87.2,181.8 L88.1,182.5 L89.1,183.2 L90.0,183.9 L91.0,184.5 L91.9,185.2 L92.9,185.8 L93.8,186.4 L94.8,186.9 L95.7,187.5 L96.7,188.1 L97.6,188.6 L98.6,189.1 L99.5,189.6 L100.5,190.0 L101.5,190.5 L102.4,190.9 L103.4,191.4 L104.3,191.8 L105.3,192.1 L106.2,192.5 L107.2,192.9 L108.1,193.2 L109.1,193.5 L110.0,193.8 L111.0,194.1 L111.9,194.4 L112.9,194.6 L113.8,194.9 L114.8,195.1 L115.8,195.3 L116.7,195.5 L117.7,195.7 L118.6,195.8 L119.6,196.0 L120.5,196.1 L121.5,196.2 L122.4,196.3 L123.4,196.4 L124.3,196.5 L125.3,196.6 L126.2,196.6 L127.2,196.7 L128.1,196.7 L129.1,196.7 L130.1,196.7 L131.0,196.7 L132.0,196.6 L132.9,196.6 L133.9,196.5 L134.8,196.5 L135.8,196.4 L136.7,196.3 L137.7,196.2 L138.6,196.1 L139.6,195.9 L140.5,195.8 L141.5,195.6 L142.4,195.5 L143.4,195.3 L144.3,195.1 L145.3,194.9 L146.3,194.7 L147.2,194.5 L148.2,194.2 L149.1,194.0 L150.1,193.7 L151.0,193.5 L152.0,193.2 L152.9,192.9 L153.9,192.6 L154.8,192.3 L155.8,192.0 L156.7,191.7 L157.7,191.4 L158.6,191.0 L159.6,190.7 L160.6,190.3 L161.5,190.0 L162.5,189.6 L163.4,189.2 L164.4,188.8 L165.3,188.4 L166.3,188.0 L167.2,187.6 L168.2,187.2 L169.1,186.7 L170.1,186.3 L171.0,185.8 L172.0,185.4 L172.9,184.9 L173.9,184.5 L174.8,184.0 L175.8,183.5 L176.8,183.0 L177.7,182.5 L178.7,182.0 L179.6,181.5 L180.6,181.0 L181.5,180.5 L182.5,180.0 L183.4,179.4 L184.4,178.9 L185.3,178.4 L186.3,177.8 L187.2,177.3 L188.2,176.7 L189.1,176.2 L190.1,175.6 L191.1,175.0 L192.0,174.5 L193.0,173.9 L193.9,173.3 L194.9,172.7 L195.8,172.1 L196.8,171.6 L197.7,171.0 L198.7,170.4 L199.6,169.8 L200.6,169.2 L201.5,168.6 L202.5,167.9 L203.4,167.3 L204.4,166.7 L205.4,166.1 L206.3,165.5 L207.3,164.9 L208.2,164.2 L209.2,163.6 L210.1,163.0 L211.1,162.4 L212.0,161.7 L213.0,161.1 L213.9,160.5 L214.9,159.8 L215.8,159.2 L216.8,158.6 L217.7,157.9 L218.7,157.3 L219.6,156.7 L220.6,156.0 L221.6,155.4 L222.5,154.8 L223.5,154.1 L224.4,153.5 L225.4,152.9 L226.3,152.2 L227.3,151.6 L228.2,151.0 L229.2,150.3 L230.1,149.7 L231.1,149.1 L232.0,148.5 L233.0,147.8 L233.9,147.2 L234.9,146.6 L235.9,146.0 L236.8,145.4 L237.8,144.8 L238.7,144.1 L239.7,143.5 L240.6,142.9 L241.6,142.3 L242.5,141.7 L243.5,141.1 L244.4,140.5 L245.4,140.0 L246.3,139.4 L247.3,138.8 L248.2,138.2 L249.2,137.6 L250.2,137.1 L251.1,136.5 L252.1,135.9 L253.0,135.4 L254.0,134.8 L254.9,134.3 L255.9,133.8 L256.8,133.2 L257.8,132.7 L258.7,132.2 L259.7,131.6 L260.6,131.1 L261.6,130.6 L262.5,130.1 L263.5,129.6 L264.4,129.1 L265.4,128.7 L266.4,128.2 L267.3,127.7 L268.3,127.3 L269.2,126.8 L270.2,126.3 L271.1,125.9 L272.1,125.5 L273.0,125.0 L274.0,124.6 L274.9,124.2 L275.9,123.8 L276.8,123.4 L277.8,123.0 L278.7,122.7 L279.7,122.3 L280.7,121.9 L281.6,121.6 L282.6,121.2 L283.5,120.9 L284.5,120.6 L285.4,120.3 L286.4,120.0 L287.3,119.7 L288.3,119.4 L289.2,119.1 L290.2,118.8 L291.1,118.6 L292.1,118.3 L293.0,118.1 L294.0,117.9 L294.9,117.7 L295.9,117.5 L296.9,117.3 L297.8,117.1 L298.8,116.9 L299.7,116.8 L300.7,116.6 L301.6,116.5 L302.6,116.3 L303.5,116.2 L304.5,116.1 L305.4,116.0 L306.4,116.0 L307.3,115.9 L308.3,115.9 L309.2,115.8 L310.2,115.8 L311.2,115.8 L312.1,115.8 L313.1,115.8 L314.0,115.8 L315.0,115.9 L315.9,115.9 L316.9,116.0 L317.8,116.1 L318.8,116.2 L319.7,116.3 L320.7,116.4 L321.6,116.6 L322.6,116.7 L323.5,116.9 L324.5,117.1 L325.5,117.3 L326.4,117.5 L327.4,117.8 L328.3,118.0 L329.3,118.3 L330.2,118.6 L331.2,118.9 L332.1,119.2 L333.1,119.5 L334.0,119.8 L335.0,120.2 L335.9,120.6 L336.9,121.0 L337.8,121.4 L338.8,121.8 L339.7,122.3 L340.7,122.7 L341.7,123.2 L342.6,123.7 L343.6,124.2 L344.5,124.8 L345.5,125.3 L346.4,125.9 L347.4,126.5 L348.3,127.1 L349.3,127.7 L350.2,128.4 L351.2,129.0 L352.1,129.7 L353.1,130.4 L354.0,131.1 L355.0,131.9" stroke="var(--pop)" stroke-width="3" stroke-dasharray="9 5"/><path d="M70.0,264.0 L71.0,257.4 L71.9,251.0 L72.9,245.0 L73.8,239.3 L74.8,233.8 L75.7,228.6 L76.7,223.6 L77.6,218.9 L78.6,214.5 L79.5,210.3 L80.5,206.3 L81.4,202.5 L82.4,199.0 L83.3,195.7 L84.3,192.6 L85.3,189.6 L86.2,186.9 L87.2,184.3 L88.1,182.0 L89.1,179.8 L90.0,177.7 L91.0,175.9 L91.9,174.2 L92.9,172.6 L93.8,171.2 L94.8,169.9 L95.7,168.8 L96.7,167.8 L97.6,166.9 L98.6,166.1 L99.5,165.5 L100.5,164.9 L101.5,164.5 L102.4,164.2 L103.4,163.9 L104.3,163.8 L105.3,163.7 L106.2,163.8 L107.2,163.9 L108.1,164.0 L109.1,164.3 L110.0,164.6 L111.0,165.0 L111.9,165.4 L112.9,165.9 L113.8,166.5 L114.8,167.1 L115.8,167.7 L116.7,168.4 L117.7,169.1 L118.6,169.9 L119.6,170.7 L120.5,171.5 L121.5,172.4 L122.4,173.3 L123.4,174.2 L124.3,175.1 L125.3,176.0 L126.2,177.0 L127.2,177.9 L128.1,178.9 L129.1,179.8 L130.1,180.8 L131.0,181.8 L132.0,182.8 L132.9,183.8 L133.9,184.7 L134.8,185.7 L135.8,186.6 L136.7,187.6 L137.7,188.5 L138.6,189.4 L139.6,190.4 L140.5,191.2 L141.5,192.1 L142.4,193.0 L143.4,193.8 L144.3,194.6 L145.3,195.4 L146.3,196.2 L147.2,196.9 L148.2,197.6 L149.1,198.3 L150.1,198.9 L151.0,199.6 L152.0,200.2 L152.9,200.7 L153.9,201.2 L154.8,201.7 L155.8,202.2 L156.7,202.6 L157.7,203.0 L158.6,203.4 L159.6,203.7 L160.6,204.0 L161.5,204.3 L162.5,204.5 L163.4,204.6 L164.4,204.8 L165.3,204.9 L166.3,205.0 L167.2,205.0 L168.2,205.0 L169.1,204.9 L170.1,204.9 L171.0,204.7 L172.0,204.6 L172.9,204.4 L173.9,204.1 L174.8,203.9 L175.8,203.6 L176.8,203.2 L177.7,202.8 L178.7,202.4 L179.6,202.0 L180.6,201.5 L181.5,201.0 L182.5,200.4 L183.4,199.8 L184.4,199.2 L185.3,198.5 L186.3,197.9 L187.2,197.1 L188.2,196.4 L189.1,195.6 L190.1,194.8 L191.1,194.0 L192.0,193.1 L193.0,192.2 L193.9,191.3 L194.9,190.3 L195.8,189.3 L196.8,188.3 L197.7,187.3 L198.7,186.3 L199.6,185.2 L200.6,184.1 L201.5,183.0 L202.5,181.9 L203.4,180.7 L204.4,179.6 L205.4,178.4 L206.3,177.2 L207.3,176.0 L208.2,174.7 L209.2,173.5 L210.1,172.3 L211.1,171.0 L212.0,169.7 L213.0,168.4 L213.9,167.2 L214.9,165.9 L215.8,164.6 L216.8,163.3 L217.7,162.0 L218.7,160.6 L219.6,159.3 L220.6,158.0 L221.6,156.7 L222.5,155.4 L223.5,154.1 L224.4,152.8 L225.4,151.5 L226.3,150.2 L227.3,148.9 L228.2,147.6 L229.2,146.3 L230.1,145.1 L231.1,143.8 L232.0,142.6 L233.0,141.3 L233.9,140.1 L234.9,138.9 L235.9,137.7 L236.8,136.5 L237.8,135.4 L238.7,134.2 L239.7,133.1 L240.6,132.0 L241.6,130.9 L242.5,129.9 L243.5,128.8 L244.4,127.8 L245.4,126.8 L246.3,125.9 L247.3,124.9 L248.2,124.0 L249.2,123.1 L250.2,122.2 L251.1,121.4 L252.1,120.6 L253.0,119.8 L254.0,119.1 L254.9,118.3 L255.9,117.7 L256.8,117.0 L257.8,116.4 L258.7,115.8 L259.7,115.2 L260.6,114.7 L261.6,114.2 L262.5,113.7 L263.5,113.3 L264.4,112.9 L265.4,112.5 L266.4,112.2 L267.3,111.9 L268.3,111.6 L269.2,111.4 L270.2,111.2 L271.1,111.0 L272.1,110.9 L273.0,110.8 L274.0,110.7 L274.9,110.7 L275.9,110.7 L276.8,110.7 L277.8,110.8 L278.7,110.9 L279.7,111.0 L280.7,111.2 L281.6,111.4 L282.6,111.6 L283.5,111.8 L284.5,112.1 L285.4,112.4 L286.4,112.8 L287.3,113.1 L288.3,113.5 L289.2,113.9 L290.2,114.4 L291.1,114.8 L292.1,115.3 L293.0,115.8 L294.0,116.3 L294.9,116.9 L295.9,117.4 L296.9,118.0 L297.8,118.6 L298.8,119.2 L299.7,119.8 L300.7,120.4 L301.6,121.0 L302.6,121.7 L303.5,122.3 L304.5,122.9 L305.4,123.6 L306.4,124.2 L307.3,124.9 L308.3,125.5 L309.2,126.1 L310.2,126.7 L311.2,127.3 L312.1,127.9 L313.1,128.4 L314.0,129.0 L315.0,129.5 L315.9,130.0 L316.9,130.4 L317.8,130.9 L318.8,131.3 L319.7,131.6 L320.7,131.9 L321.6,132.2 L322.6,132.5 L323.5,132.6 L324.5,132.8 L325.5,132.8 L326.4,132.8 L327.4,132.8 L328.3,132.6 L329.3,132.4 L330.2,132.2 L331.2,131.8 L332.1,131.4 L333.1,130.9 L334.0,130.2 L335.0,129.5 L335.9,128.7 L336.9,127.8 L337.8,126.8 L338.8,125.6 L339.7,124.3 L340.7,122.9 L341.7,121.4 L342.6,119.8 L343.6,118.0 L344.5,116.0 L345.5,113.9 L346.4,111.7 L347.4,109.3 L348.3,106.7 L349.3,104.0 L350.2,101.0 L351.2,97.9 L352.1,94.6 L353.1,91.1 L354.0,87.4 L355.0,83.5" stroke="var(--est)" stroke-width="3.2" stroke-dasharray="2 5"/><path d="M70.0,143.4 L71.0,151.8 L71.9,159.3 L72.9,166.0 L73.8,171.9 L74.8,177.1 L75.7,181.7 L76.7,185.6 L77.6,188.9 L78.6,191.8 L79.5,194.1 L80.5,196.0 L81.4,197.5 L82.4,198.6 L83.3,199.3 L84.3,199.8 L85.3,199.9 L86.2,199.8 L87.2,199.4 L88.1,198.9 L89.1,198.1 L90.0,197.2 L91.0,196.2 L91.9,195.0 L92.9,193.8 L93.8,192.4 L94.8,191.0 L95.7,189.6 L96.7,188.1 L97.6,186.6 L98.6,185.0 L99.5,183.5 L100.5,182.0 L101.5,180.5 L102.4,179.0 L103.4,177.6 L104.3,176.2 L105.3,174.9 L106.2,173.7 L107.2,172.5 L108.1,171.3 L109.1,170.3 L110.0,169.3 L111.0,168.4 L111.9,167.6 L112.9,166.9 L113.8,166.2 L114.8,165.7 L115.8,165.2 L116.7,164.9 L117.7,164.6 L118.6,164.4 L119.6,164.3 L120.5,164.3 L121.5,164.3 L122.4,164.5 L123.4,164.7 L124.3,165.0 L125.3,165.4 L126.2,165.9 L127.2,166.4 L128.1,167.0 L129.1,167.7 L130.1,168.4 L131.0,169.2 L132.0,170.1 L132.9,171.0 L133.9,171.9 L134.8,172.9 L135.8,174.0 L136.7,175.1 L137.7,176.2 L138.6,177.4 L139.6,178.5 L140.5,179.7 L141.5,181.0 L142.4,182.2 L143.4,183.5 L144.3,184.7 L145.3,186.0 L146.3,187.3 L147.2,188.5 L148.2,189.8 L149.1,191.0 L150.1,192.3 L151.0,193.5 L152.0,194.7 L152.9,195.9 L153.9,197.1 L154.8,198.2 L155.8,199.3 L156.7,200.4 L157.7,201.4 L158.6,202.4 L159.6,203.4 L160.6,204.3 L161.5,205.2 L162.5,206.0 L163.4,206.8 L164.4,207.5 L165.3,208.1 L166.3,208.8 L167.2,209.3 L168.2,209.8 L169.1,210.3 L170.1,210.6 L171.0,211.0 L172.0,211.2 L172.9,211.4 L173.9,211.5 L174.8,211.6 L175.8,211.6 L176.8,211.6 L177.7,211.4 L178.7,211.3 L179.6,211.0 L180.6,210.7 L181.5,210.3 L182.5,209.9 L183.4,209.4 L184.4,208.8 L185.3,208.2 L186.3,207.5 L187.2,206.8 L188.2,206.0 L189.1,205.1 L190.1,204.2 L191.1,203.2 L192.0,202.2 L193.0,201.1 L193.9,200.0 L194.9,198.8 L195.8,197.6 L196.8,196.3 L197.7,195.0 L198.7,193.7 L199.6,192.3 L200.6,190.8 L201.5,189.4 L202.5,187.9 L203.4,186.3 L204.4,184.8 L205.4,183.2 L206.3,181.5 L207.3,179.9 L208.2,178.2 L209.2,176.6 L210.1,174.9 L211.1,173.1 L212.0,171.4 L213.0,169.7 L213.9,167.9 L214.9,166.2 L215.8,164.4 L216.8,162.6 L217.7,160.9 L218.7,159.1 L219.6,157.4 L220.6,155.6 L221.6,153.9 L222.5,152.2 L223.5,150.5 L224.4,148.8 L225.4,147.1 L226.3,145.5 L227.3,143.8 L228.2,142.2 L229.2,140.6 L230.1,139.1 L231.1,137.5 L232.0,136.0 L233.0,134.6 L233.9,133.1 L234.9,131.8 L235.9,130.4 L236.8,129.1 L237.8,127.8 L238.7,126.5 L239.7,125.3 L240.6,124.2 L241.6,123.1 L242.5,122.0 L243.5,121.0 L244.4,120.0 L245.4,119.0 L246.3,118.2 L247.3,117.3 L248.2,116.5 L249.2,115.8 L250.2,115.1 L251.1,114.4 L252.1,113.8 L253.0,113.3 L254.0,112.8 L254.9,112.3 L255.9,111.9 L256.8,111.6 L257.8,111.3 L258.7,111.0 L259.7,110.8 L260.6,110.6 L261.6,110.5 L262.5,110.4 L263.5,110.4 L264.4,110.4 L265.4,110.4 L266.4,110.5 L267.3,110.6 L268.3,110.8 L269.2,111.0 L270.2,111.2 L271.1,111.5 L272.1,111.8 L273.0,112.1 L274.0,112.5 L274.9,112.9 L275.9,113.3 L276.8,113.7 L277.8,114.2 L278.7,114.7 L279.7,115.2 L280.7,115.7 L281.6,116.2 L282.6,116.8 L283.5,117.3 L284.5,117.9 L285.4,118.4 L286.4,119.0 L287.3,119.6 L288.3,120.1 L289.2,120.7 L290.2,121.3 L291.1,121.8 L292.1,122.4 L293.0,122.9 L294.0,123.4 L294.9,124.0 L295.9,124.5 L296.9,124.9 L297.8,125.4 L298.8,125.8 L299.7,126.3 L300.7,126.7 L301.6,127.0 L302.6,127.4 L303.5,127.7 L304.5,128.0 L305.4,128.2 L306.4,128.4 L307.3,128.6 L308.3,128.8 L309.2,128.9 L310.2,129.0 L311.2,129.0 L312.1,129.0 L313.1,129.0 L314.0,129.0 L315.0,128.9 L315.9,128.7 L316.9,128.6 L317.8,128.4 L318.8,128.1 L319.7,127.9 L320.7,127.6 L321.6,127.3 L322.6,126.9 L323.5,126.5 L324.5,126.2 L325.5,125.7 L326.4,125.3 L327.4,124.9 L328.3,124.4 L329.3,123.9 L330.2,123.5 L331.2,123.0 L332.1,122.5 L333.1,122.1 L334.0,121.6 L335.0,121.2 L335.9,120.8 L336.9,120.4 L337.8,120.1 L338.8,119.8 L339.7,119.5 L340.7,119.4 L341.7,119.3 L342.6,119.2 L343.6,119.3 L344.5,119.4 L345.5,119.6 L346.4,120.0 L347.4,120.4 L348.3,121.0 L349.3,121.8 L350.2,122.7 L351.2,123.7 L352.1,125.0 L353.1,126.4 L354.0,128.0 L355.0,129.8" stroke="var(--err)" stroke-width="3" stroke-dasharray="12 4 3 4"/><path d="M81.4,197.5 L82.1,196.9 L83.0,196.1 L83.9,195.3 L85.0,194.3 L86.2,193.3 L87.5,192.2 L88.8,191.1 L90.2,189.9 L91.7,188.6 L93.1,187.4 L94.6,186.1 L96.1,184.8 L97.5,183.6 L98.9,182.4 L100.3,181.3 L101.6,180.2 L102.8,179.1 L104.1,177.9 L105.4,176.6 L106.6,175.2 L107.9,173.8 L109.1,172.5 L110.4,171.1 L111.7,169.8 L112.9,168.5 L114.2,167.4 L115.4,166.3 L116.7,165.5 L118.0,164.8 L119.2,164.3 L120.5,164.0 L121.7,164.0 L123.0,164.3 L124.3,164.8 L125.5,165.6 L126.8,166.6 L128.0,167.7 L129.3,169.1 L130.6,170.5 L131.8,172.0 L133.1,173.6 L134.3,175.3 L135.6,176.9 L136.9,178.5 L138.1,180.1 L139.4,181.5 L140.6,182.9 L141.9,184.1 L143.2,185.2 L144.4,186.3 L145.7,187.4 L146.9,188.4 L148.2,189.4 L149.5,190.4 L150.7,191.4 L152.0,192.4 L153.3,193.4 L154.5,194.3 L155.8,195.3 L157.0,196.2 L158.3,197.2 L159.6,198.1 L160.8,199.1 L162.1,200.1 L163.3,201.1 L164.6,202.3 L165.9,203.6 L167.1,204.9 L168.4,206.3 L169.6,207.6 L170.9,209.0 L172.2,210.3 L173.4,211.5 L174.7,212.6 L175.9,213.6 L177.2,214.3 L178.5,214.9 L179.7,215.3 L181.0,215.3 L182.2,215.1 L183.5,214.6 L184.8,213.9 L186.0,212.9 L187.3,211.7 L188.5,210.3 L189.8,208.7 L191.1,207.0 L192.3,205.1 L193.6,203.2 L194.9,201.1 L196.1,199.0 L197.4,196.8 L198.6,194.6 L199.9,192.5 L201.2,190.3 L202.4,188.1 L203.7,185.9 L204.9,183.6 L206.2,181.1 L207.5,178.5 L208.7,175.8 L210.0,173.0 L211.2,170.2 L212.5,167.4 L213.8,164.6 L215.0,161.9 L216.3,159.2 L217.5,156.5 L218.8,154.0 L220.1,151.6 L221.3,149.4 L222.6,147.4 L223.8,145.5 L225.1,143.7 L226.4,142.0 L227.6,140.4 L228.9,139.0 L230.1,137.5 L231.4,136.2 L232.7,134.9 L233.9,133.7 L235.2,132.5 L236.5,131.3 L237.7,130.2 L239.0,129.0 L240.2,127.9 L241.5,126.8 L242.8,125.6 L244.0,124.4 L245.3,123.2 L246.5,122.0 L247.8,120.7 L249.1,119.5 L250.3,118.3 L251.6,117.1 L252.8,116.0 L254.1,114.9 L255.4,113.9 L256.6,113.0 L257.9,112.1 L259.1,111.4 L260.4,110.8 L261.7,110.3 L262.9,109.9 L264.2,109.7 L265.4,109.6 L266.7,109.6 L268.0,109.7 L269.2,110.0 L270.5,110.3 L271.7,110.7 L273.0,111.2 L274.3,111.7 L275.5,112.3 L276.8,112.9 L278.0,113.5 L279.3,114.2 L280.6,114.8 L281.8,115.4 L283.1,116.0 L284.4,116.6 L285.6,117.4 L286.9,118.1 L288.1,119.0 L289.4,119.9 L290.7,120.8 L291.9,121.7 L293.2,122.6 L294.4,123.6 L295.7,124.4 L297.0,125.3 L298.2,126.1 L299.5,126.8 L300.7,127.4 L302.0,127.9 L303.3,128.3 L304.5,128.6 L305.8,128.8 L307.0,128.9 L308.3,128.9 L309.6,128.9 L310.8,128.9 L312.1,128.7 L313.3,128.6 L314.6,128.4 L315.9,128.1 L317.1,127.9 L318.4,127.6 L319.6,127.3 L320.9,127.0 L322.2,126.7 L323.4,126.4 L324.7,126.1 L326.1,125.7 L327.5,125.3 L328.9,124.8 L330.4,124.3 L331.9,123.8 L333.3,123.3 L334.8,122.7 L336.2,122.2 L337.5,121.7 L338.8,121.2 L340.0,120.7 L341.1,120.3 L342.0,119.9 L342.9,119.5 L343.6,119.3" stroke="currentColor" stroke-width="1.6"/></g><g fill="currentColor"><circle cx="81.4" cy="197.5" r="3.5"/><circle cx="101.6" cy="180.2" r="3.5"/><circle cx="121.7" cy="164.0" r="3.5"/><circle cx="141.9" cy="184.1" r="3.5"/><circle cx="162.1" cy="200.1" r="3.5"/><circle cx="182.2" cy="215.1" r="3.5"/><circle cx="202.4" cy="188.1" r="3.5"/><circle cx="222.6" cy="147.4" r="3.5"/><circle cx="242.8" cy="125.6" r="3.5"/><circle cx="262.9" cy="109.9" r="3.5"/><circle cx="283.1" cy="116.0" r="3.5"/><circle cx="303.3" cy="128.3" r="3.5"/><circle cx="323.4" cy="126.4" r="3.5"/><circle cx="343.6" cy="119.3" r="3.5"/></g><g font-size="14" fill="currentColor"><line x1="392" y1="70" x2="432" y2="70" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><text x="440" y="75">most flexible</text><line x1="392" y1="104" x2="432" y2="104" stroke="var(--err)" stroke-width="3" stroke-dasharray="12 4 3 4" stroke-linecap="round"/><text x="440" y="109">even even more</text><line x1="392" y1="138" x2="432" y2="138" stroke="var(--est)" stroke-width="3.2" stroke-dasharray="2 5" stroke-linecap="round"/><text x="440" y="143">even more</text><line x1="392" y1="172" x2="432" y2="172" stroke="var(--pop)" stroke-width="3" stroke-dasharray="9 5" stroke-linecap="round"/><text x="440" y="177">little more flexible</text><line x1="392" y1="206" x2="432" y2="206" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/><text x="440" y="211">least flexible</text></g>
+</svg>
+<figcaption>Figure 1. Fits of increasing flexibility to the same data, from a straight line (least flexible) to a curve through every point (most flexible).</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 1</summary>
+  <p>The horizontal axis is <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> and the vertical axis <math alttext="Y"><mi>Y</mi></math>. A handful of points trend upward from left to right, with a bump up in the middle and a dip before a steep rise at the right. Five curves are drawn through them, labelled in the original from least to most flexible:</p>
+  <ol>
+    <li><strong>least flexible</strong>: a straight line rising across the plot, ignoring the bump and the dip;</li>
+    <li><strong>little more flexible</strong>: a gently curving line that bends slightly with the trend;</li>
+    <li><strong>even more</strong>: a curve that follows the bump and the dip;</li>
+    <li><strong>even even more</strong>: a curve that follows them more tightly, with sharper turns;</li>
+    <li><strong>most flexible</strong>: a wiggly curve that passes through every point, oscillating between them.</li>
+  </ol>
+  <p>The more flexible the curve, the more closely it tracks the individual points, including their noise.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Annotation</span> <strong>Most flexible ≠ best model.</strong></p>
+</div>
+
+<h2 id="what-is-f">2. What is <em>f</em>?</h2>
+
+<h3 id="loss">2.1 Loss</h3>
+
+<div class="eq">
+<math display="block" alttext="script L of Y comma f of X">
+  <mrow><mi>ℒ</mi><mo>(</mo><mi>Y</mi><mo>,</mo><mi>f</mi><mo>(</mo><mi>X</mi><mo>)</mo><mo>)</mo></mrow>
+</math>
+</div>
+
+<p><strong>Regression:</strong> squared error,
+  <math alttext="the quantity Y minus f of X, squared"><msup><mrow><mo>(</mo><mi>Y</mi><mo>−</mo><mi>f</mi><mo>(</mo><mi>X</mi><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup></math>.</p>
+
+<p>We want to minimize the expected prediction error</p>
+
+<div class="eq">
+<math display="block" alttext="E P E of f equals the expected value of the quantity Y minus f of X, squared">
+  <mrow><mi>EPE</mi><mo>(</mo><mi>f</mi><mo>)</mo><mo>=</mo><mi>E</mi><mrow><mo>[</mo><msup><mrow><mo>(</mo><mi>Y</mi><mo>−</mo><mi>f</mi><mo>(</mo><mi>X</mi><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>]</mo></mrow></mrow>
+</math>
+</div>
+
+<p>which is minimized by</p>
+
+<div class="eq">
+<math display="block" alttext="f of x equals the expected value of Y given X equals x">
+  <mrow><mi>f</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mi>E</mi><mrow><mo>[</mo><mi>Y</mi><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>]</mo></mrow></mrow>
+</math>
+</div>
+
+<p>the conditional mean of <math alttext="Y"><mi>Y</mi></math> given <math alttext="X equals x"><mrow><mi>X</mi><mo>=</mo><mi>x</mi></mrow></math>.</p>
+
+<h3 id="approx">2.2 Approximating the conditional mean</h3>
+
+<p>Our goal is approximate <math alttext="the expected value of Y given X equals x"><mrow><mi>E</mi><mo>[</mo><mi>Y</mi><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>]</mo></mrow></math>.</p>
+
+<ol type="A">
+  <li>Linear regression</li>
+  <li>An example: rent by apartment size.
+    <table>
+      <caption>Apartment size and rent</caption>
+      <thead><tr><th scope="col">Size (ft²)</th><th scope="col">Rent</th></tr></thead>
+      <tbody>
+        <tr><td>900</td><td>$2k</td></tr>
+        <tr><td>1000</td><td>$2.2k (circled)</td></tr>
+        <tr><td>1700</td><td>$3k (circled)</td></tr>
+        <tr><td>1800</td><td>$3.1k</td></tr>
+        <tr><td>2500</td><td>$5k</td></tr>
+      </tbody>
+    </table>
+    <p>How much rent for 1400 ft²?</p>
+  </li>
+</ol>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> The rents <strong>$2.2k</strong> and <strong>$3k</strong> (for 1000 and 1700 ft²) are circled together, as the neighbours used to answer the question.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Possible error in original</span> Measured from 1400 ft², the distances are 500 (900 ft²), 400 (1000 ft²), 300 (1700 ft²), 400 (1800 ft²) and 1100 (2500 ft²). So 1700 ft² is the nearest neighbour, but 1000 ft² and 1800 ft² are tied for second. Circling 1000 and 1700 is a valid choice for <math alttext="K equals 2"><mrow><mi>K</mi><mo>=</mo><mn>2</mn></mrow></math> only if the tie is broken toward 1000; the notes don't say which <math alttext="K"><mi>K</mi></math> is used or how ties are broken.</p>
+</div>
+
+<h3 id="knn">K-nearest neighbours (KNN)</h3>
+
+<div class="eq">
+<math display="block" alttext="f hat sub K of x equals one over K times the sum, over i such that x sub i is in N sub K of x, of y sub i">
+  <mrow>
+    <msub><mover><mi>f</mi><mo>^</mo></mover><mi>K</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mfrac><mn>1</mn><mi>K</mi></mfrac>
+    <munder><mo>∑</mo><mrow><mi>i</mi><mo>:</mo><msub><mi>x</mi><mi>i</mi></msub><mo>∈</mo><msub><mi>N</mi><mi>K</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></munder>
+    <msub><mi>y</mi><mi>i</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<p>where <math alttext="N sub K of x"><mrow><msub><mi>N</mi><mi>K</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math> = the <math alttext="K"><mi>K</mi></math> training points closest to <math alttext="x"><mi>x</mi></math>.</p>
+
+<figure>
+<svg viewBox="0 0 560 300" role="img" aria-labelledby="fig2-t fig2-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig2-t">K-nearest neighbours with K equals 3: the three points closest to x are circled</title>
+  <desc id="fig2-d">Ten points scatter above the x-one axis. A dotted vertical line marks the query point x on the axis. An oval circles the three points whose x-one values are closest to it, and an arrow from the oval points to the note: take y bar of these 3 points as our f hat of x. The label K equals 3 is in the top right.</desc>
+  <line x1="60" y1="270" x2="380" y2="270" stroke="currentColor" stroke-width="2"/><line x1="60" y1="270" x2="60" y2="25" stroke="currentColor" stroke-width="2"/><polygon points="380,270 372,266 372,274" fill="currentColor"/><polygon points="60,25 56,33 64,33" fill="currentColor"/><text x="386" y="275" font-size="15" fill="currentColor">x₁</text><text x="42" y="27" font-size="15" fill="currentColor">Y</text><line x1="303.0" y1="270" x2="303.0" y2="30" stroke="var(--pop)" stroke-width="2.5" stroke-dasharray="2 5" stroke-linecap="round"/><text x="303.0" y="292" font-size="16" fill="var(--pop)" text-anchor="middle" font-style="italic">x</text><g fill="currentColor"><circle cx="101.0" cy="192.1" r="3.5"/><circle cx="128.0" cy="138.9" r="3.5"/><circle cx="149.0" cy="168.4" r="3.5"/><circle cx="185.0" cy="90.5" r="3.5"/><circle cx="224.0" cy="117.1" r="3.5"/><circle cx="245.0" cy="56.2" r="3.5"/><circle cx="271.0" cy="100.0" r="3.5"/><circle cx="296.0" cy="136.1" r="3.5"/><circle cx="336.0" cy="114.2" r="3.5"/><circle cx="351.0" cy="164.6" r="3.5"/></g><ellipse cx="301.0" cy="116.7" rx="52" ry="40" fill="none" stroke="var(--est)" stroke-width="2.5"/><path d="M353.0,112.7 C 381.0,92.7 401.0,122.7 424,108.7" fill="none" stroke="var(--est)" stroke-width="2"/><polygon points="430,108.7 421,103.7 421,113.7" fill="var(--est)"/><text x="436" y="104.7" font-size="14" fill="var(--est)">take ȳ of these</text><text x="436" y="122.7" font-size="14" fill="var(--est)">3 pts as our f̂(x)</text><text x="470" y="40" font-size="16" fill="var(--est)">K = 3</text>
+</svg>
+<figcaption>Figure 2. KNN with <math alttext="K equals 3"><mrow><mi>K</mi><mo>=</mo><mn>3</mn></mrow></math>: the prediction at <math alttext="x"><mi>x</mi></math> is the average response of the three nearest training points.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 2</summary>
+  <p>The horizontal axis is <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> and the vertical axis <math alttext="Y"><mi>Y</mi></math>. Ten points are scattered, rising from the left to a peak just right of centre and falling a little at the right. A dotted vertical line rises from a point marked <math alttext="x"><mi>x</mi></math> on the horizontal axis, toward the right. An oval circles the three points whose <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> values are closest to <math alttext="x"><mi>x</mi></math>: one just left of the line, one just right of it, and one slightly further right. An arrow from the oval leads to the note “take <math alttext="y bar"><mover><mi>y</mi><mo>‾</mo></mover></math> of these 3 pts as our <math alttext="f hat of x"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math>”. The figure is labelled <math alttext="K equals 3"><mrow><mi>K</mi><mo>=</mo><mn>3</mn></mrow></math>.</p>
+</details>
+
+<figure>
+<svg viewBox="0 0 560 300" role="img" aria-labelledby="fig3-t fig3-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig3-t">K-nearest neighbours with K equals 1: the fit is a step function</title>
+  <desc id="fig3-d">The same kind of scatter as the previous figure. The fitted function is a staircase: a flat segment at the height of each point, with dotted vertical jumps half-way between neighbouring points. Beyond the outermost points the fit stays flat at the height of the nearest end point, extending past both ends of the data. The label K equals 1 is in the top right.</desc>
+  <line x1="60" y1="270" x2="380" y2="270" stroke="currentColor" stroke-width="2"/><line x1="60" y1="270" x2="60" y2="25" stroke="currentColor" stroke-width="2"/><polygon points="380,270 372,266 372,274" fill="currentColor"/><polygon points="60,25 56,33 64,33" fill="currentColor"/><text x="386" y="275" font-size="15" fill="currentColor">x₁</text><text x="42" y="27" font-size="15" fill="currentColor">Y</text><g stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"><line x1="20.0" y1="192.1" x2="113.5" y2="192.1"/><line x1="113.5" y1="139.8" x2="137.5" y2="139.8"/><line x1="137.5" y1="170.2" x2="167.0" y2="170.2"/><line x1="167.0" y1="91.4" x2="204.5" y2="91.4"/><line x1="204.5" y1="118.0" x2="234.5" y2="118.0"/><line x1="234.5" y1="57.2" x2="258.0" y2="57.2"/><line x1="258.0" y1="100.0" x2="283.5" y2="100.0"/><line x1="283.5" y1="138.9" x2="316.0" y2="138.9"/><line x1="316.0" y1="116.1" x2="343.5" y2="116.1"/><line x1="343.5" y1="165.5" x2="470.0" y2="165.5"/></g><g stroke="var(--est)" stroke-width="2" stroke-dasharray="2 4" stroke-linecap="round"><line x1="113.5" y1="192.1" x2="113.5" y2="139.8"/><line x1="137.5" y1="139.8" x2="137.5" y2="170.2"/><line x1="167.0" y1="170.2" x2="167.0" y2="91.4"/><line x1="204.5" y1="91.4" x2="204.5" y2="118.0"/><line x1="234.5" y1="118.0" x2="234.5" y2="57.2"/><line x1="258.0" y1="57.2" x2="258.0" y2="100.0"/><line x1="283.5" y1="100.0" x2="283.5" y2="138.9"/><line x1="316.0" y1="138.9" x2="316.0" y2="116.1"/><line x1="343.5" y1="116.1" x2="343.5" y2="165.5"/></g><g fill="currentColor"><circle cx="101.0" cy="192.1" r="3.5"/><circle cx="126.0" cy="139.8" r="3.5"/><circle cx="149.0" cy="170.2" r="3.5"/><circle cx="185.0" cy="91.4" r="3.5"/><circle cx="224.0" cy="118.0" r="3.5"/><circle cx="245.0" cy="57.2" r="3.5"/><circle cx="271.0" cy="100.0" r="3.5"/><circle cx="296.0" cy="138.9" r="3.5"/><circle cx="336.0" cy="116.1" r="3.5"/><circle cx="351.0" cy="165.5" r="3.5"/></g><text x="470" y="40" font-size="16" fill="var(--est)">K = 1</text>
+</svg>
+<figcaption>Figure 3. KNN with <math alttext="K equals 1"><mrow><mi>K</mi><mo>=</mo><mn>1</mn></mrow></math>: the fit is a step function that jumps to the height of each training point.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 3</summary>
+  <p>Axes <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> and <math alttext="Y"><mi>Y</mi></math> as before, with ten scattered points. The fitted function is a staircase. Around each point it is flat at that point's height; it jumps (drawn with dotted vertical segments) to the next point's height part-way between neighbouring points. To the left of the leftmost point the fit is a flat line at that point's height, extending past the vertical axis; to the right of the rightmost point it is a flat line at that point's height, extending to the edge of the plot. The figure is labelled <math alttext="K equals 1"><mrow><mi>K</mi><mo>=</mo><mn>1</mn></mrow></math>.</p>
+</details>
+
+<h2 id="train-test">3. Training vs testing error</h2>
+
+<p>With squared error:</p>
+
+<p><strong>Training error</strong></p>
+<div class="eq">
+<math display="block" alttext="err bar equals one over n times the sum from i equals 1 to n of the quantity y sub i minus f hat of x sub i, squared">
+  <mrow>
+    <mover><mi>err</mi><mo>‾</mo></mover><mo>=</mo>
+    <mfrac><mn>1</mn><mi>n</mi></mfrac>
+    <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover>
+    <msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup>
+  </mrow>
+</math>
+</div>
+
+<p><strong>Test error of your fitted model</strong></p>
+<div class="eq">
+<math display="block" alttext="Err sub script T equals the expected value of the quantity Y sub 0 minus f hat of X sub 0, squared, given script T">
+  <mrow>
+    <msub><mi>Err</mi><mi>𝒯</mi></msub><mo>=</mo>
+    <mi>E</mi><mrow><mo>[</mo><msup><mrow><mo>(</mo><msub><mi>Y</mi><mn>0</mn></msub><mo>−</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>X</mi><mn>0</mn></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>|</mo><mi>𝒯</mi><mo>]</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<p>where <math alttext="open paren X sub 0, Y sub 0 close paren"><mrow><mo>(</mo><msub><mi>X</mi><mn>0</mn></msub><mo>,</mo><msub><mi>Y</mi><mn>0</mn></msub><mo>)</mo></mrow></math> is a new random data point.</p>
+
+<h2 id="bias-var">4. Bias–variance decomposition</h2>
+
+<p>Fix <math alttext="x sub 0"><msub><mi>x</mi><mn>0</mn></msub></math>. <math alttext="f hat of x sub 0"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow></math> is random since <math alttext="script T"><mi>𝒯</mi></math> is random.</p>
+
+<div class="eq">
+<math display="block" alttext="f bar of x sub 0 equals the expected value of f hat of x sub 0">
+  <mrow><mover><mi>f</mi><mo>‾</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>=</mo><mi>E</mi><mrow><mo>[</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>]</mo></mrow></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> Under <math alttext="the expected value of f hat of x sub 0"><mrow><mi>E</mi><mo>[</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>]</mo></mrow></math>: <strong>avg the prediction over all training sets</strong>.</p>
+</div>
+
+<h3 id="thm41">Theorem 4.1</h3>
+
+<div class="eq">
+<math display="block" alttext="the expected value of the quantity Y sub 0 minus f hat of x sub 0, squared, equals sigma squared, plus the quantity f of x sub 0 minus f bar of x sub 0, squared, plus the expected value of the quantity f hat of x sub 0 minus f bar of x sub 0, squared">
+  <mrow>
+    <mi>E</mi><mrow><mo>[</mo><msup><mrow><mo>(</mo><msub><mi>Y</mi><mn>0</mn></msub><mo>−</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>]</mo></mrow>
+    <mo>=</mo><msup><mi>σ</mi><mn>2</mn></msup>
+    <mo>+</mo><msup><mrow><mo>[</mo><mi>f</mi><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>−</mo><mover><mi>f</mi><mo>‾</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>]</mo></mrow><mn>2</mn></msup>
+    <mo>+</mo><mi>E</mi><mrow><mo>[</mo><msup><mrow><mo>(</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>−</mo><mover><mi>f</mi><mo>‾</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>]</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<ul>
+  <li><math alttext="sigma squared"><msup><mi>σ</mi><mn>2</mn></msup></math> is the irreducible error.</li>
+  <li><math alttext="the quantity f of x sub 0 minus f bar of x sub 0, squared"><msup><mrow><mo>[</mo><mi>f</mi><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>−</mo><mover><mi>f</mi><mo>‾</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>]</mo></mrow><mn>2</mn></msup></math> is the <math alttext="bias squared"><msup><mtext>bias</mtext><mn>2</mn></msup></math> of <math alttext="f hat of x sub 0"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow></math>.</li>
+  <li><math alttext="the expected value of the quantity f hat of x sub 0 minus f bar of x sub 0, squared"><mrow><mi>E</mi><mo>[</mo><msup><mrow><mo>(</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>−</mo><mover><mi>f</mi><mo>‾</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>]</mo></mrow></math> is the variance of <math alttext="f hat of x sub 0"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow></math>.</li>
+</ul>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Beside the bias term: <strong>how far avg fit from truth</strong>.</p>
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Beside the variance term: <strong>how much <math alttext="f hat of x sub 0"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow></math> varies between training sets</strong>.</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 560 290" role="img" aria-labelledby="fig4-t fig4-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig4-t">Test error, variance, squared bias, and the irreducible error sigma squared, plotted against model flexibility</title>
+  <desc id="fig4-d">The horizontal axis is model flexibility. A dotted horizontal line marks sigma squared. A decreasing curve labelled bias squared starts just above sigma squared and falls to zero. A dashed variance curve starts near zero and rises steeply. The test error curve is U-shaped and always above the sigma squared line. Its lowest point is marked with a dot, and a leader line runs from it to the label best MSE.</desc>
+  <line x1="60" y1="250" x2="440" y2="250" stroke="currentColor" stroke-width="2"/><line x1="60" y1="250" x2="60" y2="25" stroke="currentColor" stroke-width="2"/><polygon points="440,250 432,246 432,254" fill="currentColor"/><polygon points="60,25 56,33 64,33" fill="currentColor"/><text x="250.0" y="280" font-size="15" fill="currentColor" text-anchor="middle">model flexibility</text><path d="M72.0,54.0 L73.5,56.7 L75.0,59.4 L76.5,61.9 L78.0,64.5 L79.5,66.9 L81.0,69.2 L82.6,71.5 L84.1,73.8 L85.6,75.9 L87.1,78.0 L88.6,80.1 L90.1,82.0 L91.6,83.9 L93.1,85.8 L94.6,87.6 L96.1,89.4 L97.6,91.1 L99.1,92.7 L100.6,94.3 L102.2,95.8 L103.7,97.3 L105.2,98.8 L106.7,100.2 L108.2,101.5 L109.7,102.8 L111.2,104.1 L112.7,105.3 L114.2,106.5 L115.7,107.7 L117.2,108.8 L118.7,109.8 L120.2,110.9 L121.7,111.8 L123.3,112.8 L124.8,113.7 L126.3,114.6 L127.8,115.4 L129.3,116.3 L130.8,117.0 L132.3,117.8 L133.8,118.5 L135.3,119.2 L136.8,119.9 L138.3,120.5 L139.8,121.1 L141.3,121.7 L142.9,122.2 L144.4,122.8 L145.9,123.2 L147.4,123.7 L148.9,124.2 L150.4,124.6 L151.9,125.0 L153.4,125.3 L154.9,125.7 L156.4,126.0 L157.9,126.3 L159.4,126.6 L160.9,126.9 L162.5,127.1 L164.0,127.3 L165.5,127.5 L167.0,127.7 L168.5,127.8 L170.0,128.0 L171.5,128.1 L173.0,128.2 L174.5,128.2 L176.0,128.3 L177.5,128.3 L179.0,128.4 L180.5,128.4 L182.1,128.4 L183.6,128.3 L185.1,128.3 L186.6,128.2 L188.1,128.1 L189.6,128.0 L191.1,127.9 L192.6,127.8 L194.1,127.7 L195.6,127.5 L197.1,127.3 L198.6,127.1 L200.1,126.9 L201.6,126.7 L203.2,126.5 L204.7,126.2 L206.2,126.0 L207.7,125.7 L209.2,125.4 L210.7,125.1 L212.2,124.8 L213.7,124.5 L215.2,124.1 L216.7,123.8 L218.2,123.4 L219.7,123.0 L221.2,122.6 L222.8,122.2 L224.3,121.8 L225.8,121.4 L227.3,120.9 L228.8,120.5 L230.3,120.0 L231.8,119.5 L233.3,119.0 L234.8,118.5 L236.3,118.0 L237.8,117.5 L239.3,117.0 L240.8,116.4 L242.4,115.9 L243.9,115.3 L245.4,114.7 L246.9,114.1 L248.4,113.5 L249.9,112.9 L251.4,112.3 L252.9,111.6 L254.4,111.0 L255.9,110.3 L257.4,109.7 L258.9,109.0 L260.4,108.3 L261.9,107.6 L263.5,106.9 L265.0,106.2 L266.5,105.4 L268.0,104.7 L269.5,103.9 L271.0,103.2 L272.5,102.4 L274.0,101.6 L275.5,100.8 L277.0,100.0 L278.5,99.2 L280.0,98.4 L281.5,97.5 L283.1,96.7 L284.6,95.8 L286.1,95.0 L287.6,94.1 L289.1,93.2 L290.6,92.3 L292.1,91.4 L293.6,90.5 L295.1,89.6 L296.6,88.6 L298.1,87.7 L299.6,86.7 L301.1,85.8 L302.7,84.8 L304.2,83.8 L305.7,82.8 L307.2,81.8 L308.7,80.8 L310.2,79.8 L311.7,78.8 L313.2,77.7 L314.7,76.7 L316.2,75.6 L317.7,74.5 L319.2,73.5 L320.7,72.4 L322.3,71.3 L323.8,70.2 L325.3,69.0 L326.8,67.9 L328.3,66.8 L329.8,65.6 L331.3,64.5 L332.8,63.3 L334.3,62.1 L335.8,60.9 L337.3,59.7 L338.8,58.5 L340.3,57.3 L341.8,56.1 L343.4,54.9 L344.9,53.6 L346.4,52.4 L347.9,51.1 L349.4,49.8 L350.9,48.6 L352.4,47.3 L353.9,46.0 L355.4,44.6 L356.9,43.3 L358.4,42.0 L359.9,40.7 L361.4,39.3 L363.0,37.9 L364.5,36.6 L366.0,35.2 L367.5,33.8 L369.0,32.4 L370.5,31.0" fill="none" stroke="var(--est)" stroke-width="3"/><path d="M72.0,244.0 L73.5,244.0 L75.0,244.0 L76.5,244.0 L78.0,244.0 L79.5,244.0 L81.0,244.0 L82.6,243.9 L84.1,243.9 L85.6,243.9 L87.1,243.9 L88.6,243.8 L90.1,243.8 L91.6,243.8 L93.1,243.7 L94.6,243.7 L96.1,243.6 L97.6,243.6 L99.1,243.5 L100.6,243.4 L102.2,243.4 L103.7,243.3 L105.2,243.2 L106.7,243.1 L108.2,243.0 L109.7,242.9 L111.2,242.9 L112.7,242.7 L114.2,242.6 L115.7,242.5 L117.2,242.4 L118.7,242.3 L120.2,242.1 L121.7,242.0 L123.3,241.9 L124.8,241.7 L126.3,241.6 L127.8,241.4 L129.3,241.2 L130.8,241.1 L132.3,240.9 L133.8,240.7 L135.3,240.5 L136.8,240.3 L138.3,240.1 L139.8,239.9 L141.3,239.7 L142.9,239.5 L144.4,239.3 L145.9,239.1 L147.4,238.8 L148.9,238.6 L150.4,238.3 L151.9,238.1 L153.4,237.8 L154.9,237.6 L156.4,237.3 L157.9,237.0 L159.4,236.7 L160.9,236.4 L162.5,236.1 L164.0,235.8 L165.5,235.5 L167.0,235.2 L168.5,234.9 L170.0,234.5 L171.5,234.2 L173.0,233.9 L174.5,233.5 L176.0,233.2 L177.5,232.8 L179.0,232.4 L180.5,232.0 L182.1,231.6 L183.6,231.3 L185.1,230.9 L186.6,230.5 L188.1,230.0 L189.6,229.6 L191.1,229.2 L192.6,228.8 L194.1,228.3 L195.6,227.9 L197.1,227.4 L198.6,226.9 L200.1,226.5 L201.6,226.0 L203.2,225.5 L204.7,225.0 L206.2,224.5 L207.7,224.0 L209.2,223.5 L210.7,223.0 L212.2,222.4 L213.7,221.9 L215.2,221.4 L216.7,220.8 L218.2,220.3 L219.7,219.7 L221.2,219.1 L222.8,218.5 L224.3,217.9 L225.8,217.3 L227.3,216.7 L228.8,216.1 L230.3,215.5 L231.8,214.9 L233.3,214.2 L234.8,213.6 L236.3,212.9 L237.8,212.3 L239.3,211.6 L240.8,210.9 L242.4,210.3 L243.9,209.6 L245.4,208.9 L246.9,208.2 L248.4,207.5 L249.9,206.7 L251.4,206.0 L252.9,205.3 L254.4,204.5 L255.9,203.8 L257.4,203.0 L258.9,202.2 L260.4,201.4 L261.9,200.7 L263.5,199.9 L265.0,199.1 L266.5,198.2 L268.0,197.4 L269.5,196.6 L271.0,195.8 L272.5,194.9 L274.0,194.1 L275.5,193.2 L277.0,192.3 L278.5,191.5 L280.0,190.6 L281.5,189.7 L283.1,188.8 L284.6,187.9 L286.1,186.9 L287.6,186.0 L289.1,185.1 L290.6,184.1 L292.1,183.2 L293.6,182.2 L295.1,181.2 L296.6,180.3 L298.1,179.3 L299.6,178.3 L301.1,177.3 L302.7,176.3 L304.2,175.2 L305.7,174.2 L307.2,173.2 L308.7,172.1 L310.2,171.1 L311.7,170.0 L313.2,168.9 L314.7,167.8 L316.2,166.7 L317.7,165.6 L319.2,164.5 L320.7,163.4 L322.3,162.3 L323.8,161.1 L325.3,160.0 L326.8,158.8 L328.3,157.7 L329.8,156.5 L331.3,155.3 L332.8,154.1 L334.3,152.9 L335.8,151.7 L337.3,150.5 L338.8,149.3 L340.3,148.1 L341.8,146.8 L343.4,145.6 L344.9,144.3 L346.4,143.0 L347.9,141.7 L349.4,140.5 L350.9,139.2 L352.4,137.8 L353.9,136.5 L355.4,135.2 L356.9,133.9 L358.4,132.5 L359.9,131.2 L361.4,129.8 L363.0,128.4 L364.5,127.0 L366.0,125.7 L367.5,124.3 L369.0,122.8 L370.5,121.4 L372.0,120.0" fill="none" stroke="var(--err)" stroke-width="3" stroke-dasharray="10 5"/><path d="M72.0,150.0 L73.5,152.7 L75.0,155.4 L76.5,158.0 L78.0,160.5 L79.5,162.9 L81.0,165.3 L82.6,167.6 L84.1,169.8 L85.6,172.0 L87.1,174.1 L88.6,176.2 L90.1,178.2 L91.6,180.2 L93.1,182.1 L94.6,183.9 L96.1,185.7 L97.6,187.5 L99.1,189.2 L100.6,190.9 L102.2,192.5 L103.7,194.0 L105.2,195.6 L106.7,197.0 L108.2,198.5 L109.7,199.9 L111.2,201.3 L112.7,202.6 L114.2,203.9 L115.7,205.1 L117.2,206.4 L118.7,207.5 L120.2,208.7 L121.7,209.8 L123.3,210.9 L124.8,212.0 L126.3,213.0 L127.8,214.0 L129.3,215.0 L130.8,216.0 L132.3,216.9 L133.8,217.8 L135.3,218.7 L136.8,219.5 L138.3,220.4 L139.8,221.2 L141.3,222.0 L142.9,222.7 L144.4,223.5 L145.9,224.2 L147.4,224.9 L148.9,225.6 L150.4,226.2 L151.9,226.9 L153.4,227.5 L154.9,228.1 L156.4,228.7 L157.9,229.3 L159.4,229.9 L160.9,230.4 L162.5,231.0 L164.0,231.5 L165.5,232.0 L167.0,232.5 L168.5,232.9 L170.0,233.4 L171.5,233.9 L173.0,234.3 L174.5,234.7 L176.0,235.1 L177.5,235.6 L179.0,235.9 L180.5,236.3 L182.1,236.7 L183.6,237.1 L185.1,237.4 L186.6,237.8 L188.1,238.1 L189.6,238.4 L191.1,238.7 L192.6,239.0 L194.1,239.3 L195.6,239.6 L197.1,239.9 L198.6,240.2 L200.1,240.5 L201.6,240.7 L203.2,241.0 L204.7,241.2 L206.2,241.5 L207.7,241.7 L209.2,241.9 L210.7,242.1 L212.2,242.3 L213.7,242.6 L215.2,242.8 L216.7,243.0 L218.2,243.1 L219.7,243.3 L221.2,243.5 L222.8,243.7 L224.3,243.9 L225.8,244.0 L227.3,244.2 L228.8,244.4 L230.3,244.5 L231.8,244.7 L233.3,244.8 L234.8,244.9 L236.3,245.1 L237.8,245.2 L239.3,245.3 L240.8,245.5 L242.4,245.6 L243.9,245.7 L245.4,245.8 L246.9,245.9 L248.4,246.1 L249.9,246.2 L251.4,246.3 L252.9,246.4 L254.4,246.5 L255.9,246.6 L257.4,246.7 L258.9,246.8 L260.4,246.8 L261.9,246.9 L263.5,247.0 L265.0,247.1 L266.5,247.2 L268.0,247.2 L269.5,247.3 L271.0,247.4 L272.5,247.5 L274.0,247.5 L275.5,247.6 L277.0,247.7 L278.5,247.7 L280.0,247.8 L281.5,247.9 L283.1,247.9 L284.6,248.0 L286.1,248.0 L287.6,248.1 L289.1,248.1 L290.6,248.2 L292.1,248.2 L293.6,248.3 L295.1,248.3 L296.6,248.4 L298.1,248.4 L299.6,248.5 L301.1,248.5 L302.7,248.5 L304.2,248.6 L305.7,248.6 L307.2,248.7 L308.7,248.7 L310.2,248.7 L311.7,248.8 L313.2,248.8 L314.7,248.8 L316.2,248.9 L317.7,248.9 L319.2,248.9 L320.7,249.0 L322.3,249.0 L323.8,249.0 L325.3,249.0 L326.8,249.1 L328.3,249.1 L329.8,249.1 L331.3,249.1 L332.8,249.2 L334.3,249.2 L335.8,249.2 L337.3,249.2 L338.8,249.2 L340.3,249.3 L341.8,249.3 L343.4,249.3 L344.9,249.3 L346.4,249.3 L347.9,249.4 L349.4,249.4 L350.9,249.4 L352.4,249.4 L353.9,249.4 L355.4,249.4 L356.9,249.5 L358.4,249.5 L359.9,249.5 L361.4,249.5 L363.0,249.5 L364.5,249.5 L366.0,249.5 L367.5,249.6 L369.0,249.6 L370.5,249.6 L372.0,249.6" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="3 5" stroke-linecap="round"/><line x1="72" y1="160.0" x2="387.0" y2="160.0" stroke="var(--pop)" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round"/><text x="393.0" y="165.0" font-size="15" fill="var(--pop)">σ²</text><text x="378.5" y="36.0" font-size="14" fill="var(--est)">test error</text><text x="380.0" y="125.0" font-size="14" fill="var(--err)">variance</text><text x="380.0" y="245.6" font-size="14" fill="var(--accent)">bias²</text><circle cx="180.5" cy="128.4" r="5" fill="var(--pop)"/><path d="M180.5,133.4 C 190.5,168.4 252.0,186.0 382.0,206.0" fill="none" stroke="var(--pop)" stroke-width="2"/><text x="388.0" y="211.0" font-size="14" fill="var(--pop)">best MSE</text>
+</svg>
+<figcaption>Figure 4. As model flexibility grows, the squared bias falls and the variance rises; the test error is U-shaped and never drops below <math alttext="sigma squared"><msup><mi>σ</mi><mn>2</mn></msup></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 4</summary>
+  <p>The horizontal axis is labelled “model flexibility”; the vertical axis has no label. Four curves are drawn:</p>
+  <ul>
+    <li>a horizontal dotted line labelled <math alttext="sigma squared"><msup><mi>σ</mi><mn>2</mn></msup></math>, a little below half-way up;</li>
+    <li>a curve labelled <strong>bias²</strong> (no label in the original) that starts just above the <math alttext="sigma squared"><msup><mi>σ</mi><mn>2</mn></msup></math> line at the left and decreases quickly, flattening out to zero by the middle of the axis;</li>
+    <li>a curve labelled <strong>variance</strong> that starts near zero and increases slowly, then steeply, crossing the <math alttext="sigma squared"><msup><mi>σ</mi><mn>2</mn></msup></math> line toward the right;</li>
+    <li>a U-shaped curve labelled <strong>test error</strong>, high at the left, falling to a minimum a little above the <math alttext="sigma squared"><msup><mi>σ</mi><mn>2</mn></msup></math> line, and rising steeply on the right.</li>
+  </ul>
+  <p>A line runs from the label <strong>best MSE</strong> to the minimum of the test error curve.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> The decreasing curve in Figure 4 has no label in the original. It is labelled <math alttext="bias squared"><msup><mtext>bias</mtext><mn>2</mn></msup></math> here, following Theorem 4.1, since the test error is the sum of <math alttext="sigma squared"><msup><mi>σ</mi><mn>2</mn></msup></math>, the squared bias and the variance.</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 560 200" role="img" aria-labelledby="fig5-t fig5-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig5-t">Three bullseye targets illustrating combinations of bias and variance</title>
+  <desc id="fig5-d">Three targets, each three concentric rings. Left, labelled low bias, low variance: the shots form a tight cluster on the centre. Middle, labelled high bias, low variance: a tight cluster up and to the right of the centre, between the inner and middle rings. Right, labelled low bias, high variance: shots scattered widely around the centre.</desc>
+  <circle cx="95" cy="80" r="60" fill="none" stroke="var(--pop)" stroke-width="2.5"/><circle cx="95" cy="80" r="36" fill="none" stroke="var(--pop)" stroke-width="2.5"/><circle cx="95" cy="80" r="12" fill="none" stroke="var(--pop)" stroke-width="2.5"/><g fill="currentColor"><circle cx="95" cy="80" r="2.6"/><circle cx="98" cy="78" r="2.6"/><circle cx="92" cy="82" r="2.6"/><circle cx="97" cy="83" r="2.6"/><circle cx="93" cy="77" r="2.6"/></g><text x="95" y="166" font-size="15" fill="currentColor" text-anchor="middle">low bias</text><text x="95" y="186" font-size="15" fill="currentColor" text-anchor="middle">low variance</text><circle cx="280" cy="80" r="60" fill="none" stroke="var(--pop)" stroke-width="2.5"/><circle cx="280" cy="80" r="36" fill="none" stroke="var(--pop)" stroke-width="2.5"/><circle cx="280" cy="80" r="12" fill="none" stroke="var(--pop)" stroke-width="2.5"/><g fill="currentColor"><circle cx="310" cy="55" r="2.6"/><circle cx="314" cy="58" r="2.6"/><circle cx="307" cy="52" r="2.6"/><circle cx="312" cy="51" r="2.6"/><circle cx="316" cy="54" r="2.6"/></g><text x="280" y="166" font-size="15" fill="currentColor" text-anchor="middle">high bias</text><text x="280" y="186" font-size="15" fill="currentColor" text-anchor="middle">low variance</text><circle cx="465" cy="80" r="60" fill="none" stroke="var(--pop)" stroke-width="2.5"/><circle cx="465" cy="80" r="36" fill="none" stroke="var(--pop)" stroke-width="2.5"/><circle cx="465" cy="80" r="12" fill="none" stroke="var(--pop)" stroke-width="2.5"/><g fill="currentColor"><circle cx="443" cy="74" r="2.6"/><circle cx="483" cy="94" r="2.6"/><circle cx="455" cy="100" r="2.6"/><circle cx="489" cy="68" r="2.6"/><circle cx="471" cy="56" r="2.6"/><circle cx="447" cy="96" r="2.6"/><circle cx="479" cy="84" r="2.6"/><circle cx="459" cy="66" r="2.6"/></g><text x="465" y="166" font-size="15" fill="currentColor" text-anchor="middle">low bias</text><text x="465" y="186" font-size="15" fill="currentColor" text-anchor="middle">high variance</text>
+</svg>
+<figcaption>Figure 5. Bias is how far the centre of the shots is from the bullseye; variance is how spread out the shots are.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 5</summary>
+  <p>Three targets drawn side by side, each with three concentric rings. Left, <strong>low bias, low variance</strong>: all the shots land in a tight cluster on the centre. Middle, <strong>high bias, low variance</strong>: the shots form a tight cluster, but it sits off-centre, up and to the right, outside the inner ring. Right, <strong>low bias, high variance</strong>: the shots are scattered all around the centre; their average is near the bullseye, but individual shots are far from it.</p>
+</details>
+
+<h2 id="curse">5. Curse of dimensionality</h2>
+
+<p>In high dimensions (<math alttext="p"><mi>p</mi></math>), neighbourhoods are not local.</p>
+
+<figure>
+<svg viewBox="0 0 560 190" role="img" aria-labelledby="fig6-t fig6-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig6-t">One dimension: a segment of length 0.1 covers 10 percent of uniformly spread data</title>
+  <desc id="fig6-d">A horizontal segment from 0 to 1 labelled x one, with data points spread evenly along it. Below it a bracket runs from 0 to 0.1, one tenth of the segment.</desc>
+  <text x="30" y="40" font-size="16" fill="currentColor">p = 1</text><line x1="70" y1="90" x2="470" y2="90" stroke="currentColor" stroke-width="2.5"/><line x1="70" y1="80" x2="70" y2="100" stroke="currentColor" stroke-width="2"/><line x1="470" y1="80" x2="470" y2="100" stroke="currentColor" stroke-width="2"/><text x="70" y="122" font-size="15" fill="currentColor" text-anchor="middle">0</text><text x="470" y="122" font-size="15" fill="currentColor" text-anchor="middle">1</text><text x="482" y="95" font-size="15" fill="currentColor">x₁</text><g fill="var(--err)"><circle cx="74.1" cy="86" r="2.6"/><circle cx="121.4" cy="86" r="2.6"/><circle cx="122.3" cy="86" r="2.6"/><circle cx="127.3" cy="86" r="2.6"/><circle cx="143.6" cy="86" r="2.6"/><circle cx="153.0" cy="86" r="2.6"/><circle cx="156.6" cy="86" r="2.6"/><circle cx="165.7" cy="86" r="2.6"/><circle cx="166.9" cy="86" r="2.6"/><circle cx="175.5" cy="86" r="2.6"/><circle cx="183.0" cy="86" r="2.6"/><circle cx="208.9" cy="86" r="2.6"/><circle cx="230.8" cy="86" r="2.6"/><circle cx="245.0" cy="86" r="2.6"/><circle cx="253.2" cy="86" r="2.6"/><circle cx="268.7" cy="86" r="2.6"/><circle cx="288.5" cy="86" r="2.6"/><circle cx="352.7" cy="86" r="2.6"/><circle cx="365.6" cy="86" r="2.6"/><circle cx="369.1" cy="86" r="2.6"/><circle cx="372.7" cy="86" r="2.6"/><circle cx="384.1" cy="86" r="2.6"/><circle cx="400.7" cy="86" r="2.6"/><circle cx="412.8" cy="86" r="2.6"/><circle cx="413.9" cy="86" r="2.6"/><circle cx="436.2" cy="86" r="2.6"/></g><line x1="70" y1="140" x2="110.0" y2="140" stroke="var(--pop)" stroke-width="3"/><line x1="70" y1="132" x2="70" y2="148" stroke="var(--pop)" stroke-width="2"/><line x1="110.0" y1="132" x2="110.0" y2="148" stroke="var(--pop)" stroke-width="2"/><text x="110.0" y="168" font-size="15" fill="var(--pop)" text-anchor="middle">.1</text>
+</svg>
+<figcaption>Figure 6. With <math alttext="p equals 1"><mrow><mi>p</mi><mo>=</mo><mn>1</mn></mrow></math> and data spread evenly on <math alttext="the interval from 0 to 1"><mrow><mo>[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>]</mo></mrow></math>, an interval of length 0.1 captures 10% of the data.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 6</summary>
+  <p>Labelled <math alttext="p equals 1"><mrow><mi>p</mi><mo>=</mo><mn>1</mn></mrow></math>. A horizontal segment runs from 0 to 1 along the <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> axis, with data points dotted evenly along its length. Below the left end, a bracket marks the interval from 0 to 0.1.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> Beside the bracket: <strong>we capture 10% of data</strong>.</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 560 290" role="img" aria-labelledby="fig7-t fig7-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig7-t">Two dimensions: a small square in the corner of the unit square, with edge about 0.32, covers 10 percent of the data</title>
+  <desc id="fig7-d">The unit square with axes x one and x two, filled with evenly scattered data points. In the lower-left corner a smaller square with edge length about 0.32 is outlined; it holds one tenth of the area and so one tenth of the data.</desc>
+  <line x1="70" y1="250" x2="320" y2="250" stroke="currentColor" stroke-width="2"/><line x1="70" y1="250" x2="70" y2="10" stroke="currentColor" stroke-width="2"/><polygon points="320,250 312,246 312,254" fill="currentColor"/><polygon points="70,10 66,18 74,18" fill="currentColor"/><text x="326" y="255" font-size="15" fill="currentColor">x₁</text><text x="52" y="12" font-size="15" fill="currentColor">x₂</text><rect x="70" y="40" width="210" height="210" fill="none" stroke="var(--est)" stroke-width="2.5"/><text x="70" y="270" font-size="15" fill="currentColor" text-anchor="middle">0</text><text x="280" y="270" font-size="15" fill="currentColor" text-anchor="middle">1</text><text x="56" y="45" font-size="15" fill="currentColor" text-anchor="end">1</text><text x="340" y="40" font-size="16" fill="currentColor">p = 2</text><g fill="var(--err)"><circle cx="216.7" cy="159.5" r="2.6"/><circle cx="81.8" cy="229.2" r="2.6"/><circle cx="164.3" cy="74.8" r="2.6"/><circle cx="271.6" cy="76.8" r="2.6"/><circle cx="124.0" cy="88.8" r="2.6"/><circle cx="251.7" cy="64.1" r="2.6"/><circle cx="269.6" cy="128.6" r="2.6"/><circle cx="185.0" cy="52.8" r="2.6"/><circle cx="210.6" cy="83.7" r="2.6"/><circle cx="233.1" cy="84.5" r="2.6"/><circle cx="215.6" cy="72.3" r="2.6"/><circle cx="161.9" cy="86.3" r="2.6"/><circle cx="148.7" cy="204.5" r="2.6"/><circle cx="169.8" cy="225.0" r="2.6"/><circle cx="157.0" cy="172.2" r="2.6"/><circle cx="254.5" cy="206.0" r="2.6"/><circle cx="267.6" cy="65.7" r="2.6"/><circle cx="178.6" cy="144.3" r="2.6"/><circle cx="175.2" cy="229.0" r="2.6"/><circle cx="181.6" cy="94.0" r="2.6"/><circle cx="218.4" cy="239.8" r="2.6"/><circle cx="107.9" cy="233.8" r="2.6"/><circle cx="164.6" cy="173.6" r="2.6"/><circle cx="131.7" cy="228.1" r="2.6"/><circle cx="199.3" cy="103.9" r="2.6"/><circle cx="92.0" cy="240.5" r="2.6"/><circle cx="155.6" cy="183.8" r="2.6"/><circle cx="211.7" cy="156.1" r="2.6"/><circle cx="104.1" cy="147.1" r="2.6"/><circle cx="222.0" cy="109.0" r="2.6"/><circle cx="155.6" cy="117.5" r="2.6"/><circle cx="124.8" cy="93.4" r="2.6"/><circle cx="234.9" cy="225.9" r="2.6"/><circle cx="84.7" cy="120.6" r="2.6"/><circle cx="238.2" cy="183.5" r="2.6"/><circle cx="190.0" cy="173.9" r="2.6"/><circle cx="233.8" cy="65.1" r="2.6"/><circle cx="229.6" cy="196.4" r="2.6"/><circle cx="220.6" cy="114.1" r="2.6"/><circle cx="249.2" cy="81.0" r="2.6"/></g><rect x="70" y="182.8" width="67.2" height="67.2" fill="none" stroke="var(--pop)" stroke-width="3.5"/><text x="103.6" y="174.8" font-size="14" fill="var(--pop)" text-anchor="middle">e ≈ .32</text>
+</svg>
+<figcaption>Figure 7. With <math alttext="p equals 2"><mrow><mi>p</mi><mo>=</mo><mn>2</mn></mrow></math>, capturing 10% of the data takes a square with edge about 0.32.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 7</summary>
+  <p>Labelled <math alttext="p equals 2"><mrow><mi>p</mi><mo>=</mo><mn>2</mn></mrow></math>. The unit square, with <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> on the horizontal axis and <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math> on the vertical axis running from 0 to 1, is filled with evenly scattered data points. A smaller square is outlined in the lower-left corner, starting at the origin. It contains about one tenth of the points.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> <strong>Fraction of data = fraction of volume.</strong></p>
+  <p>Let <math alttext="e"><mi>e</mi></math> = edge length. If <math alttext="p equals 2"><mrow><mi>p</mi><mo>=</mo><mn>2</mn></mrow></math>, volume = <math alttext="e to the p equals e squared"><mrow><msup><mi>e</mi><mi>p</mi></msup><mo>=</mo><msup><mi>e</mi><mn>2</mn></msup></mrow></math>, so</p>
+  <math display="block" alttext="e squared equals 0.10, so e equals the square root of 0.10, which is approximately 0.32">
+    <mrow>
+      <msup><mi>e</mi><mn>2</mn></msup><mo>=</mo><mn>.10</mn>
+      <mspace width="1.5em"></mspace>
+      <mi>e</mi><mo>=</mo><msqrt><mn>.10</mn></msqrt><mo>≈</mo><mn>.32</mn>
+    </mrow>
+  </math>
+</div>
+
+<figure>
+<svg viewBox="0 0 560 300" role="img" aria-labelledby="fig8-t fig8-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig8-t">Three dimensions: a smaller cube in the corner of the unit cube, with edge about 0.46, covers 10 percent of the data</title>
+  <desc id="fig8-d">A unit cube drawn in perspective with axes x one, x two and x three, filled with scattered data points. A smaller cube sharing the corner at the origin is outlined inside it; its edge is about 0.46 of the full edge, so it holds one tenth of the volume.</desc>
+  <g fill="var(--err)"><circle cx="192.9" cy="152.6" r="2.4"/><circle cx="302.5" cy="178.3" r="2.4"/><circle cx="177.5" cy="150.6" r="2.4"/><circle cx="285.6" cy="205.3" r="2.4"/><circle cx="198.8" cy="184.3" r="2.4"/><circle cx="153.1" cy="82.7" r="2.4"/><circle cx="238.4" cy="175.1" r="2.4"/><circle cx="322.9" cy="70.2" r="2.4"/><circle cx="235.0" cy="195.6" r="2.4"/><circle cx="242.3" cy="79.8" r="2.4"/><circle cx="189.5" cy="92.2" r="2.4"/><circle cx="363.6" cy="58.2" r="2.4"/><circle cx="229.3" cy="105.1" r="2.4"/><circle cx="254.9" cy="53.2" r="2.4"/><circle cx="162.0" cy="84.6" r="2.4"/><circle cx="158.9" cy="172.7" r="2.4"/><circle cx="319.0" cy="98.3" r="2.4"/><circle cx="234.8" cy="205.2" r="2.4"/><circle cx="280.9" cy="144.4" r="2.4"/><circle cx="208.0" cy="69.0" r="2.4"/><circle cx="146.1" cy="114.5" r="2.4"/><circle cx="165.0" cy="206.7" r="2.4"/><circle cx="172.7" cy="67.6" r="2.4"/><circle cx="225.2" cy="165.5" r="2.4"/><circle cx="202.7" cy="28.8" r="2.4"/><circle cx="268.0" cy="65.6" r="2.4"/><circle cx="283.6" cy="68.1" r="2.4"/><circle cx="309.4" cy="57.5" r="2.4"/><circle cx="223.8" cy="190.2" r="2.4"/><circle cx="165.5" cy="236.9" r="2.4"/><circle cx="220.1" cy="232.4" r="2.4"/><circle cx="286.4" cy="148.5" r="2.4"/><circle cx="293.1" cy="71.7" r="2.4"/><circle cx="265.9" cy="50.3" r="2.4"/><circle cx="244.4" cy="95.7" r="2.4"/><circle cx="290.9" cy="180.4" r="2.4"/><circle cx="275.2" cy="131.2" r="2.4"/><circle cx="248.0" cy="59.9" r="2.4"/><circle cx="227.8" cy="96.5" r="2.4"/><circle cx="240.9" cy="118.7" r="2.4"/><circle cx="160.1" cy="102.5" r="2.4"/><circle cx="254.3" cy="82.8" r="2.4"/><circle cx="342.0" cy="98.5" r="2.4"/><circle cx="219.2" cy="120.6" r="2.4"/><circle cx="233.0" cy="75.6" r="2.4"/></g><line x1="80.0" y1="270.0" x2="280.0" y2="270.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="280.0" y1="270.0" x2="280.0" y2="70.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="280.0" y1="70.0" x2="80.0" y2="70.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="80.0" y1="70.0" x2="80.0" y2="270.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="190.0" y1="200.0" x2="390.0" y2="200.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="390.0" y1="200.0" x2="390.0" y2="0.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="390.0" y1="0.0" x2="190.0" y2="0.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="190.0" y1="0.0" x2="190.0" y2="200.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="80.0" y1="270.0" x2="190.0" y2="200.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="280.0" y1="270.0" x2="390.0" y2="200.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="280.0" y1="70.0" x2="390.0" y2="0.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="80.0" y1="70.0" x2="190.0" y2="0.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="80.0" y1="270.0" x2="172.0" y2="270.0" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="172.0" y1="270.0" x2="172.0" y2="178.0" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="172.0" y1="178.0" x2="80.0" y2="178.0" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="80.0" y1="178.0" x2="80.0" y2="270.0" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="130.6" y1="237.8" x2="222.6" y2="237.8" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="222.6" y1="237.8" x2="222.6" y2="145.8" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="222.6" y1="145.8" x2="130.6" y2="145.8" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="130.6" y1="145.8" x2="130.6" y2="237.8" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="80.0" y1="270.0" x2="130.6" y2="237.8" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="172.0" y1="270.0" x2="222.6" y2="237.8" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="172.0" y1="178.0" x2="222.6" y2="145.8" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><line x1="80.0" y1="178.0" x2="130.6" y2="145.8" stroke="var(--pop)" stroke-width="3.5" stroke-linecap="round"/><text x="286" y="288" font-size="15" fill="currentColor">x₁</text><text x="72" y="68" font-size="15" fill="currentColor" text-anchor="end">x₂</text><text x="398" y="208" font-size="15" fill="currentColor">x₃</text><text x="460" y="40" font-size="16" fill="currentColor">p = 3</text><text x="460" y="66" font-size="14" fill="var(--pop)">e ≈ .46</text>
+</svg>
+<figcaption>Figure 8. With <math alttext="p equals 3"><mrow><mi>p</mi><mo>=</mo><mn>3</mn></mrow></math>, capturing 10% of the data takes a cube with edge about 0.46.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 8</summary>
+  <p>Labelled <math alttext="p equals 3"><mrow><mi>p</mi><mo>=</mo><mn>3</mn></mrow></math>. A unit cube is drawn in perspective, with <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> along the bottom front edge, <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math> up the left front edge, and <math alttext="x sub 3"><msub><mi>x</mi><mn>3</mn></msub></math> along the edge receding into the page. Data points are scattered throughout. A smaller cube sharing the corner at the origin is outlined inside it, reaching almost half-way along each edge.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> For <math alttext="p equals 3"><mrow><mi>p</mi><mo>=</mo><mn>3</mn></mrow></math>:</p>
+  <math display="block" alttext="e equals 0.1 to the one third, which equals 0.46">
+    <mrow><mi>e</mi><mo>=</mo><msup><mn>.1</mn><mrow><mn>1</mn><mo>/</mo><mn>3</mn></mrow></msup><mo>=</mo><mn>.46</mn></mrow>
+  </math>
+</div>
+
+<table>
+  <caption>Edge length needed to capture 10% of uniformly spread data, by dimension</caption>
+  <thead><tr><th scope="col"><math alttext="p"><mi>p</mi></math></th><th scope="col">Segment length to capture 10%</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>.1</td></tr>
+    <tr><td>2</td><td>.32</td></tr>
+    <tr><td>3</td><td>.46</td></tr>
+    <tr><td>10</td><td>.79</td></tr>
+    <tr><td>100</td><td>.98</td></tr>
+  </tbody>
+</table>
+
+
+</main>
+
+<footer>
+  <p>Transcribed from the handwritten notes <em>ML_week_1_day_1.pdf</em> (8 pages). Equations are MathML; figures are inline SVG with title, description, and an expandable long description. Conforms to WCAG 2.2 Level AA.</p>
+</footer>
+</div>
+</body>
+</html>
