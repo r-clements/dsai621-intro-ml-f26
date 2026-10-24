@@ -2,7 +2,7 @@
 
 ## This Week: Week 2 (Mon 10/26 & Thu 10/29)
 
-**Quiz 1 is this Thursday, 10/29, in class.** Bring your hand-written cheat sheet (8.5x11, one side, with your name on it). No phones, calculators or other devices.
+**Quiz 1 is this Thursday, 10/29.** Bring your hand-written cheat sheet (8.5x11, one side, with your name on it). No phones, calculators or other devices.
 
 **Topic:** Shrinkage: ridge regression, the lasso and the elastic net.
 
@@ -11,7 +11,7 @@
 **Work on:**
 - [Practice Problems 2](problem_sets/PP2.pdf) ([solutions](problem_sets/PP2_sol.pdf)). These aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
 - Notebook: [`notebooks/ridge_lasso.ipynb`](notebooks/ridge_lasso.ipynb). Run `git pull` and then `uv sync` first.
-- Interactive demo: [Shrinkage: Ridge, Lasso and Elastic Net](https://robertclements.org/dsai621-intro-ml-f26/topics/shrinkage-paths/). It now has a Loss tab.
+- Interactive demo: [Shrinkage: Ridge, Lasso and Elastic Net](https://robertclements.org/dsai621-intro-ml-f26/topics/shrinkage-paths/). 
 - If you haven't finished them yet, the Week 1 problems are below under Past weeks.
 
 <details>
