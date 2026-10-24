@@ -1,21 +1,31 @@
 # Introduction to Machine Learning - DSAI 621
 
-## This Week: Week 1 (Thu 10/22)
+## This Week: Week 2 (Mon 10/26 & Thu 10/29)
+
+**Quiz 1 is this Thursday, 10/29, in class.** Bring your hand-written cheat sheet (8.5x11, one side, with your name on it). No phones, calculators or other devices.
+
+**Topic:** Shrinkage: ridge regression, the lasso and the elastic net.
+
+**Read:** ISL 6.2 (and 6.1 for a review of subset selection); ESL 3.4.
+
+**Work on:**
+- [Practice Problems 2](problem_sets/PP2.pdf) ([solutions](problem_sets/PP2_sol.pdf)). These aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
+- Notebook: [`notebooks/ridge_lasso.ipynb`](notebooks/ridge_lasso.ipynb). Run `git pull` and then `uv sync` first.
+- Interactive demo: [Shrinkage: Ridge, Lasso and Elastic Net](https://robertclements.org/dsai621-intro-ml-f26/topics/shrinkage-paths/). It now has a Loss tab.
+- If you haven't finished them yet, the Week 1 problems are below under Past weeks.
+
+<details>
+<summary>Past weeks</summary>
+
+### Week 1 (Thu 10/22)
 
 **Topic:** What is machine learning? The bias-variance tradeoff and the curse of dimensionality.
 
 **Read:** ISL 2.1–2.2 and 3.5; ESL 2.1–2.5 and 7.2–7.3.
 
-**Work on:**
-- [Practice Problems 1](problem_sets/PP1.pdf) ([solutions](problem_sets/PP1_sol.pdf)). These aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
+- Class notes: [handwritten](notes/hand-written/ML_week_1_day_1.pdf) · [accessible HTML](notes/html/ML_week_1_day_1.html)
+- [Practice Problems 1](problem_sets/PP1.pdf) ([solutions](problem_sets/PP1_sol.pdf))
 - Interactive demo: [Bias–Variance Tradeoff with KNN Regression](https://robertclements.org/dsai621-intro-ml-f26/topics/bias-variance-knn/)
-
-**Coming up:** Quiz 1 is in class on **Thursday 10/29**. Bring your hand-written cheat sheet (8.5x11, one side).
-
-<details>
-<summary>Past weeks</summary>
-
-*Nothing yet.*
 
 </details>
 

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LDA, QDA, Naive Bayes and Logistic Regression — DSAI 621</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      max-width: 760px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #222;
+      background: #fff;
+      color-scheme: light;
+    }
+    a.back { font-size: 0.9rem; color: #1a5fb4; text-decoration: none; }
+    a.back:hover { text-decoration: underline; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1rem; margin: 1rem 0 0.25rem; }
+    p.instructions { color: #555; font-size: 0.95rem; margin-top: 0; }
+    p.a11y-instructions {
+      border-left: 3px solid #1a5fb4;
+      padding-left: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .presets { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.75rem 0 0.25rem; }
+    .presets span { font-weight: 600; margin-right: 0.25rem; }
+    .controls {
+      display: grid; grid-template-columns: max-content 1fr 5ch max-content; gap: 0.35rem 0.75rem;
+      align-items: center; margin: 0.75rem 0;
+    }
+    .controls label { font-weight: 600; }
+    .controls input[type=range] { width: 100%; min-width: 120px; accent-color: #1a5fb4; }
+    .controls output { font-variant-numeric: tabular-nums; }
+    button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
+    button[aria-pressed="true"] { background: #1a5fb4; color: #fff; border: 1px solid #1a5fb4; font-weight: 600; }
+    :focus-visible { outline: 3px solid #1a5fb4; outline-offset: 2px; }
+    .panel { border: 1px solid #ddd; border-radius: 4px; padding: 0.25rem; }
+    .panel svg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .axis text { font-size: 11px; }
+    .axis-label { font-size: 12px; fill: #333; }
+    .handle { cursor: grab; }
+    .handle:focus { outline: none; }
+    .handle:focus-visible .ring { stroke: #1a5fb4; stroke-width: 3; }
+    .handle .ring { fill: none; stroke: transparent; }
+    #stats { font-size: 0.95rem; margin-top: 0.75rem; font-variant-numeric: tabular-nums; }
+    table.errors { border-collapse: collapse; width: 100%; font-size: 0.92rem; font-variant-numeric: tabular-nums; margin-top: 0.5rem; }
+    table.errors th, table.errors td { padding: 0.3rem 0.5rem; text-align: right; border-bottom: 1px solid #e3e3e3; }
+    table.errors th:first-child, table.errors td:first-child { text-align: left; }
+    table.errors td.key { text-align: left; }
+    table.errors tr.best td { font-weight: 700; }
+    table.errors caption { text-align: left; font-size: 0.85rem; color: #555; caption-side: bottom; padding-top: 0.35rem; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+    @media (max-width: 480px) {
+      .controls { grid-template-columns: 1fr 5ch max-content; }
+      .controls label { grid-column: 1 / -1; }
+      table.errors th, table.errors td { padding: 0.25rem 0.3rem; }
+    }
+  </style>
+</head>
+<body>
+  <a class="back" href="../../">&larr; All topics</a>
+  <h1>LDA, QDA, Naive Bayes and Logistic Regression</h1>
+  <p id="instructions" class="instructions">
+    Two Gaussian classes. The shaded region is where the Bayes classifier says class 2; the four
+    lines are the boundaries fitted to the training sample. Pick a scenario, change the sample size,
+    and drag a class mean to move it. (Lecture notes §2–§5; ISL 4.4–4.5.)
+  </p>
+  <p id="a11y-instructions" class="instructions a11y-instructions">
+    Keyboard: Tab to a class mean and use the arrow keys to move it (Shift for bigger steps).
+    The test errors are in the table below the plot and are announced after each change.
+  </p>
+
+  <div class="presets" role="group" aria-labelledby="presets-label">
+    <span id="presets-label">Scenario:</span>
+    <button type="button" data-preset="lda" aria-pressed="true">Shared Σ (LDA is right)</button>
+    <button type="button" data-preset="qda" aria-pressed="false">Different Σ (QDA is right)</button>
+    <button type="button" data-preset="nb" aria-pressed="false">Independent features (naive Bayes is right)</button>
+  </div>
+
+  <div class="controls">
+    <label for="n-slider">Training size n</label>
+    <input type="range" id="n-slider" min="0" max="11" step="1" value="5" aria-describedby="instructions">
+    <output id="n-out" for="n-slider">50</output>
+    <button id="resample" type="button">New sample</button>
+  </div>
+
+  <figure class="panel" style="margin:0">
+    <div id="plot"></div>
+  </figure>
+
+  <div id="stats" aria-live="polite" aria-atomic="true"></div>
+
+  <h2 id="table-heading">Test error</h2>
+  <table class="errors" aria-labelledby="table-heading">
+    <thead>
+      <tr>
+        <th scope="col">Method</th>
+        <th scope="col" class="key">Line</th>
+        <th scope="col">This sample</th>
+        <th scope="col">Average of 100 samples</th>
+      </tr>
+    </thead>
+    <tbody id="error-rows"></tbody>
+    <caption>
+      Bold: lowest average among the four fitted methods. "—": the method can't be fitted on every sample at this n (QDA needs 3 points in each class, naive Bayes 2).
+    </caption>
+  </table>
+
+  <script src="app.js"></script>
+</body>
+</html>
