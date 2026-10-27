@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Curse of Dimensionality, Ridge Regression, and the Lasso — Week 2, Day 1 | DSAI 621</title>
+<meta name="description" content="Accessible class notes finishing the curse of dimensionality, then regularized linear models: overfitting, problems with OLS, ridge regression and its closed-form solution, standardizing predictors, the lasso, the constrained forms of both, and the role of the tuning parameter lambda.">
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #4a4a4a;
+    --rule: #c9c9c9;
+    --accent: #0b4f8a;
+    --accent-bg: #eef4fa;
+    --focus: #0b4f8a;
+    --pop: #a4262c;   /* population / true  — 5.9:1 on white */
+    --est: #5b2d8e;   /* estimate / fitted  — 8.5:1 on white */
+    --err: #8a5000;   /* errors / residuals — 5.1:1 on white */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f2; --muted: #cfcfcf; --rule: #555;
+      --accent: #8ab8e0; --accent-bg: #182430; --focus: #8ab8e0;
+      --pop: #ff9f99; --est: #cbb0ff; --err: #f0b458;
+    }
+    body { background: #131313; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--ink);
+    background: #fff;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #131313; } }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 5rem; }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible, :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--accent); color: #fff;
+    padding: .75rem 1rem; z-index: 10; text-decoration: none;
+  }
+  .skip:focus { left: .5rem; top: .5rem; }
+  h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; line-height: 1.3; margin: 2.5rem 0 .5rem;
+       padding-top: .75rem; border-top: 2px solid var(--rule); }
+  h3 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  p, li { max-width: 42rem; }
+  .lede { color: var(--muted); margin-top: 0; }
+  nav.toc {
+    background: var(--accent-bg); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 1rem 1.25rem; margin: 2rem 0;
+  }
+  nav.toc h2 { font-size: 1.05rem; margin: 0 0 .5rem; border: 0; padding: 0; }
+  nav.toc ol { margin: 0; padding-left: 1.25rem; }
+  nav.toc li { margin: .3rem 0; }
+  nav.toc a { display: inline-block; min-height: 24px; padding: 2px 0; }
+  table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+  caption { text-align: left; font-weight: 600; padding-bottom: .5rem; }
+  th, td { border: 1px solid var(--rule); padding: .5rem .7rem; text-align: left; }
+  thead th { background: var(--accent-bg); }
+  figure { margin: 1.5rem 0; }
+  figcaption { font-size: .95rem; color: var(--muted); margin-top: .5rem; }
+  svg { max-width: 100%; height: auto; display: block; }
+  details {
+    border: 1px solid var(--rule); border-radius: 6px;
+    padding: .5rem .85rem; margin: .75rem 0; background: var(--accent-bg);
+  }
+  summary { cursor: pointer; font-weight: 600; min-height: 24px; padding: .25rem 0; }
+  details[open] summary { margin-bottom: .5rem; }
+  math { font-size: 1.15em; }
+  math[display="block"] { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }
+  .eq { margin: 1.25rem 0; }
+  .note {
+    border-left: 4px solid var(--accent); background: var(--accent-bg);
+    padding: .75rem 1rem; margin: 1.25rem 0; border-radius: 0 6px 6px 0;
+  }
+  .note > :first-child { margin-top: 0; }
+  .note > :last-child { margin-bottom: 0; }
+  .tag {
+    display: inline-block; font-size: .8rem; font-weight: 700;
+    letter-spacing: .02em; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 4px;
+    padding: 0 .4em; white-space: nowrap;
+  }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 2px solid var(--rule);
+           color: var(--muted); font-size: .95rem; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps > li { margin: .75rem 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<div class="wrap">
+<header>
+  <p class="lede"><strong>DSAI 621 — Intro to Machine Learning</strong> · Fall 2026 · Week 2, Day 1</p>
+  <h1>The Curse of Dimensionality, Ridge Regression, and the Lasso</h1>
+  <p class="lede">Accessible transcription of the handwritten class notes. All equations are marked up in MathML so they can be read by a screen reader, magnified, or rendered in braille. All figures have text descriptions. Annotations written in a second pen colour in the original are reproduced here as labelled callouts, so none of their meaning depends on colour.</p>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+  <h2 id="toc-h">On this page</h2>
+  <ol>
+    <li><a href="#agenda">Agenda</a></li>
+    <li><a href="#curse">1. Curse of dimensionality</a></li>
+    <li><a href="#problem6">Practice problem 6(b) and 6(c)</a></li>
+    <li><a href="#regularized">2. Regularized linear models</a></li>
+    <li><a href="#regularization">2.1 Regularization</a></li>
+    <li><a href="#ols-problems">2.2 OLS problems</a></li>
+    <li><a href="#ridge">3. Ridge regression</a></li>
+    <li><a href="#standardize">3.2 Standardize the data matrix</a></li>
+    <li><a href="#ridge-solution">3.3 Solution for <em>β</em></a></li>
+    <li><a href="#lasso">4. Lasso / L1 regularization</a></li>
+    <li><a href="#hard">4.4 Hard constraint</a></li>
+    <li><a href="#lambda">5. The tuning parameter <em>λ</em></a></li>
+    <li><a href="#summary">6. Summary</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+
+<h2 id="agenda">Agenda</h2>
+<ul>
+  <li>Curse of dimensionality</li>
+  <li>Ridge regression</li>
+  <li>Lasso regression</li>
+</ul>
+
+<h2 id="curse">1. Curse of dimensionality</h2>
+
+<figure>
+<svg viewBox="0 0 470 300" role="img" aria-labelledby="fig1-t fig1-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig1-t">Three dimensions: a cube centred in the unit cube holding 10 percent of the volume has edges of length 0.46</title>
+  <desc id="fig1-d">A unit cube with axes x one, x two and x three, with data points scattered through it. A smaller cube sits in its centre; its front face is labelled 0.10 and each of its edges is labelled 0.46. On each of the three axis edges of the unit cube, a thick segment marks the 0.46 stretch of that predictor's range that the small cube spans.</desc>
+  <g fill="var(--err)"><circle cx="294.9" cy="105.8" r="2.4"/><circle cx="206.3" cy="219.7" r="2.4"/><circle cx="321.1" cy="41.9" r="2.4"/><circle cx="240.4" cy="130.5" r="2.4"/><circle cx="222.0" cy="27.6" r="2.4"/><circle cx="133.2" cy="223.0" r="2.4"/><circle cx="311.1" cy="54.0" r="2.4"/><circle cx="258.9" cy="88.2" r="2.4"/><circle cx="142.9" cy="102.6" r="2.4"/><circle cx="296.3" cy="189.4" r="2.4"/><circle cx="236.8" cy="190.1" r="2.4"/><circle cx="251.5" cy="200.3" r="2.4"/><circle cx="204.5" cy="129.9" r="2.4"/><circle cx="226.1" cy="165.2" r="2.4"/><circle cx="236.1" cy="179.0" r="2.4"/><circle cx="202.5" cy="122.1" r="2.4"/><circle cx="308.9" cy="88.0" r="2.4"/><circle cx="338.9" cy="37.2" r="2.4"/><circle cx="338.3" cy="116.5" r="2.4"/><circle cx="362.4" cy="81.8" r="2.4"/><circle cx="319.9" cy="65.3" r="2.4"/><circle cx="342.8" cy="128.0" r="2.4"/><circle cx="217.8" cy="192.1" r="2.4"/><circle cx="156.5" cy="160.7" r="2.4"/><circle cx="366.5" cy="161.7" r="2.4"/><circle cx="319.3" cy="131.4" r="2.4"/><circle cx="248.5" cy="211.2" r="2.4"/><circle cx="243.9" cy="125.5" r="2.4"/><circle cx="177.1" cy="221.2" r="2.4"/><circle cx="175.7" cy="202.5" r="2.4"/><circle cx="225.1" cy="123.7" r="2.4"/><circle cx="136.1" cy="165.7" r="2.4"/><circle cx="242.8" cy="168.5" r="2.4"/><circle cx="261.5" cy="79.4" r="2.4"/><circle cx="201.2" cy="125.8" r="2.4"/><circle cx="251.6" cy="105.5" r="2.4"/><circle cx="193.2" cy="91.7" r="2.4"/><circle cx="194.3" cy="130.4" r="2.4"/><circle cx="327.8" cy="42.7" r="2.4"/><circle cx="213.0" cy="82.5" r="2.4"/></g><line x1="90.0" y1="270.0" x2="200.0" y2="200.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="90.0" y1="270.0" x2="90.0" y2="70.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="90.0" y1="270.0" x2="290.0" y2="270.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="200.0" y1="200.0" x2="200.0" y2="0.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="200.0" y1="200.0" x2="400.0" y2="200.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="90.0" y1="70.0" x2="200.0" y2="0.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="90.0" y1="70.0" x2="290.0" y2="70.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="200.0" y1="0.0" x2="400.0" y2="0.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="290.0" y1="270.0" x2="400.0" y2="200.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="290.0" y1="270.0" x2="290.0" y2="70.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="400.0" y1="200.0" x2="400.0" y2="0.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="290.0" y1="70.0" x2="400.0" y2="0.0" stroke="var(--est)" stroke-width="2.5" stroke-linecap="round"/><line x1="173.7" y1="197.1" x2="224.3" y2="164.9" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="173.7" y1="197.1" x2="173.7" y2="105.1" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="173.7" y1="197.1" x2="265.7" y2="197.1" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="224.3" y1="164.9" x2="224.3" y2="72.9" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="224.3" y1="164.9" x2="316.3" y2="164.9" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="173.7" y1="105.1" x2="224.3" y2="72.9" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="173.7" y1="105.1" x2="265.7" y2="105.1" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="224.3" y1="72.9" x2="316.3" y2="72.9" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="265.7" y1="197.1" x2="316.3" y2="164.9" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="265.7" y1="197.1" x2="265.7" y2="105.1" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="316.3" y1="164.9" x2="316.3" y2="72.9" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="265.7" y1="105.1" x2="316.3" y2="72.9" stroke="var(--err)" stroke-width="3.5" stroke-linecap="round"/><line x1="144.0" y1="270.0" x2="236.0" y2="270.0" stroke="var(--err)" stroke-width="6" stroke-linecap="round"/><line x1="90.0" y1="216.0" x2="90.0" y2="124.0" stroke="var(--err)" stroke-width="6" stroke-linecap="round"/><line x1="319.7" y1="251.1" x2="370.3" y2="218.9" stroke="var(--err)" stroke-width="6" stroke-linecap="round"/><text x="211.7" y="189.1" font-size="16" fill="var(--pop)" text-anchor="start">.10</text><text x="219.7" y="217.1" font-size="14" fill="currentColor" text-anchor="middle">.46</text><text x="167.7" y="156.1" font-size="14" fill="currentColor" text-anchor="end">.46</text><text x="299.0" y="195.0" font-size="14" fill="currentColor" text-anchor="start">.46</text><text x="90.0" y="290.0" font-size="15" fill="currentColor" text-anchor="middle">0</text><text x="290.0" y="292.0" font-size="15" fill="currentColor" text-anchor="middle">x₁</text><text x="82.0" y="75.0" font-size="15" fill="currentColor" text-anchor="end">x₂ 1</text><text x="410.0" y="210.0" font-size="15" fill="currentColor" text-anchor="start">x₃</text>
+</svg>
+<figcaption>Figure 1. With <math alttext="p equals 3"><mrow><mi>p</mi><mo>=</mo><mn>3</mn></mrow></math>, a cube holding 10% of the volume has edges of length 0.46.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 1</summary>
+  <p>A unit cube is drawn in perspective, with <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> along the bottom front edge, <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math> up the left front edge (marked 1 at the top) and <math alttext="x sub 3"><msub><mi>x</mi><mn>3</mn></msub></math> along the edge receding into the page. The corner at the origin is marked 0. Data points are scattered through it. A smaller cube floats in the middle of it. Its front face is labelled .10, its volume, and its edges are labelled .46. On each of the three axis edges of the big cube, a thick segment marks the stretch of that predictor's range, 46% of it, that the small cube spans.</p>
+</details>
+
+<p>A “local” average of <math alttext="y"><mi>y</mi></math> over 10% of the data, we need 46% of the range of every predictor!</p>
+
+<h3 id="problem6">Practice problem 6(b) and 6(c)</h3>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> “Problem 6” is Problem 6 of Practice Problems 1 (adapted from ISL 4.8, Exercise 4). It uses only the training points within 10% of <em>each</em> predictor's range of the test point. The headings “Problem 6(b)” and “6(c)”, the sketch, and the notes marked as annotations below are in a second colour in the original.</p>
+</div>
+
+<p><strong>6(b)</strong>, with <math alttext="p equals 2"><mrow><mi>p</mi><mo>=</mo><mn>2</mn></mrow></math>:</p>
+
+<figure>
+<svg viewBox="0 0 470 280" role="img" aria-labelledby="fig2-t fig2-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig2-t">Two dimensions: a square of side 0.1 in the middle of the unit square covers only 1 percent of it</title>
+  <desc id="fig2-d">The unit square with axes x one and x two. A tiny square, 0.1 on each side, is drawn in its centre. It covers 10 percent of the range of each predictor but only 1 percent of the area.</desc>
+  <rect x="110" y="40" width="210" height="210" fill="none" stroke="var(--est)" stroke-width="2.5"/><text x="328.0" y="264.0" font-size="15" fill="currentColor" text-anchor="start">x₁</text><text x="102.0" y="45.0" font-size="15" fill="currentColor" text-anchor="end">x₂ 1</text><text x="110.0" y="270.0" font-size="15" fill="currentColor" text-anchor="middle">0</text><text x="30.0" y="34.0" font-size="16" fill="currentColor" text-anchor="start">p = 2</text><rect x="204.5" y="134.5" width="21.0" height="21.0" fill="none" stroke="var(--err)" stroke-width="3"/><text x="198.5" y="150.0" font-size="14" fill="var(--err)" text-anchor="end">.1</text><text x="215.0" y="173.5" font-size="14" fill="var(--err)" text-anchor="middle">.1</text>
+</svg>
+<figcaption>Figure 2. With <math alttext="p equals 2"><mrow><mi>p</mi><mo>=</mo><mn>2</mn></mrow></math>, a square with edge 0.1 covers only 1% of the unit square.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 2</summary>
+  <p>Labelled <math alttext="p equals 2"><mrow><mi>p</mi><mo>=</mo><mn>2</mn></mrow></math>. The unit square, with <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> on the horizontal and <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math> on the vertical; the origin is marked 0 and the top of the vertical axis 1. A tiny square sits in its centre, with each side labelled .1.</p>
+</details>
+
+<p>With <math alttext="e"><mi>e</mi></math> = edge length = .1,</p>
+<div class="eq">
+<math display="block" alttext="0.1 squared equals 0.01, the volume">
+  <mrow><msup><mn>.1</mn><mn>2</mn></msup><mo>=</mo><mn>.01</mn><mspace width="1em"></mspace><mo>←</mo><mspace width="0.5em"></mspace><mtext>volume</mtext></mrow>
+</math>
+</div>
+<p>So 10% of the range of <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> and <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math> = 1% of data.</p>
+
+<p><strong>6(c)</strong>, with <math alttext="p equals 100"><mrow><mi>p</mi><mo>=</mo><mn>100</mn></mrow></math> (the result, <math alttext="10 to the minus 100"><msup><mn>10</mn><mrow><mo>−</mo><mn>100</mn></mrow></msup></math>, is double-underlined):</p>
+<div class="eq">
+<math display="block" alttext="0.1 to the 100 equals 10 to the minus 100">
+  <mrow><msup><mn>.1</mn><mn>100</mn></msup><mo>=</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>100</mn></mrow></msup></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> <strong>10% of range of every predictor = no training points.</strong></p>
+</div>
+
+<p><strong>The fix:</strong> other ML models impose structure, e.g. a linear relationship.</p>
+
+<h2 id="regularized">2. Regularized linear models</h2>
+
+<ul>
+  <li><math alttext="n"><mi>n</mi></math> = number of observations</li>
+  <li><math alttext="p"><mi>p</mi></math> = number of predictors</li>
+  <li><math alttext="beta equals the column vector beta sub 1 through beta sub p"><mrow><mi>β</mi><mo>=</mo>
+      <mrow><mo>(</mo><mtable><mtr><mtd><msub><mi>β</mi><mn>1</mn></msub></mtd></mtr><mtr><mtd><mo>⋮</mo></mtd></mtr><mtr><mtd><msub><mi>β</mi><mi>p</mi></msub></mtd></mtr></mtable><mo>)</mo></mrow></mrow></math>,
+    <math alttext="beta sub 0"><msub><mi>β</mi><mn>0</mn></msub></math>: intercept</li>
+  <li><math alttext="bold X, n by p"><msub><mi mathvariant="bold">X</mi><mrow><mi>n</mi><mo>×</mo><mi>p</mi></mrow></msub></math> (no column of 1s)</li>
+</ul>
+
+<p>Recall:</p>
+<ul>
+  <li>AIC (<math alttext="lambda equals 2"><mrow><mi>λ</mi><mo>=</mo><mn>2</mn></mrow></math>): penalty <math alttext="lambda times the number of beta hat sub j not equal to 0"><mrow><mi>λ</mi><mo>⋅</mo><mo>#</mo><mtext> of </mtext><msub><mover><mi>β</mi><mo>^</mo></mover><mi>j</mi></msub><mo>≠</mo><mn>0</mn></mrow></math></li>
+  <li>BIC (<math alttext="lambda equals the natural log of n"><mrow><mi>λ</mi><mo>=</mo><mi>ln</mi><mo>(</mo><mi>n</mi><mo>)</mo></mrow></math>)</li>
+</ul>
+<p>How about <math alttext="lambda times the L1 norm of beta"><mrow><mi>λ</mi><msub><mrow><mo>‖</mo><mi>β</mi><mo>‖</mo></mrow><mn>1</mn></msub></mrow></math> or <math alttext="lambda times the squared L2 norm of beta"><mrow><mi>λ</mi><msubsup><mrow><mo>‖</mo><mi>β</mi><mo>‖</mo></mrow><mn>2</mn><mn>2</mn></msubsup></mrow></math>?</p>
+
+
+<h3 id="regularization">2.1 Regularization</h3>
+
+<p><strong>Overfitting:</strong> the model predicts <em>much</em> better on the training set than on testing (unseen) data, i.e. it doesn't generalize well.</p>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Boxed</span> To improve generalization, add a penalty / constraint to the model's fitting objective to discourage complexity (reduce flexibility).</p>
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> Written above the box: <strong>Regularization</strong></p>
+</div>
+
+<h3 id="ols-problems">2.2 OLS problems</h3>
+
+<ol>
+  <li>If <math alttext="p"><mi>p</mi></math> is relatively large, variance is high:
+    <math display="block" alttext="one over n times the sum from i equals 1 to n of the variance of y hat sub i equals the quantity p plus 1, times sigma squared over n">
+      <mrow>
+        <mfrac><mn>1</mn><mi>n</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><mi>Var</mi><mo>(</mo><msub><mover><mi>y</mi><mo>^</mo></mover><mi>i</mi></msub><mo>)</mo>
+        <mo>=</mo><mo>(</mo><mi>p</mi><mo>+</mo><mn>1</mn><mo>)</mo><mfrac><msup><mi>σ</mi><mn>2</mn></msup><mi>n</mi></mfrac>
+      </mrow>
+    </math>
+  </li>
+  <li>Multicollinearity</li>
+  <li><math alttext="p greater than n"><mrow><mi>p</mi><mo>&gt;</mo><mi>n</mi></mrow></math>: <math alttext="bold X transpose bold X"><mrow><msup><mi mathvariant="bold">X</mi><mi>T</mi></msup><mi mathvariant="bold">X</mi></mrow></math> is singular</li>
+</ol>
+
+<h2 id="ridge">3. Ridge regression</h2>
+
+<h3 id="ridge-def">3.1 Ridge regression / L2 regularization</h3>
+
+<div class="eq">
+<math display="block" alttext="beta hat ridge sub lambda equals the argmin over beta sub 0 and beta of, in brackets, the sum from i equals 1 to n of the quantity y sub i minus y hat sub i, squared, plus lambda times the sum from j equals 1 to p of beta sub j squared">
+  <mrow>
+    <msubsup><mover><mi>β</mi><mo>^</mo></mover><mi>λ</mi><mtext>ridge</mtext></msubsup><mo>=</mo>
+    <munder><mo>argmin</mo><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>,</mo><mi>β</mi></mrow></munder>
+    <mrow><mo>[</mo>
+    <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover>
+    <msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>y</mi><mo>^</mo></mover><mi>i</mi></msub><mo>)</mo></mrow><mn>2</mn></msup>
+    <mo>+</mo><mi>λ</mi>
+    <munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover>
+    <msubsup><mi>β</mi><mi>j</mi><mn>2</mn></msubsup>
+    <mo>]</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="equals the argmin over beta sub 0 and beta of the sum from i equals 1 to n of the quantity y sub i minus beta sub 0 minus the sum from j equals 1 to p of x sub i j beta sub j, squared, plus lambda times the sum from j equals 1 to p of beta sub j squared">
+  <mrow>
+    <mo>=</mo>
+    <munder><mo>argmin</mo><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>,</mo><mi>β</mi></mrow></munder>
+    <mrow><mo>[</mo>
+      <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover>
+      <msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mi>β</mi><mn>0</mn></msub><mo>−</mo>
+        <munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover>
+        <msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><msub><mi>β</mi><mi>j</mi></msub><mo>)</mo></mrow><mn>2</mn></msup>
+      <mo>+</mo><mi>λ</mi>
+      <munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover>
+      <msubsup><mi>β</mi><mi>j</mi><mn>2</mn></msubsup>
+    <mo>]</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> A brace under <math alttext="beta sub 0 plus the sum over j of x sub i j beta sub j"><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><munder><mo>∑</mo><mi>j</mi></munder><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><msub><mi>β</mi><mi>j</mi></msub></mrow></math> points to</p>
+  <math display="block" alttext="y hat sub i equals beta sub 0 plus beta sub 1 x sub i 1 plus beta sub 2 x sub i 2 plus dot dot dot plus beta sub p x sub i p">
+    <mrow><msub><mover><mi>y</mi><mo>^</mo></mover><mi>i</mi></msub><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>β</mi><mn>2</mn></msub><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi>β</mi><mi>p</mi></msub><msub><mi>x</mi><mrow><mi>i</mi><mi>p</mi></mrow></msub></mrow>
+  </math>
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> The penalty <math alttext="the sum from j equals 1 to p of beta sub j squared"><mrow><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msubsup><mi>β</mi><mi>j</mi><mn>2</mn></msubsup></mrow></math> is boxed and labelled <strong>(L2 norm)²</strong>, <math alttext="the squared L2 norm of beta"><msubsup><mrow><mo>‖</mo><mi>β</mi><mo>‖</mo></mrow><mn>2</mn><mn>2</mn></msubsup></math>.</p>
+</div>
+
+<h3 id="standardize">3.2 Standardize <math alttext="bold X"><mi mathvariant="bold">X</mi></math></h3>
+
+<p>We want all predictors on the same scale, so replace <math alttext="x sub i j"><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></math> with</p>
+
+<div class="eq">
+<math display="block" alttext="x tilde sub i j equals the quantity x sub i j minus x bar sub j, over s sub j, where s sub j equals the square root of one over n times the sum over i of the quantity x sub i j minus x bar sub j, squared">
+  <mrow>
+    <msub><mover><mi>x</mi><mo>~</mo></mover><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo>
+    <mfrac><mrow><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msub><mover><mi>x</mi><mo>‾</mo></mover><mi>j</mi></msub></mrow><msub><mi>s</mi><mi>j</mi></msub></mfrac>
+    <mspace width="2em"></mspace>
+    <msub><mi>s</mi><mi>j</mi></msub><mo>=</mo>
+    <msqrt><mfrac><mn>1</mn><mi>n</mi></mfrac><munder><mo>∑</mo><mi>i</mi></munder><msup><mrow><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>−</mo><msub><mover><mi>x</mi><mo>‾</mo></mover><mi>j</mi></msub><mo>)</mo></mrow><mn>2</mn></msup></msqrt>
+  </mrow>
+</math>
+</div>
+
+
+<p><strong>Why?</strong></p>
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> An example of predictors on very different scales:</p>
+  <ul>
+    <li><math alttext="X sub 1 in the set 0, 1, 2, 3, 4, 5"><mrow><msub><mi>X</mi><mn>1</mn></msub><mo>∈</mo><mo>{</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>,</mo><mn>4</mn><mo>,</mo><mn>5</mn><mo>}</mo></mrow></math>, e.g. number of rooms</li>
+    <li><math alttext="X sub 2 in the interval from 500 to 5000"><mrow><msub><mi>X</mi><mn>2</mn></msub><mo>∈</mo><mo>[</mo><mn>500</mn><mo>,</mo><mn>5000</mn><mo>]</mo></mrow></math>, e.g. ft²</li>
+  </ul>
+  <p>With an arrow pointing to these: <strong>one will dominate the loss function</strong>, e.g. <math alttext="beta sub 1 equals 500"><mrow><msub><mi>β</mi><mn>1</mn></msub><mo>=</mo><mn>500</mn></mrow></math>, <math alttext="beta sub 2 equals 1"><mrow><msub><mi>β</mi><mn>2</mn></msub><mo>=</mo><mn>1</mn></mrow></math>.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Important</span> Use <math alttext="x bar sub j"><msub><mover><mi>x</mi><mo>‾</mo></mover><mi>j</mi></msub></math> and <math alttext="s sub j"><msub><mi>s</mi><mi>j</mi></msub></math> from the <strong>training set</strong>.</p>
+</div>
+
+<p><strong>Lemma 3.2.</strong> If <math alttext="bold X"><mi mathvariant="bold">X</mi></math> is centered, then</p>
+<div class="eq">
+<math display="block" alttext="beta hat sub 0 equals y bar, which implies R S S equals the sum from i equals 1 to n of the quantity, y sub i minus y bar, minus the sum from j equals 1 to p of x sub i j beta sub j">
+  <mrow>
+    <msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>=</mo><mover><mi>y</mi><mo>‾</mo></mover>
+    <mspace width="1em"></mspace><mo>⇒</mo><mspace width="1em"></mspace>
+    <mi>RSS</mi><mo>=</mo>
+    <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover>
+    <mrow><mo>(</mo><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>‾</mo></mover><mo>)</mo><mo>−</mo>
+      <munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover>
+      <msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><msub><mi>β</mi><mi>j</mi></msub><mo>)</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Possible error in original</span> The square is missing. As written, the terms are not squared, so this sum is not the RSS: positive and negative residuals would cancel. It should be <math alttext="the sum from i equals 1 to n of the quantity, y sub i minus y bar, minus the sum over j of x sub i j beta sub j, squared"><mrow><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>‾</mo></mover><mo>)</mo><mo>−</mo><munder><mo>∑</mo><mi>j</mi></munder><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><msub><mi>β</mi><mi>j</mi></msub><mo>)</mo></mrow><mn>2</mn></msup></mrow></math>, as in the ridge objective in 3.1.</p>
+</div>
+
+<p>You can center <math alttext="bold y"><mi mathvariant="bold">y</mi></math> and get the same <math alttext="beta hat"><mover><mi>β</mi><mo>^</mo></mover></math>s (without a <math alttext="beta hat sub 0"><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub></math>).</p>
+
+<h3 id="ridge-solution">3.3 Solution for <em>β</em></h3>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Aside</span> Hoerl &amp; Kennard (1970) noticed that <math alttext="bold X transpose bold X plus alpha I"><mrow><mo>(</mo><msup><mi mathvariant="bold">X</mi><mi>T</mi></msup><mi mathvariant="bold">X</mi><mo>+</mo><mi>α</mi><mi>I</mi><mo>)</mo></mrow></math> fixes the singularity, so that <math alttext="the inverse of bold X transpose bold X plus alpha I"><msup><mrow><mo>(</mo><msup><mi mathvariant="bold">X</mi><mi>T</mi></msup><mi mathvariant="bold">X</mi><mo>+</mo><mi>α</mi><mi>I</mi><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup></math> exists and behaves, so</p>
+  <math display="block" alttext="beta hat equals the inverse of bold X transpose bold X plus alpha I, times bold X transpose bold y">
+    <mrow><mover><mi>β</mi><mo>^</mo></mover><mo>=</mo><msup><mrow><mo>(</mo><msup><mi mathvariant="bold">X</mi><mi>T</mi></msup><mi mathvariant="bold">X</mi><mo>+</mo><mi>α</mi><mi>I</mi><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><msup><mi mathvariant="bold">X</mi><mi>T</mi></msup><mi mathvariant="bold">y</mi></mrow>
+  </math>
+  <p>which is biased, but its variance is lower!</p>
+</div>
+
+<div class="eq">
+<math display="block" alttext="R S S of beta equals the quantity bold y minus bold X beta, transpose, times the quantity bold y minus bold X beta, plus lambda beta transpose beta">
+  <mrow>
+    <mi>RSS</mi><mo>(</mo><mi>β</mi><mo>)</mo><mo>=</mo>
+    <msup><mrow><mo>(</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">X</mi><mi>β</mi><mo>)</mo></mrow><mi>T</mi></msup>
+    <mrow><mo>(</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">X</mi><mi>β</mi><mo>)</mo></mrow>
+    <mo>+</mo><mi>λ</mi><msup><mi>β</mi><mi>T</mi></msup><mi>β</mi>
+  </mrow>
+</math>
+</div>
+
+<p>Expand, take the derivative, set it to 0, and solve for <math alttext="beta"><mi>β</mi></math>:</p>
+
+<div class="eq">
+<math display="block" alttext="beta hat ridge sub lambda equals the inverse of bold X transpose bold X plus lambda I, times bold X transpose bold y">
+  <mrow>
+    <msubsup><mover><mi>β</mi><mo>^</mo></mover><mi>λ</mi><mtext>ridge</mtext></msubsup><mo>=</mo>
+    <msup><mrow><mo>(</mo><msup><mi mathvariant="bold">X</mi><mi>T</mi></msup><mi mathvariant="bold">X</mi><mo>+</mo><mi>λ</mi><mi>I</mi><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup>
+    <msup><mi mathvariant="bold">X</mi><mi>T</mi></msup><mi mathvariant="bold">y</mi>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> <math alttext="lambda I"><mrow><mi>λ</mi><mi>I</mi></mrow></math> is underlined, with the note: <strong>added some bias to <math alttext="beta hat"><mover><mi>β</mi><mo>^</mo></mover></math>s, but reducing variance</strong>.</p>
+</div>
+
+<h2 id="lasso">4. Lasso / L1 regularization</h2>
+
+<h3 id="lasso-def">4.1 Definition</h3>
+
+<div class="eq">
+<math display="block" alttext="beta hat lasso sub lambda equals the argmin over beta sub 0 and beta of the sum from i equals 1 to n of the quantity y sub i minus y hat sub i, squared, plus lambda times the sum from j equals 1 to p of the absolute value of beta sub j">
+  <mrow>
+    <msubsup><mover><mi>β</mi><mo>^</mo></mover><mi>λ</mi><mtext>lasso</mtext></msubsup><mo>=</mo>
+    <munder><mo>argmin</mo><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>,</mo><mi>β</mi></mrow></munder>
+    <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover>
+    <msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>y</mi><mo>^</mo></mover><mi>i</mi></msub><mo>)</mo></mrow><mn>2</mn></msup>
+    <mo>+</mo><mi>λ</mi>
+    <munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover>
+    <mrow><mo>|</mo><msub><mi>β</mi><mi>j</mi></msub><mo>|</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> The penalty <math alttext="the sum from j equals 1 to p of the absolute value of beta sub j"><mrow><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><mo>|</mo><msub><mi>β</mi><mi>j</mi></msub><mo>|</mo></mrow></math> is boxed and labelled <strong>L1 norm</strong>, <math alttext="the L1 norm of beta"><msub><mrow><mo>‖</mo><mi>β</mi><mo>‖</mo></mrow><mn>1</mn></msub></math>.</p>
+</div>
+
+<h3 id="lasso-std">4.2 Standardize your predictors!</h3>
+
+<p>Written beside this heading: <math alttext="beta hat sub 0 equals y bar"><mrow><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>=</mo><mover><mi>y</mi><mo>‾</mo></mover></mrow></math>.</p>
+
+<h3 id="lasso-solution">4.3 Solution for <em>β</em></h3>
+
+<div class="eq">
+<math display="block" alttext="the partial derivative with respect to beta of R S S of beta equals minus 2 bold X transpose times the quantity bold y minus bold X beta, plus lambda times sign of beta">
+  <mrow>
+    <mfrac><mo>∂</mo><mrow><mo>∂</mo><mi>β</mi></mrow></mfrac><mi>RSS</mi><mo>(</mo><mi>β</mi><mo>)</mo><mo>=</mo>
+    <mo>−</mo><mn>2</mn><msup><mi mathvariant="bold">X</mi><mi>T</mi></msup><mrow><mo>(</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">X</mi><mi>β</mi><mo>)</mo></mrow>
+    <mo>+</mo><mi>λ</mi><mspace width="0.2em"></mspace><mi>sign</mi><mo>(</mo><mi>β</mi><mo>)</mo>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> An arrow points to <math alttext="sign of beta"><mrow><mi>sign</mi><mo>(</mo><mi>β</mi><mo>)</mo></mrow></math>: <strong>undefined if <math alttext="beta equals 0"><mrow><mi>β</mi><mo>=</mo><mn>0</mn></mrow></math></strong>.</p>
+  <p><span class="tag" style="color:var(--accent)">Annotation</span> <strong>Must use a numerical method: coordinate descent.</strong></p>
+</div>
+
+<h3 id="hard">4.4 Hard constraint</h3>
+
+<p><strong>Ridge:</strong></p>
+<div class="eq">
+<math display="block" alttext="beta hat ridge equals the argmin over beta sub 0 and beta of R S S of beta sub 0 comma beta, subject to the sum from j equals 1 to p of beta sub j squared less than or equal to t">
+  <mrow>
+    <msup><mover><mi>β</mi><mo>^</mo></mover><mtext>ridge</mtext></msup><mo>=</mo>
+    <munder><mo>argmin</mo><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>,</mo><mi>β</mi></mrow></munder>
+    <mi>RSS</mi><mo>(</mo><msub><mi>β</mi><mn>0</mn></msub><mo>,</mo><mi>β</mi><mo>)</mo>
+    <mspace width="1em"></mspace><mtext>subject to</mtext><mspace width="1em"></mspace>
+    <munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover>
+    <msubsup><mi>β</mi><mi>j</mi><mn>2</mn></msubsup><mo>≤</mo><mi>t</mi>
+  </mrow>
+</math>
+</div>
+
+<p><strong>Lasso:</strong></p>
+<div class="eq">
+<math display="block" alttext="beta hat lasso equals the argmin over beta sub 0 and beta of R S S of beta sub 0 comma beta, subject to the sum from j equals 1 to p of the absolute value of beta sub j less than or equal to t">
+  <mrow>
+    <msup><mover><mi>β</mi><mo>^</mo></mover><mtext>lasso</mtext></msup><mo>=</mo>
+    <munder><mo>argmin</mo><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>,</mo><mi>β</mi></mrow></munder>
+    <mi>RSS</mi><mo>(</mo><msub><mi>β</mi><mn>0</mn></msub><mo>,</mo><mi>β</mi><mo>)</mo>
+    <mspace width="1em"></mspace><mtext>subject to</mtext><mspace width="1em"></mspace>
+    <munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover>
+    <mrow><mo>|</mo><msub><mi>β</mi><mi>j</mi></msub><mo>|</mo></mrow><mo>≤</mo><mi>t</mi>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> An arrow labelled <strong>Hard constraint</strong> points to the condition <math alttext="the sum of beta sub j squared less than or equal to t"><mrow><mo>∑</mo><msubsup><mi>β</mi><mi>j</mi><mn>2</mn></msubsup><mo>≤</mo><mi>t</mi></mrow></math>.</p>
+</div>
+
+<h2 id="lambda">5. <em>λ</em> (tuning parameter)</h2>
+
+<ul>
+  <li>If <math alttext="lambda equals 0"><mrow><mi>λ</mi><mo>=</mo><mn>0</mn></mrow></math> ⇒ OLS.</li>
+  <li>As <math alttext="lambda"><mi>λ</mi></math> increases, the <math alttext="beta hat sub j"><msub><mover><mi>β</mi><mo>^</mo></mover><mi>j</mi></msub></math>s decrease.</li>
+  <li>Lasso shrinks <math alttext="beta hat sub j"><msub><mover><mi>β</mi><mo>^</mo></mover><mi>j</mi></msub></math>s → 0 (feature selection).</li>
+  <li>Correlated features (<math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> and <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math>): Ridge shrinks <math alttext="beta hat sub 1"><msub><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn></msub></math> and <math alttext="beta hat sub 2"><msub><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn></msub></math> together. Lasso shrinks one to 0.</li>
+  <li>Choose <math alttext="lambda"><mi>λ</mi></math> using a test set, or use cross-validation.</li>
+</ul>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> The second bullet is written with arrows: “as <math alttext="lambda"><mi>λ</mi></math> ↗, <math alttext="beta hat sub j"><msub><mover><mi>β</mi><mo>^</mo></mover><mi>j</mi></msub></math>s ↘”.</p>
+</div>
+
+<h2 id="summary">6. Summary</h2>
+
+<ul>
+  <li><math alttext="beta hat sub 0 equals y bar"><mrow><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>=</mo><mover><mi>y</mi><mo>‾</mo></mover></mrow></math></li>
+  <li>Ridge won't shrink <math alttext="beta hat sub j"><msub><mover><mi>β</mi><mo>^</mo></mover><mi>j</mi></msub></math>s → 0.</li>
+  <li>Both add bias to <math alttext="beta hat sub j"><msub><mover><mi>β</mi><mo>^</mo></mover><mi>j</mi></msub></math>, lower the variance, and less flexible than OLS.</li>
+</ul>
+
+</main>
+
+<footer>
+  <p>Transcribed from the handwritten notes <em>ML_week_2_day_1_pm.pdf</em> (7 pages), the corrected version of <em>ML_week_2_day_1.pdf</em>. Equations are MathML; figures are inline SVG with title, description, and an expandable long description. Conforms to WCAG 2.2 Level AA.</p>
+</footer>
+</div>
+</body>
+</html>
