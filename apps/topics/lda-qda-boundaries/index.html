@@ -34,6 +34,9 @@
     .controls label { font-weight: 600; }
     .controls input[type=range] { width: 100%; min-width: 120px; accent-color: #1a5fb4; }
     .controls output { font-variant-numeric: tabular-nums; }
+    fieldset.show { border: none; padding: 0; margin: 0.5rem 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; align-items: center; }
+    fieldset.show legend { font-weight: 600; float: left; margin-right: 0.5rem; padding: 0; }
+    fieldset.show label { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
     button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
     button[aria-pressed="true"] { background: #1a5fb4; color: #fff; border: 1px solid #1a5fb4; font-weight: 600; }
     :focus-visible { outline: 3px solid #1a5fb4; outline-offset: 2px; }
@@ -67,9 +70,9 @@
   <a class="back" href="../../">&larr; All topics</a>
   <h1>LDA, QDA, Naive Bayes and Logistic Regression</h1>
   <p id="instructions" class="instructions">
-    Two Gaussian classes. The shaded region is where the Bayes classifier says class 2; the four
-    lines are the boundaries fitted to the training sample. Pick a scenario, change the sample size,
-    and drag a class mean to move it. (Lecture notes §2–§5; ISL 4.4–4.5.)
+    Two Gaussian classes. The solid black line is the true (Bayes) boundary and the shaded region is
+    where it says class 2; the other lines are the boundaries fitted to the training sample. Pick a scenario, tick the boundaries you
+    want to compare, change the sample size, and drag a class mean to move it. (ISL 4.4–4.5.)
   </p>
   <p id="a11y-instructions" class="instructions a11y-instructions">
     Keyboard: Tab to a class mean and use the arrow keys to move it (Shift for bigger steps).
@@ -90,6 +93,14 @@
     <button id="resample" type="button">New sample</button>
   </div>
 
+  <fieldset class="show">
+    <legend>Show boundaries:</legend>
+    <label><input type="checkbox" data-method="lda" checked> LDA</label>
+    <label><input type="checkbox" data-method="qda"> QDA</label>
+    <label><input type="checkbox" data-method="nb"> Naive Bayes</label>
+    <label><input type="checkbox" data-method="lr"> Logistic</label>
+  </fieldset>
+
   <figure class="panel" style="margin:0">
     <div id="plot"></div>
   </figure>
@@ -109,6 +120,7 @@
     <tbody id="error-rows"></tbody>
     <caption>
       Bold: lowest average among the four fitted methods. "—": the method can't be fitted on every sample at this n (QDA needs 3 points in each class, naive Bayes 2).
+      Logistic regression has a tiny ridge penalty (λ = 10⁻⁴), so it has a solution even when the classes separate.
     </caption>
   </table>
 

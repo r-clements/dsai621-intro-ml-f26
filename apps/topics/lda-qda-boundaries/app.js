@@ -1,8 +1,8 @@
 // LDA, QDA, Gaussian naive Bayes and logistic regression on two Gaussian classes in 2-D
-// (lecture notes §2–§5, ISL 4.4–4.5, ESL 4.3, 4.4.5).
+// (ISL 4.4–4.5, ESL 4.3, 4.4.5).
 // Truth: X | Y = k ~ N(mu_k, Sigma_k), Pr(Y = 1) = pi1. Every method returns
 // g(x) = (class-2 discriminant) − (class-1 discriminant) and says "class 2" when g(x) > 0.
-//   LDA   pooled covariance with divisor n − K (notes §2.4)
+//   LDA   pooled covariance with divisor n − K
 //   QDA   class sample covariances, divisor n_k − 1 (sklearn 1.9 divides by n_k, which moves
 //         the boundary slightly at small n_k)
 //   NB    per-class, per-feature means and variances (divisor n_k, as sklearn's GaussianNB)
@@ -64,12 +64,12 @@ const CLASS_COLOR = ["#3d3846", "#c64600"];
 
 // ---------- state ----------
 const PRESETS = {
-  // Lecture notes §5.3 scenario A (shifted to centre the plot): unit variances, correlation
+  // Shared covariance (centred in the plot): unit variances, correlation
   // 0.7, so the long axis is at 45° with s.d. √1.7 and the short axis has s.d. √0.3.
   lda: { shared: true, cls: [
     { mx: -0.5, my: -0.75, th: 45, a: Math.sqrt(1.7), w: 0.42 },
     { mx: 0.5, my: 0.75, th: 45, a: Math.sqrt(1.7), w: 0.42 }] },
-  // Scenario B: class 2 has correlation −0.7.
+  // Different covariances: as above, but class 2 has correlation −0.7.
   qda: { shared: false, cls: [
     { mx: -0.5, my: -0.75, th: 45, a: Math.sqrt(1.7), w: 0.42 },
     { mx: 0.5, my: 0.75, th: -45, a: Math.sqrt(1.7), w: 0.42 }] },
@@ -347,6 +347,11 @@ const cellAvg = rows.append("td");
 const nSlider = document.getElementById("n-slider");
 const presetButtons = document.querySelectorAll("button[data-preset]");
 const statsEl = document.getElementById("stats");
+const show = { bayes: true };   // the Bayes boundary and region are always drawn
+document.querySelectorAll("input[data-method]").forEach(cb => {
+  show[cb.dataset.method] = cb.checked;
+  cb.addEventListener("change", () => { show[cb.dataset.method] = cb.checked; schedule(); });
+});
 let avgTimer = null;
 let pending = false;
 function schedule() {
@@ -388,12 +393,12 @@ function update() {
   const values = new Float64Array(G * G);
   for (const m of METHODS) {
     const g = fits[m.key];
-    if (!g) { boundaryPaths[m.key].attr("d", null); continue; }
+    if (!g || (!show[m.key] && m.key !== "bayes")) { boundaryPaths[m.key].attr("d", null); continue; }
     for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) values[i + j * G] = g(gridX[i], gridY[j]);
     const shape = contours(values)[0];
     const d = contourPath(shape);
     if (m.key === "bayes") regionPath.attr("d", d);
-    boundaryPaths[m.key].attr("d", d);
+    boundaryPaths[m.key].attr("d", show[m.key] ? d : null);
   }
 
   // Ellipses (1 and 2 s.d.)
