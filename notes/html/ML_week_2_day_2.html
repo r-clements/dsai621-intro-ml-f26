@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classification: Logistic Regression, Generative Models, and LDA — Week 2, Day 2 | DSAI 621</title>
+<meta name="description" content="Accessible class notes on classification with 0-1 loss and the Bayes classifier, a review of logistic regression (predictions, the confusion table, decision boundaries), multinomial regression and softmax, generative versus discriminative models, Bayes' theorem, and the set-up for linear discriminant analysis.">
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #4a4a4a;
+    --rule: #c9c9c9;
+    --accent: #0b4f8a;
+    --accent-bg: #eef4fa;
+    --focus: #0b4f8a;
+    --pop: #a4262c;   /* population / true  — 5.9:1 on white */
+    --est: #5b2d8e;   /* estimate / fitted  — 8.5:1 on white */
+    --err: #8a5000;   /* errors / residuals — 5.1:1 on white */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f2; --muted: #cfcfcf; --rule: #555;
+      --accent: #8ab8e0; --accent-bg: #182430; --focus: #8ab8e0;
+      --pop: #ff9f99; --est: #cbb0ff; --err: #f0b458;
+    }
+    body { background: #131313; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--ink);
+    background: #fff;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #131313; } }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 5rem; }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible, :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--accent); color: #fff;
+    padding: .75rem 1rem; z-index: 10; text-decoration: none;
+  }
+  .skip:focus { left: .5rem; top: .5rem; }
+  h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; line-height: 1.3; margin: 2.5rem 0 .5rem;
+       padding-top: .75rem; border-top: 2px solid var(--rule); }
+  h3 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  p, li { max-width: 42rem; }
+  .lede { color: var(--muted); margin-top: 0; }
+  nav.toc {
+    background: var(--accent-bg); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 1rem 1.25rem; margin: 2rem 0;
+  }
+  nav.toc h2 { font-size: 1.05rem; margin: 0 0 .5rem; border: 0; padding: 0; }
+  nav.toc ol { margin: 0; padding-left: 1.25rem; }
+  nav.toc li { margin: .3rem 0; }
+  nav.toc a { display: inline-block; min-height: 24px; padding: 2px 0; }
+  table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+  caption { text-align: left; font-weight: 600; padding-bottom: .5rem; }
+  th, td { border: 1px solid var(--rule); padding: .5rem .7rem; text-align: left; }
+  thead th { background: var(--accent-bg); }
+  figure { margin: 1.5rem 0; }
+  figcaption { font-size: .95rem; color: var(--muted); margin-top: .5rem; }
+  svg { max-width: 100%; height: auto; display: block; }
+  details {
+    border: 1px solid var(--rule); border-radius: 6px;
+    padding: .5rem .85rem; margin: .75rem 0; background: var(--accent-bg);
+  }
+  summary { cursor: pointer; font-weight: 600; min-height: 24px; padding: .25rem 0; }
+  details[open] summary { margin-bottom: .5rem; }
+  math { font-size: 1.15em; }
+  math[display="block"] { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }
+  .eq { margin: 1.25rem 0; }
+  .note {
+    border-left: 4px solid var(--accent); background: var(--accent-bg);
+    padding: .75rem 1rem; margin: 1.25rem 0; border-radius: 0 6px 6px 0;
+  }
+  .note > :first-child { margin-top: 0; }
+  .note > :last-child { margin-bottom: 0; }
+  .tag {
+    display: inline-block; font-size: .8rem; font-weight: 700;
+    letter-spacing: .02em; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 4px;
+    padding: 0 .4em; white-space: nowrap;
+  }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 2px solid var(--rule);
+           color: var(--muted); font-size: .95rem; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps > li { margin: .75rem 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<div class="wrap">
+<header>
+  <p class="lede"><strong>DSAI 621 — Intro to Machine Learning</strong> · Fall 2026 · Week 2, Day 2</p>
+  <h1>Classification: Logistic Regression, Generative Models, and LDA</h1>
+  <p class="lede">Accessible transcription of the handwritten class notes. All equations are marked up in MathML so they can be read by a screen reader, magnified, or rendered in braille. All figures have text descriptions. Annotations written in a second pen colour in the original are reproduced here as labelled callouts, so none of their meaning depends on colour.</p>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+  <h2 id="toc-h">On this page</h2>
+  <ol>
+    <li><a href="#agenda">Agenda</a></li>
+    <li><a href="#classification">0. Classification</a></li>
+    <li><a href="#logistic">1. Logistic regression</a></li>
+    <li><a href="#model">1.1 The model</a></li>
+    <li><a href="#predictions">1.2 Predictions</a></li>
+    <li><a href="#boundary">1.3 Decision boundary</a></li>
+    <li><a href="#multinomial">1.4 Multinomial regression</a></li>
+    <li><a href="#gen-disc">2. Generative vs discriminative</a></li>
+    <li><a href="#bayes">2.1 Bayes' theorem</a></li>
+    <li><a href="#lda">3. Linear discriminant analysis (LDA)</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+
+<h2 id="agenda">Agenda</h2>
+<ul>
+  <li>Classification</li>
+  <li>Logistic review</li>
+  <li>LDA</li>
+</ul>
+
+<h2 id="classification">0. Classification</h2>
+
+<p><math alttext="Y is in the set 1, 2, through K"><mrow><mi>Y</mi><mo>∈</mo><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mo>…</mo><mo>,</mo><mi>K</mi><mo>}</mo></mrow></math>, with <strong>0–1 loss</strong>:</p>
+
+<div class="eq">
+<math display="block" alttext="the expected value of I of Y not equal to f of X">
+  <mrow><mi>E</mi><mrow><mo>[</mo><mi>I</mi><mo>(</mo><mi>Y</mi><mo>≠</mo><mi>f</mi><mo>(</mo><mi>X</mi><mo>)</mo><mo>)</mo><mo>]</mo></mrow></mrow>
+</math>
+</div>
+
+<p>where <math alttext="I of true equals 1"><mrow><mi>I</mi><mo>(</mo><mtext>true</mtext><mo>)</mo><mo>=</mo><mn>1</mn></mrow></math> and <math alttext="I of false equals 0"><mrow><mi>I</mi><mo>(</mo><mtext>false</mtext><mo>)</mo><mo>=</mo><mn>0</mn></mrow></math>. This is minimized by</p>
+
+<div class="eq">
+<math display="block" alttext="f of x equals the argmax over k of the probability that Y equals k given X equals x">
+  <mrow><mi>f</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><munder><mo>argmax</mo><mi>k</mi></munder><mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>)</mo></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Under the right-hand side: <strong>Bayes classifier (unknown). Approximate it!</strong></p>
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> The <math alttext="k"><mi>k</mi></math> under argmax is double-underlined, and an arrow points to the <math alttext="k"><mi>k</mi></math> in <math alttext="Y equals k"><mrow><mi>Y</mi><mo>=</mo><mi>k</mi></mrow></math>.</p>
+</div>
+
+<h2 id="logistic">1. Logistic regression</h2>
+
+<p><math alttext="Y is in the set 1, 2"><mrow><mi>Y</mi><mo>∈</mo><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>}</mo></mrow></math>.</p>
+
+<p><strong>Assumption:</strong> the log odds is linear,</p>
+<div class="eq">
+<math display="block" alttext="log of p of x over 1 minus p of x equals beta sub 0 plus x transpose beta">
+  <mrow><mi>log</mi><mfrac><mrow><mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><mrow><mn>1</mn><mo>−</mo><mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></mfrac><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><mi>β</mi></mrow>
+</math>
+</div>
+
+<h3 id="model">1.1 The model</h3>
+
+<div class="eq">
+<math display="block" alttext="p of x equals the probability that Y equals 2 given X equals x, which equals e to the beta sub 0 plus x transpose beta, over 1 plus e to the beta sub 0 plus x transpose beta, which equals 1 over 1 plus e to the minus quantity beta sub 0 plus x transpose beta">
+  <mrow>
+    <mi>p</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mn>2</mn><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>)</mo>
+    <mo>=</mo>
+    <mfrac>
+      <msup><mi>e</mi><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><mi>β</mi></mrow></msup>
+      <mrow><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><mi>β</mi></mrow></msup></mrow>
+    </mfrac>
+    <mo>=</mo>
+    <mfrac>
+      <mn>1</mn>
+      <mrow><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><mo>−</mo><mo>(</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><mi>β</mi><mo>)</mo></mrow></msup></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<figure>
+<svg viewBox="0 0 540 260" role="img" aria-labelledby="fig3-t fig3-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig3-t">The logistic function: an S-shaped curve rising from 0 to 1</title>
+  <desc id="fig3-d">An S-shaped curve. On the left it runs along the horizontal axis at height 0; it crosses the vertical axis close to 0, rises steeply, and levels off just under a dashed horizontal line at height 1.</desc>
+  <line x1="40" y1="230" x2="500" y2="230" stroke="currentColor" stroke-width="2"/><line x1="170" y1="250" x2="170" y2="30" stroke="currentColor" stroke-width="2"/><line x1="170" y1="60" x2="500" y2="60" stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 6"/><text x="160.0" y="65.0" font-size="15" fill="currentColor" text-anchor="end">1</text><text x="160.0" y="250.0" font-size="15" fill="currentColor" text-anchor="end">0</text><path d="M40.0,229.4 L41.5,229.3 L43.0,229.3 L44.6,229.3 L46.1,229.3 L47.6,229.2 L49.1,229.2 L50.7,229.2 L52.2,229.1 L53.7,229.1 L55.2,229.0 L56.7,229.0 L58.3,229.0 L59.8,228.9 L61.3,228.9 L62.8,228.8 L64.3,228.8 L65.9,228.7 L67.4,228.7 L68.9,228.6 L70.4,228.5 L72.0,228.5 L73.5,228.4 L75.0,228.3 L76.5,228.3 L78.0,228.2 L79.6,228.1 L81.1,228.0 L82.6,228.0 L84.1,227.9 L85.7,227.8 L87.2,227.7 L88.7,227.6 L90.2,227.5 L91.7,227.4 L93.3,227.3 L94.8,227.1 L96.3,227.0 L97.8,226.9 L99.3,226.8 L100.9,226.6 L102.4,226.5 L103.9,226.3 L105.4,226.2 L107.0,226.0 L108.5,225.8 L110.0,225.7 L111.5,225.5 L113.0,225.3 L114.6,225.1 L116.1,224.9 L117.6,224.7 L119.1,224.4 L120.7,224.2 L122.2,223.9 L123.7,223.7 L125.2,223.4 L126.7,223.2 L128.3,222.9 L129.8,222.6 L131.3,222.3 L132.8,221.9 L134.3,221.6 L135.9,221.3 L137.4,220.9 L138.9,220.5 L140.4,220.1 L142.0,219.7 L143.5,219.3 L145.0,218.9 L146.5,218.4 L148.0,218.0 L149.6,217.5 L151.1,217.0 L152.6,216.5 L154.1,215.9 L155.7,215.4 L157.2,214.8 L158.7,214.2 L160.2,213.6 L161.7,212.9 L163.3,212.2 L164.8,211.6 L166.3,210.8 L167.8,210.1 L169.3,209.3 L170.9,208.6 L172.4,207.7 L173.9,206.9 L175.4,206.0 L177.0,205.2 L178.5,204.2 L180.0,203.3 L181.5,202.3 L183.0,201.3 L184.6,200.3 L186.1,199.2 L187.6,198.1 L189.1,197.0 L190.7,195.9 L192.2,194.7 L193.7,193.5 L195.2,192.3 L196.7,191.0 L198.3,189.7 L199.8,188.4 L201.3,187.0 L202.8,185.6 L204.3,184.2 L205.9,182.8 L207.4,181.3 L208.9,179.8 L210.4,178.3 L212.0,176.8 L213.5,175.2 L215.0,173.6 L216.5,172.0 L218.0,170.3 L219.6,168.7 L221.1,167.0 L222.6,165.3 L224.1,163.6 L225.7,161.8 L227.2,160.1 L228.7,158.3 L230.2,156.6 L231.7,154.8 L233.3,153.0 L234.8,151.2 L236.3,149.4 L237.8,147.6 L239.3,145.8 L240.9,144.0 L242.4,142.2 L243.9,140.3 L245.4,138.5 L247.0,136.7 L248.5,135.0 L250.0,133.2 L251.5,131.4 L253.0,129.6 L254.6,127.9 L256.1,126.2 L257.6,124.5 L259.1,122.8 L260.7,121.1 L262.2,119.4 L263.7,117.8 L265.2,116.2 L266.7,114.6 L268.3,113.0 L269.8,111.5 L271.3,110.0 L272.8,108.5 L274.3,107.0 L275.9,105.6 L277.4,104.2 L278.9,102.8 L280.4,101.4 L282.0,100.1 L283.5,98.8 L285.0,97.6 L286.5,96.3 L288.0,95.1 L289.6,94.0 L291.1,92.8 L292.6,91.7 L294.1,90.6 L295.7,89.6 L297.2,88.5 L298.7,87.5 L300.2,86.6 L301.7,85.6 L303.3,84.7 L304.8,83.8 L306.3,83.0 L307.8,82.1 L309.3,81.3 L310.9,80.5 L312.4,79.8 L313.9,79.1 L315.4,78.3 L317.0,77.7 L318.5,77.0 L320.0,76.4 L321.5,75.7 L323.0,75.1 L324.6,74.6 L326.1,74.0 L327.6,73.5 L329.1,72.9 L330.7,72.4 L332.2,72.0 L333.7,71.5 L335.2,71.1 L336.7,70.6 L338.3,70.2 L339.8,69.8 L341.3,69.4 L342.8,69.0 L344.3,68.7 L345.9,68.3 L347.4,68.0 L348.9,67.7 L350.4,67.4 L352.0,67.1 L353.5,66.8 L355.0,66.5 L356.5,66.3 L358.0,66.0 L359.6,65.8 L361.1,65.5 L362.6,65.3 L364.1,65.1 L365.7,64.9 L367.2,64.7 L368.7,64.5 L370.2,64.3 L371.7,64.1 L373.3,64.0 L374.8,63.8 L376.3,63.7 L377.8,63.5 L379.3,63.4 L380.9,63.2 L382.4,63.1 L383.9,63.0 L385.4,62.8 L387.0,62.7 L388.5,62.6 L390.0,62.5 L391.5,62.4 L393.0,62.3 L394.6,62.2 L396.1,62.1 L397.6,62.0 L399.1,62.0 L400.7,61.9 L402.2,61.8 L403.7,61.7 L405.2,61.6 L406.7,61.6 L408.3,61.5 L409.8,61.5 L411.3,61.4 L412.8,61.3 L414.3,61.3 L415.9,61.2 L417.4,61.2 L418.9,61.1 L420.4,61.1 L422.0,61.0 L423.5,61.0 L425.0,61.0 L426.5,60.9 L428.0,60.9 L429.6,60.8 L431.1,60.8 L432.6,60.8 L434.1,60.7 L435.7,60.7 L437.2,60.7 L438.7,60.6 L440.2,60.6 L441.7,60.6 L443.3,60.6 L444.8,60.5 L446.3,60.5 L447.8,60.5 L449.3,60.5 L450.9,60.5 L452.4,60.4 L453.9,60.4 L455.4,60.4 L457.0,60.4 L458.5,60.4 L460.0,60.4 L461.5,60.3 L463.0,60.3 L464.6,60.3 L466.1,60.3 L467.6,60.3 L469.1,60.3 L470.7,60.3 L472.2,60.3 L473.7,60.2 L475.2,60.2 L476.7,60.2 L478.3,60.2 L479.8,60.2 L481.3,60.2 L482.8,60.2 L484.3,60.2 L485.9,60.2 L487.4,60.2 L488.9,60.2 L490.4,60.2 L492.0,60.1 L493.5,60.1 L495.0,60.1" fill="none" stroke="var(--accent)" stroke-width="3"/>
+</svg>
+<figcaption>Figure 3. The logistic function, rising from 0 toward 1.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 3</summary>
+  <p>A horizontal axis and a vertical axis, with 0 marked where they cross and a dashed horizontal line marked 1. The curve runs along the horizontal axis on the far left and crosses the vertical axis at about 0. It then rises in an S shape, steeply at first and then levelling off, getting close to the dashed line at 1 toward the right without reaching it. Neither axis is labelled.</p>
+</details>
+
+<p>Find <math alttext="beta hat"><mover><mi>β</mi><mo>^</mo></mover></math> and <math alttext="beta hat sub 0"><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub></math> using MLE, but there is no closed-form solution. Use gradient descent or Newton–Raphson.</p>
+
+<h3 id="predictions">1.2 Predictions</h3>
+
+<div class="eq">
+<math display="block" alttext="if p hat of x equals 1 over 1 plus e to the minus quantity beta hat sub 0 plus x transpose beta hat, is greater than c, then Y equals 2; else Y equals 1">
+  <mrow>
+    <mover><mi>p</mi><mo>^</mo></mover><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><mo>−</mo><mo>(</mo><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><mover><mi>β</mi><mo>^</mo></mover><mo>)</mo></mrow></msup></mrow></mfrac>
+    <mo>&gt;</mo><mi>c</mi><mo>,</mo><mspace width="0.5em"></mspace><mi>Y</mi><mo>=</mo><mn>2</mn>
+    <mspace width="2em"></mspace><mtext>else</mtext><mspace width="0.5em"></mspace><mi>Y</mi><mo>=</mo><mn>1</mn>
+  </mrow>
+</math>
+</div>
+
+<p><math alttext="c equals 0.5"><mrow><mi>c</mi><mo>=</mo><mn>0.5</mn></mrow></math> is the natural choice, but not usually the best.</p>
+
+<p><strong>Example:</strong></p>
+<ul>
+  <li><math alttext="p hat of x"><mrow><mover><mi>p</mi><mo>^</mo></mover><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math> = (.1, .6, .3, .4, .7, .9, .8)</li>
+  <li>predicted class = (0, 1, 0, 0, 1, 1, 1)</li>
+  <li>actual = (0, 1, 0, 1, 0, 1, 1)</li>
+</ul>
+
+<table>
+  <caption>Each observation in the example, and the cell of the confusion table it falls in</caption>
+  <thead><tr><th scope="col">Observation</th><th scope="col"><math alttext="p hat of x"><mrow><mover><mi>p</mi><mo>^</mo></mover><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math></th><th scope="col">Predicted</th><th scope="col">Actual</th><th scope="col">Cell</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">1</th><td>.1</td><td>0</td><td>0</td><td>Actual 0, predict 0</td></tr>
+    <tr><th scope="row">2</th><td>.6</td><td>1</td><td>1</td><td>Actual 1, predict 1</td></tr>
+    <tr><th scope="row">3</th><td>.3</td><td>0</td><td>0</td><td>Actual 0, predict 0</td></tr>
+    <tr><th scope="row">4</th><td>.4</td><td>0</td><td>1</td><td>Actual 1, predict 0</td></tr>
+    <tr><th scope="row">5</th><td>.7</td><td>1</td><td>0</td><td>Actual 0, predict 1</td></tr>
+    <tr><th scope="row">6</th><td>.9</td><td>1</td><td>1</td><td>Actual 1, predict 1</td></tr>
+    <tr><th scope="row">7</th><td>.8</td><td>1</td><td>1</td><td>Actual 1, predict 1</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> In the original, the table above is shown by colour alone: a short coloured tick joins each predicted class to its actual class, and each tick has the colour of the number in the confusion-table cell it counts toward.</p>
+</div>
+
+<table>
+  <caption>Confusion table</caption>
+  <thead><tr><td></td><th scope="col">Predict 0</th><th scope="col">Predict 1</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Actual 0</th><td><strong>2</strong> (highlighted)</td><td>1</td></tr>
+    <tr><th scope="row">Actual 1</th><td>1</td><td><strong>3</strong> (highlighted)</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> Arrows point to the two highlighted diagonal cells: <strong>want these to be high</strong>.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Possible error in original</span> This example codes the two classes as 0 and 1, but the rest of the section uses <math alttext="Y is in the set 1, 2"><mrow><mi>Y</mi><mo>∈</mo><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>}</mo></mrow></math>, predicting <math alttext="Y equals 2"><mrow><mi>Y</mi><mo>=</mo><mn>2</mn></mrow></math> when <math alttext="p hat of x is greater than c"><mrow><mover><mi>p</mi><mo>^</mo></mover><mo>(</mo><mi>x</mi><mo>)</mo><mo>&gt;</mo><mi>c</mi></mrow></math>. Read class 0 here as <math alttext="Y equals 1"><mrow><mi>Y</mi><mo>=</mo><mn>1</mn></mrow></math> and class 1 as <math alttext="Y equals 2"><mrow><mi>Y</mi><mo>=</mo><mn>2</mn></mrow></math>.</p>
+</div>
+
+<h3 id="boundary">1.3 Decision boundary</h3>
+
+<figure>
+<svg viewBox="0 0 600 300" role="img" aria-labelledby="fig4-t fig4-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig4-t">Logistic regression decision boundary for two predictors: a straight line separating the region predicted as class 1 from the region predicted as class 2</title>
+  <desc id="fig4-d">A rectangle with axes x one and x two holds training points drawn as the digits 1 and 2. A dashed straight line runs from the bottom edge, a little left of centre, up to the top edge, right of centre. The region to the right of the line is shaded and labelled predict y equals 2; the region to the left is labelled predict y equals 1. Most 1s are on the left and most 2s on the right, but a few 2s fall on the left side and a few 1s on the right side.</desc>
+  <polygon points="196.2,264.0 331.2,30.0 453.0,30.0 453.0,264.0" fill="var(--est)" opacity="0.18"/><rect x="60.0" y="30.0" width="393.0" height="234.0" fill="none" stroke="currentColor" stroke-width="2"/><line x1="196.2" y1="264.0" x2="331.2" y2="30.0" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="3 4" stroke-linecap="round"/><text x="54.0" y="36.0" font-size="15" fill="currentColor" text-anchor="end">x₂</text><text x="457.0" y="284.0" font-size="15" fill="currentColor" text-anchor="start">x₁</text><text x="2.0" y="20.0" font-size="16" fill="currentColor" text-anchor="start">p = 2</text><text x="114.0" y="79.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="171.0" y="76.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="205.2" y="67.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="241.2" y="91.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="297.0" y="67.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="106.8" y="118.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="198.0" y="109.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="162.0" y="127.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="127.8" y="145.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="246.0" y="142.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="93.0" y="193.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="154.8" y="178.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="166.8" y="229.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="228.0" y="187.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="301.2" y="156.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="313.8" y="238.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="363.0" y="64.2" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="330.0" y="108.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="387.0" y="102.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="189.0" y="151.2" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="339.0" y="146.4" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="381.0" y="158.4" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="417.0" y="140.4" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="190.8" y="194.4" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="322.8" y="206.4" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="411.0" y="200.4" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="273.0" y="236.4" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="373.8" y="236.4" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="66.0" y="286.0" font-size="14" fill="var(--accent)" text-anchor="start">Predict y = 1</text><text x="463.0" y="177.0" font-size="14" fill="var(--accent)" text-anchor="start">Predict y = 2</text><text x="463.0" y="40.0" font-size="14" fill="var(--accent)" text-anchor="start">boundary:</text><text x="463.0" y="60.0" font-size="14" fill="var(--accent)" text-anchor="start">β̂₀ + β̂₁x₁ + β̂₂x₂ = 0</text>
+</svg>
+<figcaption>Figure 4. With <math alttext="p equals 2"><mrow><mi>p</mi><mo>=</mo><mn>2</mn></mrow></math>, the logistic regression decision boundary is a straight line.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 4</summary>
+  <p>Labelled <math alttext="p equals 2"><mrow><mi>p</mi><mo>=</mo><mn>2</mn></mrow></math>. A rectangle with <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> on the horizontal axis and <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math> on the vertical axis. The training points are written as the digits 1 and 2, the class of each point. A dashed straight line runs from the bottom edge, a little left of centre, up to the top edge, right of centre. An arrow from the top of the line leads to its equation, <math alttext="beta hat sub 0 plus beta hat sub 1 x sub 1 plus beta hat sub 2 x sub 2 equals 0"><mrow><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>+</mo><msub><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn></msub><msub><mi>x</mi><mn>1</mn></msub><mo>+</mo><msub><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn></msub><msub><mi>x</mi><mn>2</mn></msub><mo>=</mo><mn>0</mn></mrow></math>. The region to the right of the line is shaded, with an arrow from the label “Predict <math alttext="y equals 2"><mrow><mi>y</mi><mo>=</mo><mn>2</mn></mrow></math>”; an arrow from “Predict <math alttext="y equals 1"><mrow><mi>y</mi><mo>=</mo><mn>1</mn></mrow></math>” points into the unshaded region on the left. Most of the 1s are on the left and most of the 2s on the right, but two 2s are on the left side, two 1s are inside the shaded region, and one 1 sits right next to the line.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Annotation</span> The boundary is</p>
+  <math display="block" alttext="beta hat sub 0 plus beta hat sub 1 x sub 1 plus beta hat sub 2 x sub 2 equals 0, so x sub 2 equals minus the quantity beta hat sub 0 plus beta hat sub 1 x sub 1, over beta hat sub 2">
+    <mrow>
+      <msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>+</mo><msub><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn></msub><msub><mi>x</mi><mn>1</mn></msub><mo>+</mo><msub><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn></msub><msub><mi>x</mi><mn>2</mn></msub><mo>=</mo><mn>0</mn>
+      <mspace width="2em"></mspace>
+      <msub><mi>x</mi><mn>2</mn></msub><mo>=</mo><mo>−</mo>
+      <mfrac><mrow><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>+</mo><msub><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn></msub><msub><mi>x</mi><mn>1</mn></msub></mrow><msub><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn></msub></mfrac>
+    </mrow>
+  </math>
+</div>
+
+<h3 id="multinomial">1.4 Multinomial regression</h3>
+
+<p><math alttext="Y"><mi>Y</mi></math> has <math alttext="K"><mi>K</mi></math> classes (<math alttext="K greater than 2"><mrow><mi>K</mi><mo>&gt;</mo><mn>2</mn></mrow></math>). Pick a baseline class (class <math alttext="K"><mi>K</mi></math>).</p>
+
+<div class="eq">
+<math display="block" alttext="log of the probability that Y equals k given X equals x, over the probability that Y equals K given X equals x, equals beta sub k 0 plus x transpose beta sub k">
+  <mrow>
+    <mi>log</mi>
+    <mfrac>
+      <mrow><mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>)</mo></mrow>
+      <mrow><mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>K</mi><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>)</mo></mrow>
+    </mfrac>
+    <mo>=</mo><msub><mi>β</mi><mrow><mi>k</mi><mn>0</mn></mrow></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><msub><mi>β</mi><mi>k</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<p>Written beside this: <math alttext="K equals 4"><mrow><mi>K</mi><mo>=</mo><mn>4</mn></mrow></math>, <math alttext="k equals 1, 2, or 3"><mrow><mi>k</mi><mo>=</mo><mn>1</mn><mo>,</mo><mn>2</mn></mrow></math>, or 3.</p>
+
+<p>Each class gets its own <math alttext="beta sub 0 k"><msub><mi>β</mi><mrow><mn>0</mn><mi>k</mi></mrow></msub></math> and <math alttext="beta sub k"><msub><mi>β</mi><mi>k</mi></msub></math>:</p>
+
+<div class="eq">
+<math display="block" alttext="the probability that Y equals k given X equals x equals e to the beta sub k 0 plus x transpose beta sub k, over 1 plus the sum from l equals 1 to K minus 1 of e to the beta sub l 0 plus x transpose beta sub l">
+  <mrow>
+    <mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mfrac>
+      <msup><mi>e</mi><mrow><msub><mi>β</mi><mrow><mi>k</mi><mn>0</mn></mrow></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><msub><mi>β</mi><mi>k</mi></msub></mrow></msup>
+      <mrow><mn>1</mn><mo>+</mo><munderover><mo>∑</mo><mrow><mi>ℓ</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi>K</mi><mo>−</mo><mn>1</mn></mrow></munderover><msup><mi>e</mi><mrow><mo>(</mo><msub><mi>β</mi><mrow><mi>ℓ</mi><mn>0</mn></mrow></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><msub><mi>β</mi><mi>ℓ</mi></msub><mo>)</mo></mrow></msup></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="the probability that Y equals K given X equals x equals 1 over 1 plus the same sum">
+  <mrow>
+    <mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>K</mi><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><munderover><mo>∑</mo><mrow><mi>ℓ</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi>K</mi><mo>−</mo><mn>1</mn></mrow></munderover><msup><mi>e</mi><mrow><mo>(</mo><msub><mi>β</mi><mrow><mi>ℓ</mi><mn>0</mn></mrow></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><msub><mi>β</mi><mi>ℓ</mi></msub><mo>)</mo></mrow></msup></mrow></mfrac>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> In the original, the second formula is written only as “<math alttext="1 over 1 plus"><mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo></mrow></mfrac></math>”: a brace under the sum in the first denominator, drawn in a second colour, has an arrow carrying it into this denominator.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Possible error in original</span> The intercept for class <math alttext="k"><mi>k</mi></math> is written <math alttext="beta sub k 0"><msub><mi>β</mi><mrow><mi>k</mi><mn>0</mn></mrow></msub></math> in the formulas but <math alttext="beta sub 0 k"><msub><mi>β</mi><mrow><mn>0</mn><mi>k</mi></mrow></msub></math> in “each class gets its own <math alttext="beta sub 0 k"><msub><mi>β</mi><mrow><mn>0</mn><mi>k</mi></mrow></msub></math>, <math alttext="beta sub k"><msub><mi>β</mi><mi>k</mi></msub></math>” and in the note on penalties below. Both mean the same parameter; ISL writes <math alttext="beta sub k 0"><msub><mi>β</mi><mrow><mi>k</mi><mn>0</mn></mrow></msub></math>.</p>
+</div>
+
+<p><strong>Softmax:</strong></p>
+
+<div class="eq">
+<math display="block" alttext="p sub k of x equals e to the beta sub k 0 plus x transpose beta sub k, over the sum from l equals 1 to K of e to the beta sub l 0 plus x transpose beta sub l, which implies the sum from k equals 1 to K of p sub k of x equals 1">
+  <mrow>
+    <msub><mi>p</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mfrac>
+      <msup><mi>e</mi><mrow><msub><mi>β</mi><mrow><mi>k</mi><mn>0</mn></mrow></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><msub><mi>β</mi><mi>k</mi></msub></mrow></msup>
+      <mrow><munderover><mo>∑</mo><mrow><mi>ℓ</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msup><mi>e</mi><mrow><msub><mi>β</mi><mrow><mi>ℓ</mi><mn>0</mn></mrow></msub><mo>+</mo><msup><mi>x</mi><mi>T</mi></msup><msub><mi>β</mi><mi>ℓ</mi></msub></mrow></msup></mrow>
+    </mfrac>
+    <mspace width="1em"></mspace><mo>⇒</mo><mspace width="1em"></mspace>
+    <munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mi>p</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mn>1</mn>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> Pointing to the numerator: <strong>each class <math alttext="k"><mi>k</mi></math> gets one</strong>. Pointing to the denominator: <strong>sum across all classes</strong>.</p>
+  <p><span class="tag" style="color:var(--est)">Annotation</span> <strong>Prediction:</strong> predict the class <math alttext="k"><mi>k</mi></math> with the highest <math alttext="p sub k of x"><mrow><msub><mi>p</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math>.</p>
+</div>
+
+<p><strong>Note:</strong> ridge and lasso work on logistic and multinomial regression. Add a penalty (<math alttext="lambda times the sum over j of beta sub j squared"><mrow><mi>λ</mi><munder><mo>∑</mo><mi>j</mi></munder><msubsup><mi>β</mi><mi>j</mi><mn>2</mn></msubsup></mrow></math> or <math alttext="lambda times the sum over j of the absolute value of beta sub j"><mrow><mi>λ</mi><munder><mo>∑</mo><mi>j</mi></munder><mo>|</mo><msub><mi>β</mi><mi>j</mi></msub><mo>|</mo></mrow></math>) to the negative log-likelihood. Don't include <math alttext="beta sub 0 k"><msub><mi>β</mi><mrow><mn>0</mn><mi>k</mi></mrow></msub></math>.</p>
+
+<h2 id="gen-disc">2. Generative vs discriminative</h2>
+
+<p><strong>Logistic (discriminative):</strong> <math alttext="the probability that Y equals k given X equals x"><mrow><mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>)</mo></mrow></math>.</p>
+<p>An arrow points to the conditioning on <math alttext="X equals x"><mrow><mi>X</mi><mo>=</mo><mi>x</mi></mrow></math>: we don't use the distribution of <math alttext="X"><mi>X</mi></math> or of <math alttext="X comma Y"><mrow><mo>(</mo><mi>X</mi><mo>,</mo><mi>Y</mi><mo>)</mo></mrow></math>.</p>
+
+<p><strong>Generative:</strong></p>
+<ul>
+  <li><math alttext="P of X comma Y"><mrow><mi>P</mi><mo>(</mo><mi>X</mi><mo>,</mo><mi>Y</mi><mo>)</mo></mrow></math></li>
+  <li><math alttext="P of X given Y equals k"><mrow><mi>P</mi><mo>(</mo><mi>X</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>)</mo></mrow></math></li>
+  <li><math alttext="P of Y equals k"><mrow><mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>)</mo></mrow></math></li>
+</ul>
+<p>then use these, using Bayes' theorem, to get <math alttext="the probability that Y equals k given X equals x"><mrow><mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>)</mo></mrow></math>.</p>
+
+<p><strong>Why?</strong></p>
+<ul>
+  <li>Logistic fails if the classes have perfect separation.</li>
+  <li>If <math alttext="X is distributed normal"><mrow><mi>X</mi><mo>∼</mo><mtext>Normal</mtext></mrow></math> and <math alttext="n"><mi>n</mi></math> is small, generative is more accurate.</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 300 210" role="img" aria-labelledby="fig5-t fig5-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig5-t">Two classes with perfect separation: a straight line has every 1 on one side and every 2 on the other</title>
+  <desc id="fig5-d">A rectangle with axes x one and x two. Points labelled 1 are clustered in the upper left and points labelled 2 in the lower right. A straight line runs diagonally between the two groups, from the bottom edge up to the top edge, with no point on the wrong side.</desc>
+  <rect x="60" y="30" width="200" height="160.0" fill="none" stroke="currentColor" stroke-width="2"/><text x="54.0" y="36.0" font-size="15" fill="currentColor" text-anchor="end">x₂</text><text x="264.0" y="208.0" font-size="15" fill="currentColor" text-anchor="start">x₁</text><text x="80.0" y="60.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="105.0" y="55.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="130.0" y="52.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="85.0" y="90.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="108.0" y="80.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="90.0" y="120.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="220.0" y="125.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="210.0" y="155.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="232.0" y="158.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="240.0" y="180.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><line x1="130" y1="190.0" x2="210" y2="30" stroke="var(--est)" stroke-width="3"/>
+</svg>
+<figcaption>Figure 5. Perfect separation: a straight line splits the two classes with no errors.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 5</summary>
+  <p>A small rectangle with <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> on the horizontal axis and <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math> on the vertical axis. A handful of 1s sit in the upper left and a handful of 2s in the lower right. A straight line runs diagonally from the bottom edge to the top-right corner region, with every 1 on one side and every 2 on the other.</p>
+</details>
+
+<h3 id="bayes">2.1 Bayes' theorem</h3>
+
+<p>For events <math alttext="A"><mi>A</mi></math> and <math alttext="B"><mi>B</mi></math>:</p>
+
+<div class="eq">
+<math display="block" alttext="P of A given B equals P of A intersect B over P of B, equals P of B given A times P of A over P of B, equals P of A times P of B given A, over P of B intersect A complement plus P of B intersect A">
+  <mrow>
+    <mi>P</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>B</mi><mo>)</mo><mo>=</mo>
+    <mfrac><mrow><mi>P</mi><mo>(</mo><mi>A</mi><mo>∩</mo><mi>B</mi><mo>)</mo></mrow><mrow><mi>P</mi><mo>(</mo><mi>B</mi><mo>)</mo></mrow></mfrac>
+    <mo>=</mo>
+    <mfrac><mrow><mi>P</mi><mo>(</mo><mi>B</mi><mo>|</mo><mi>A</mi><mo>)</mo><mi>P</mi><mo>(</mo><mi>A</mi><mo>)</mo></mrow><mrow><mi>P</mi><mo>(</mo><mi>B</mi><mo>)</mo></mrow></mfrac>
+    <mo>=</mo>
+    <mfrac><mrow><mi>P</mi><mo>(</mo><mi>A</mi><mo>)</mo><mi>P</mi><mo>(</mo><mi>B</mi><mo>|</mo><mi>A</mi><mo>)</mo></mrow><mrow><mi>P</mi><mo>(</mo><mi>B</mi><mo>∩</mo><msup><mi>A</mi><mi>c</mi></msup><mo>)</mo><mo>+</mo><mi>P</mi><mo>(</mo><mi>B</mi><mo>∩</mo><mi>A</mi><mo>)</mo></mrow></mfrac>
+  </mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="equals P of A times P of B given A, over P of A times P of B given A plus P of A complement times P of B given A complement">
+  <mrow>
+    <mo>=</mo>
+    <mfrac><mrow><mi>P</mi><mo>(</mo><mi>A</mi><mo>)</mo><mi>P</mi><mo>(</mo><mi>B</mi><mo>|</mo><mi>A</mi><mo>)</mo></mrow><mrow><mi>P</mi><mo>(</mo><mi>A</mi><mo>)</mo><mi>P</mi><mo>(</mo><mi>B</mi><mo>|</mo><mi>A</mi><mo>)</mo><mo>+</mo><mi>P</mi><mo>(</mo><msup><mi>A</mi><mi>c</mi></msup><mo>)</mo><mi>P</mi><mo>(</mo><mi>B</mi><mo>|</mo><msup><mi>A</mi><mi>c</mi></msup><mo>)</mo></mrow></mfrac>
+  </mrow>
+</math>
+</div>
+
+<p>For classification:</p>
+
+<div class="eq">
+<math display="block" alttext="the probability that Y equals k given X equals x equals P of Y equals k times P of X equals x given Y equals k, over the sum from l equals 1 to K of P of Y equals l times P of X equals x given Y equals l">
+  <mrow>
+    <mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>|</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mfrac>
+      <mrow><mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>)</mo><mi>P</mi><mo>(</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>)</mo></mrow>
+      <mrow><munderover><mo>∑</mo><mrow><mi>ℓ</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>ℓ</mi><mo>)</mo><mi>P</mi><mo>(</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mi>ℓ</mi><mo>)</mo></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> Under the left-hand side: <strong>posterior</strong>.</p>
+</div>
+
+<ul>
+  <li><math alttext="P of Y equals k equals pi sub k"><mrow><mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>)</mo><mo>=</mo><msub><mi>π</mi><mi>k</mi></msub></mrow></math>; annotation: <strong>prior for class <math alttext="k"><mi>k</mi></math></strong></li>
+  <li><math alttext="P of X equals x given Y equals k equals f sub k of x"><mrow><mi>P</mi><mo>(</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>)</mo><mo>=</mo><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math>: density of <math alttext="x"><mi>x</mi></math> for class <math alttext="k"><mi>k</mi></math></li>
+</ul>
+
+<div class="eq">
+<math display="block" alttext="p sub k of x equals pi sub k f sub k of x, over the sum from l equals 1 to K of pi sub l f sub l of x">
+  <mrow>
+    <msub><mi>p</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mfrac>
+      <mrow><msub><mi>π</mi><mi>k</mi></msub><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+      <mrow><munderover><mo>∑</mo><mrow><mi>ℓ</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mi>π</mi><mi>ℓ</mi></msub><msub><mi>f</mi><mi>ℓ</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> An arrow labelled <strong>posterior</strong> points to <math alttext="p sub k of x"><mrow><msub><mi>p</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math>.</p>
+  <p><span class="tag" style="color:var(--accent)">Annotation</span> The numerator <math alttext="pi sub k f sub k of x"><mrow><msub><mi>π</mi><mi>k</mi></msub><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math> is highlighted: <strong>estimate these</strong>.</p>
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> Pointing to the denominator: <strong>same for all <math alttext="k"><mi>k</mi></math>, ignore these</strong>.</p>
+</div>
+
+<p>So</p>
+<div class="eq">
+<math display="block" alttext="y hat of x equals the argmax over k of pi sub k f sub k of x, which equals the argmax over k of log pi sub k plus log f sub k of x">
+  <mrow>
+    <mover><mi>y</mi><mo>^</mo></mover><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <munder><mo>argmax</mo><mi>k</mi></munder><msub><mi>π</mi><mi>k</mi></msub><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo>
+    <mo>=</mo>
+    <munder><mo>argmax</mo><mi>k</mi></munder>
+    <mrow><mo>[</mo><mi>log</mi><msub><mi>π</mi><mi>k</mi></msub><mo>+</mo><mi>log</mi><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>]</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Estimating the prior:</p>
+  <math display="block" alttext="pi hat sub k equals n sub k over n, for example the number of spam over the number of emails">
+    <mrow>
+      <msub><mover><mi>π</mi><mo>^</mo></mover><mi>k</mi></msub><mo>=</mo><mfrac><msub><mi>n</mi><mi>k</mi></msub><mi>n</mi></mfrac>
+      <mspace width="2em"></mspace><mtext>e.g.</mtext><mspace width="0.5em"></mspace>
+      <mfrac><mtext># of SPAM</mtext><mtext># of emails</mtext></mfrac>
+    </mrow>
+  </math>
+</div>
+
+<h2 id="lda">3. Linear discriminant analysis (LDA)</h2>
+
+<p>Written beside the heading: <strong>Generative</strong>.</p>
+
+<h3 id="discriminant">3.1 Discriminant function</h3>
+
+<p>Assume</p>
+<div class="eq">
+<math display="block" alttext="X given Y equals k is distributed normal with mean mu sub k and covariance Sigma">
+  <mrow><mi>X</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>∼</mo><mi>N</mi><mo>(</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>,</mo><mi>Σ</mi><mo>)</mo></mrow>
+</math>
+</div>
+<p>where <math alttext="mu sub k"><msub><mi>μ</mi><mi>k</mi></msub></math> = the mean of each predictor for class <math alttext="k"><mi>k</mi></math>; e.g. <math alttext="mu sub spam"><msub><mi>μ</mi><mtext>spam</mtext></msub></math> = average number of words.</p>
+
+<p>With <math alttext="p equals 1"><mrow><mi>p</mi><mo>=</mo><mn>1</mn></mrow></math> and <math alttext="K equals 2"><mrow><mi>K</mi><mo>=</mo><mn>2</mn></mrow></math> (SPAM, NONSPAM), and <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> = number of words:</p>
+
+<figure>
+<svg viewBox="0 0 570 230" role="img" aria-labelledby="fig6-t fig6-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig6-t">Two bell-shaped class densities along x one: nonspam on the left and spam on the right, overlapping in the middle</title>
+  <desc id="fig6-d">A horizontal axis labelled x one, the number of words. Two bell curves of the same shape sit on it: the solid curve on the left is labelled NONSPAM and the dashed curve on the right is labelled SPAM. Their tails overlap between the two peaks.</desc>
+  <line x1="40" y1="200" x2="520" y2="200" stroke="currentColor" stroke-width="2"/><polygon points="520,200 512,196 512,204" fill="currentColor"/><text x="526.0" y="205.0" font-size="15" fill="currentColor" text-anchor="start">x₁</text><path d="M40.0,196.9 L41.5,196.6 L43.1,196.3 L44.6,196.0 L46.2,195.7 L47.7,195.4 L49.2,195.0 L50.8,194.6 L52.3,194.2 L53.8,193.7 L55.4,193.3 L56.9,192.8 L58.5,192.2 L60.0,191.7 L61.5,191.1 L63.1,190.4 L64.6,189.8 L66.2,189.1 L67.7,188.3 L69.2,187.5 L70.8,186.7 L72.3,185.8 L73.8,184.9 L75.4,183.9 L76.9,182.9 L78.5,181.9 L80.0,180.8 L81.5,179.6 L83.1,178.4 L84.6,177.1 L86.2,175.8 L87.7,174.4 L89.2,173.0 L90.8,171.5 L92.3,170.0 L93.8,168.4 L95.4,166.7 L96.9,165.0 L98.5,163.3 L100.0,161.4 L101.5,159.6 L103.1,157.6 L104.6,155.7 L106.2,153.6 L107.7,151.5 L109.2,149.4 L110.8,147.2 L112.3,144.9 L113.8,142.6 L115.4,140.3 L116.9,137.9 L118.5,135.5 L120.0,133.1 L121.5,130.6 L123.1,128.0 L124.6,125.5 L126.2,122.9 L127.7,120.3 L129.2,117.7 L130.8,115.1 L132.3,112.4 L133.8,109.8 L135.4,107.2 L136.9,104.5 L138.5,101.9 L140.0,99.3 L141.5,96.7 L143.1,94.1 L144.6,91.5 L146.2,89.0 L147.7,86.5 L149.2,84.1 L150.8,81.7 L152.3,79.3 L153.8,77.0 L155.4,74.8 L156.9,72.7 L158.5,70.6 L160.0,68.6 L161.5,66.7 L163.1,64.8 L164.6,63.1 L166.2,61.4 L167.7,59.9 L169.2,58.4 L170.8,57.1 L172.3,55.8 L173.8,54.7 L175.4,53.7 L176.9,52.8 L178.5,52.0 L180.0,51.4 L181.5,50.9 L183.1,50.5 L184.6,50.2 L186.2,50.0 L187.7,50.0 L189.2,50.1 L190.8,50.3 L192.3,50.7 L193.8,51.2 L195.4,51.8 L196.9,52.5 L198.5,53.4 L200.0,54.3 L201.5,55.4 L203.1,56.6 L204.6,57.9 L206.2,59.3 L207.7,60.8 L209.2,62.5 L210.8,64.2 L212.3,66.0 L213.8,67.9 L215.4,69.8 L216.9,71.9 L218.5,74.0 L220.0,76.2 L221.5,78.5 L223.1,80.8 L224.6,83.2 L226.2,85.6 L227.7,88.1 L229.2,90.6 L230.8,93.1 L232.3,95.7 L233.8,98.3 L235.4,100.9 L236.9,103.6 L238.5,106.2 L240.0,108.8 L241.5,111.5 L243.1,114.1 L244.6,116.8 L246.2,119.4 L247.7,122.0 L249.2,124.6 L250.8,127.1 L252.3,129.7 L253.8,132.2 L255.4,134.6 L256.9,137.1 L258.5,139.5 L260.0,141.8 L261.5,144.1 L263.1,146.4 L264.6,148.6 L266.2,150.8 L267.7,152.9 L269.2,154.9 L270.8,156.9 L272.3,158.9 L273.8,160.8 L275.4,162.6 L276.9,164.4 L278.5,166.1 L280.0,167.8 L281.5,169.4 L283.1,171.0 L284.6,172.5 L286.2,173.9 L287.7,175.3 L289.2,176.6 L290.8,177.9 L292.3,179.2 L293.8,180.3 L295.4,181.5 L296.9,182.5 L298.5,183.6 L300.0,184.6 L301.5,185.5 L303.1,186.4 L304.6,187.2 L306.2,188.0 L307.7,188.8 L309.2,189.5 L310.8,190.2 L312.3,190.8 L313.8,191.5 L315.4,192.0 L316.9,192.6 L318.5,193.1 L320.0,193.6 L321.5,194.0 L323.1,194.5 L324.6,194.9 L326.2,195.2 L327.7,195.6 L329.2,195.9 L330.8,196.2 L332.3,196.5 L333.8,196.8 L335.4,197.0 L336.9,197.3 L338.5,197.5 L340.0,197.7 L341.5,197.9 L343.1,198.0 L344.6,198.2 L346.2,198.4 L347.7,198.5 L349.2,198.6 L350.8,198.7 L352.3,198.8 L353.8,199.0 L355.4,199.0 L356.9,199.1 L358.5,199.2 L360.0,199.3 L361.5,199.3 L363.1,199.4 L364.6,199.5 L366.2,199.5 L367.7,199.6 L369.2,199.6 L370.8,199.6 L372.3,199.7 L373.8,199.7 L375.4,199.7 L376.9,199.8 L378.5,199.8 L380.0,199.8 L381.5,199.8 L383.1,199.8 L384.6,199.9 L386.2,199.9 L387.7,199.9 L389.2,199.9 L390.8,199.9 L392.3,199.9 L393.8,199.9 L395.4,199.9 L396.9,199.9 L398.5,199.9 L400.0,200.0 L401.5,200.0 L403.1,200.0 L404.6,200.0 L406.2,200.0 L407.7,200.0 L409.2,200.0 L410.8,200.0 L412.3,200.0 L413.8,200.0 L415.4,200.0 L416.9,200.0 L418.5,200.0 L420.0,200.0 L421.5,200.0 L423.1,200.0 L424.6,200.0 L426.2,200.0 L427.7,200.0 L429.2,200.0 L430.8,200.0 L432.3,200.0 L433.8,200.0 L435.4,200.0 L436.9,200.0 L438.5,200.0 L440.0,200.0 L441.5,200.0 L443.1,200.0 L444.6,200.0 L446.2,200.0 L447.7,200.0 L449.2,200.0 L450.8,200.0 L452.3,200.0 L453.8,200.0 L455.4,200.0 L456.9,200.0 L458.5,200.0 L460.0,200.0 L461.5,200.0 L463.1,200.0 L464.6,200.0 L466.2,200.0 L467.7,200.0 L469.2,200.0 L470.8,200.0 L472.3,200.0 L473.8,200.0 L475.4,200.0 L476.9,200.0 L478.5,200.0 L480.0,200.0 L481.5,200.0 L483.1,200.0 L484.6,200.0 L486.2,200.0 L487.7,200.0 L489.2,200.0 L490.8,200.0 L492.3,200.0 L493.8,200.0 L495.4,200.0 L496.9,200.0 L498.5,200.0 L500.0,200.0" fill="none" stroke="var(--pop)" stroke-width="3"/><path d="M40.0,200.0 L41.5,200.0 L43.1,200.0 L44.6,200.0 L46.2,200.0 L47.7,200.0 L49.2,200.0 L50.8,200.0 L52.3,200.0 L53.8,200.0 L55.4,200.0 L56.9,200.0 L58.5,200.0 L60.0,200.0 L61.5,200.0 L63.1,200.0 L64.6,200.0 L66.2,200.0 L67.7,200.0 L69.2,200.0 L70.8,200.0 L72.3,200.0 L73.8,200.0 L75.4,200.0 L76.9,200.0 L78.5,200.0 L80.0,200.0 L81.5,200.0 L83.1,200.0 L84.6,200.0 L86.2,200.0 L87.7,200.0 L89.2,200.0 L90.8,200.0 L92.3,200.0 L93.8,200.0 L95.4,200.0 L96.9,200.0 L98.5,200.0 L100.0,200.0 L101.5,200.0 L103.1,200.0 L104.6,200.0 L106.2,200.0 L107.7,200.0 L109.2,200.0 L110.8,200.0 L112.3,200.0 L113.8,200.0 L115.4,200.0 L116.9,200.0 L118.5,200.0 L120.0,200.0 L121.5,200.0 L123.1,200.0 L124.6,200.0 L126.2,200.0 L127.7,200.0 L129.2,200.0 L130.8,200.0 L132.3,199.9 L133.8,199.9 L135.4,199.9 L136.9,199.9 L138.5,199.9 L140.0,199.9 L141.5,199.9 L143.1,199.9 L144.6,199.9 L146.2,199.9 L147.7,199.8 L149.2,199.8 L150.8,199.8 L152.3,199.8 L153.8,199.8 L155.4,199.7 L156.9,199.7 L158.5,199.7 L160.0,199.6 L161.5,199.6 L163.1,199.6 L164.6,199.5 L166.2,199.5 L167.7,199.4 L169.2,199.3 L170.8,199.3 L172.3,199.2 L173.8,199.1 L175.4,199.0 L176.9,199.0 L178.5,198.9 L180.0,198.7 L181.5,198.6 L183.1,198.5 L184.6,198.4 L186.2,198.2 L187.7,198.1 L189.2,197.9 L190.8,197.7 L192.3,197.5 L193.8,197.3 L195.4,197.0 L196.9,196.8 L198.5,196.5 L200.0,196.2 L201.5,195.9 L203.1,195.6 L204.6,195.2 L206.2,194.9 L207.7,194.5 L209.2,194.0 L210.8,193.6 L212.3,193.1 L213.8,192.6 L215.4,192.0 L216.9,191.5 L218.5,190.9 L220.0,190.2 L221.5,189.5 L223.1,188.8 L224.6,188.0 L226.2,187.2 L227.7,186.4 L229.2,185.5 L230.8,184.6 L232.3,183.6 L233.8,182.6 L235.4,181.5 L236.9,180.4 L238.5,179.2 L240.0,178.0 L241.5,176.7 L243.1,175.3 L244.6,174.0 L246.2,172.5 L247.7,171.0 L249.2,169.4 L250.8,167.8 L252.3,166.2 L253.8,164.4 L255.4,162.7 L256.9,160.8 L258.5,158.9 L260.0,157.0 L261.5,155.0 L263.1,152.9 L264.6,150.8 L266.2,148.6 L267.7,146.4 L269.2,144.2 L270.8,141.9 L272.3,139.5 L273.8,137.1 L275.4,134.7 L276.9,132.2 L278.5,129.7 L280.0,127.2 L281.5,124.6 L283.1,122.0 L284.6,119.4 L286.2,116.8 L287.7,114.2 L289.2,111.5 L290.8,108.9 L292.3,106.3 L293.8,103.6 L295.4,101.0 L296.9,98.4 L298.5,95.8 L300.0,93.2 L301.5,90.7 L303.1,88.1 L304.6,85.7 L306.2,83.2 L307.7,80.9 L309.2,78.5 L310.8,76.3 L312.3,74.1 L313.8,71.9 L315.4,69.9 L316.9,67.9 L318.5,66.0 L320.0,64.2 L321.5,62.5 L323.1,60.9 L324.6,59.4 L326.2,57.9 L327.7,56.6 L329.2,55.4 L330.8,54.3 L332.3,53.4 L333.8,52.5 L335.4,51.8 L336.9,51.2 L338.5,50.7 L340.0,50.3 L341.5,50.1 L343.1,50.0 L344.6,50.0 L346.2,50.2 L347.7,50.4 L349.2,50.8 L350.8,51.4 L352.3,52.0 L353.8,52.8 L355.4,53.7 L356.9,54.7 L358.5,55.8 L360.0,57.0 L361.5,58.4 L363.1,59.8 L364.6,61.4 L366.2,63.0 L367.7,64.8 L369.2,66.6 L370.8,68.5 L372.3,70.5 L373.8,72.6 L375.4,74.8 L376.9,77.0 L378.5,79.3 L380.0,81.6 L381.5,84.0 L383.1,86.5 L384.6,88.9 L386.2,91.5 L387.7,94.0 L389.2,96.6 L390.8,99.2 L392.3,101.8 L393.8,104.5 L395.4,107.1 L396.9,109.7 L398.5,112.4 L400.0,115.0 L401.5,117.7 L403.1,120.3 L404.6,122.9 L406.2,125.4 L407.7,128.0 L409.2,130.5 L410.8,133.0 L412.3,135.5 L413.8,137.9 L415.4,140.3 L416.9,142.6 L418.5,144.9 L420.0,147.1 L421.5,149.3 L423.1,151.5 L424.6,153.6 L426.2,155.6 L427.7,157.6 L429.2,159.5 L430.8,161.4 L432.3,163.2 L433.8,165.0 L435.4,166.7 L436.9,168.4 L438.5,170.0 L440.0,171.5 L441.5,173.0 L443.1,174.4 L444.6,175.8 L446.2,177.1 L447.7,178.4 L449.2,179.6 L450.8,180.7 L452.3,181.8 L453.8,182.9 L455.4,183.9 L456.9,184.9 L458.5,185.8 L460.0,186.7 L461.5,187.5 L463.1,188.3 L464.6,189.0 L466.2,189.8 L467.7,190.4 L469.2,191.1 L470.8,191.7 L472.3,192.2 L473.8,192.8 L475.4,193.3 L476.9,193.7 L478.5,194.2 L480.0,194.6 L481.5,195.0 L483.1,195.4 L484.6,195.7 L486.2,196.0 L487.7,196.3 L489.2,196.6 L490.8,196.9 L492.3,197.1 L493.8,197.3 L495.4,197.6 L496.9,197.8 L498.5,197.9 L500.0,198.1" fill="none" stroke="var(--est)" stroke-width="3" stroke-dasharray="10 5"/><text x="117.2" y="60.0" font-size="14" fill="var(--pop)" text-anchor="end">NONSPAM</text><line x1="121.20000000000002" y1="56" x2="145.8" y2="85" stroke="var(--pop)" stroke-width="1.5"/><text x="409.6" y="60.0" font-size="14" fill="var(--est)" text-anchor="start">SPAM</text><line x1="405.59999999999997" y1="56" x2="385.0" y2="85" stroke="var(--est)" stroke-width="1.5"/>
+</svg>
+<figcaption>Figure 6. One normal density for each class: NONSPAM on the left and SPAM on the right.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 6</summary>
+  <p>A horizontal axis labelled <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math>, the number of words. Two bell-shaped curves of about the same height and width sit on it. The left curve is labelled NONSPAM and the right curve SPAM. The right tail of the NONSPAM curve overlaps the left tail of the SPAM curve between the two peaks.</p>
+</details>
+
+</main>
+
+<footer>
+  <p>Transcribed from the handwritten notes <em>ML_week_2_day_2.pdf</em> (6 pages). Equations are MathML; figures are inline SVG with title, description, and an expandable long description. Figure numbering continues from Week 2, Day 1. Conforms to WCAG 2.2 Level AA.</p>
+</footer>
+</div>
+</body>
+</html>
