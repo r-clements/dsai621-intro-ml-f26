@@ -1,4 +1,4 @@
-// Shrinkage: ridge, lasso and elastic net (lecture notes §2–§5, ISL 6.2, ESL 3.4).
+// Shrinkage: ridge, lasso and elastic net (ISL 6.2, ESL 3.4).
 //
 // Paths view: the elastic-net problem in scikit-learn's ElasticNet scaling,
 //   minimize (1/2n)||y − Xb||² + λ[ρ||b||₁ + (1−ρ)/2 ||b||²],
@@ -612,6 +612,113 @@ document.getElementById("reset-geom").addEventListener("click", () => {
 });
 
 // =====================================================================
+// One-predictor view: the loss RSS(β) + λ·penalty as a curve in β, in ISL's scaling.
+// One standardized predictor and centred y, n = 20, so Σx² = 20; the least-squares slope is
+// β̂ = 2 and RSS(β̂) = 20. Then RSS(β) = 20 + 20(β − 2)², and the minimizer is
+//   ridge: β̂_λ = Σxy / (Σx² + λ) = 40 / (20 + λ)
+//   lasso: β̂_λ = (Σxy − λ/2)₊ / Σx² = (40 − λ/2)₊ / 20, which is exactly 0 for λ ≥ 80.
+// =====================================================================
+const O_SXX = 20, O_BHAT = 2, O_RSS0 = 20, O_SXY = O_SXX * O_BHAT;
+const oRSS = b => O_RSS0 + O_SXX * (b - O_BHAT) ** 2;
+const oPen = (b, lam, method) => (method === "ridge" ? lam * b * b : lam * Math.abs(b));
+const oMin = (lam, method) => (method === "ridge" ? O_SXY / (O_SXX + lam) : Math.max(O_SXY - lam / 2, 0) / O_SXX);
+
+const OW = 720, OH = 380, om = { top: 14, right: 20, bottom: 42, left: 52 };
+const oneSvg = d3.select("#one").append("svg").attr("viewBox", `0 0 ${OW} ${OH}`).attr("role", "img");
+const oneTitle = oneSvg.append("title").attr("id", "one-title");
+const oneDesc = oneSvg.append("desc").attr("id", "one-desc");
+oneSvg.attr("aria-labelledby", "one-title one-desc");
+const ox = d3.scaleLinear().domain([-1, 3]).range([om.left, OW - om.right]);
+const oy = d3.scaleLinear().domain([0, 200]).range([OH - om.bottom, om.top]);   // fixed, so a rising loss shows
+oneSvg.append("defs").append("clipPath").attr("id", "one-clip").append("rect")
+  .attr("x", om.left).attr("y", om.top).attr("width", OW - om.left - om.right).attr("height", OH - om.top - om.bottom);
+oneSvg.append("g").attr("class", "axis").attr("transform", `translate(0,${OH - om.bottom})`)
+  .call(d3.axisBottom(ox).ticks(8).tickFormat(v => minus(v)));
+oneSvg.append("g").attr("class", "axis").attr("transform", `translate(${om.left},0)`).call(d3.axisLeft(oy).ticks(5));
+oneSvg.append("text").attr("class", "axis-label").attr("x", (om.left + OW - om.right) / 2).attr("y", OH - 6)
+  .attr("text-anchor", "middle").text("coefficient β");
+oneSvg.append("text").attr("class", "axis-label").attr("transform", `translate(14,${(om.top + OH - om.bottom) / 2}) rotate(-90)`)
+  .attr("text-anchor", "middle").text("loss");
+oneSvg.append("line").attr("x1", ox(0)).attr("x2", ox(0)).attr("y1", om.top).attr("y2", OH - om.bottom).attr("stroke", "#bbb");
+oneSvg.append("line").attr("x1", ox(O_BHAT)).attr("x2", ox(O_BHAT)).attr("y1", oy(O_RSS0)).attr("y2", OH - om.bottom)
+  .attr("stroke", "#888").attr("stroke-dasharray", "2 3");
+oneSvg.append("text").attr("class", "line-label").attr("x", ox(O_BHAT) + 5).attr("y", OH - om.bottom - 5).text("least squares, β̂ = 2");
+
+const oClip = oneSvg.append("g").attr("clip-path", "url(#one-clip)");
+const oGrid = d3.range(0, 401).map(k => -1 + (4 * k) / 400);
+const oLine = d3.line().x(d => ox(d[0])).y(d => oy(d[1]));
+const rssCurve = oClip.append("path").attr("fill", "none").attr("stroke", "#5e5c64").attr("stroke-width", 2).attr("stroke-dasharray", "7 4");
+const penCurve = oClip.append("path").attr("fill", "none").attr("stroke", "#c64600").attr("stroke-width", 2).attr("stroke-dasharray", "2 3");
+const lossCurve = oClip.append("path").attr("fill", "none").attr("stroke", "#1a5fb4").attr("stroke-width", 3);
+// Stacked bar under the minimum: the RSS part from 0, then the penalty part on top.
+const rssBar = oneSvg.append("rect").attr("width", 12).attr("fill", "#d4d3d8").attr("stroke", "#5e5c64");
+const penBar = oneSvg.append("rect").attr("width", 12).attr("fill", "#f3c9a8").attr("stroke", "#c64600");
+const oDot = oneSvg.append("circle").attr("r", 6).attr("fill", "#1a5fb4").attr("stroke", "#fff").attr("stroke-width", 2);
+const oLabels = oneSvg.append("g");
+
+let oneLive = null;
+function updateOne() {
+  const method = document.querySelector("input[name=omethod]:checked").value;
+  const lam = +document.getElementById("olam-slider").value;
+  document.getElementById("olam-out").textContent = `λ = ${lam}`;
+
+  const b = oMin(lam, method), rss = oRSS(b), pen = oPen(b, lam, method), loss = rss + pen;
+  rssCurve.attr("d", oLine(oGrid.map(t => [t, oRSS(t)])));
+  penCurve.attr("d", oLine(oGrid.map(t => [t, oPen(t, lam, method)])));
+  lossCurve.attr("d", oLine(oGrid.map(t => [t, oRSS(t) + oPen(t, lam, method)])));
+
+  const bx0 = ox(b) - 6;
+  rssBar.attr("x", bx0).attr("y", oy(rss)).attr("height", oy(0) - oy(rss));
+  penBar.attr("x", bx0).attr("y", oy(loss)).attr("height", Math.max(oy(rss) - oy(loss), 0));
+  oDot.attr("cx", ox(b)).attr("cy", oy(loss));
+
+  // Labels beside the bar: the two parts and the total. Put them on whichever side has room.
+  const right = b < 1.6, ax = ox(b) + (right ? 12 : -12), anchor = right ? "start" : "end";
+  const lbl = [
+    { y: oy(loss) - 10, text: `minimum loss ${fmt2(loss)} at β = ${fmt3(b)}`, bold: true },
+    { y: (oy(rss) + oy(loss)) / 2 + 4, text: `penalty ${fmt2(pen)}` },
+    { y: (oy(0) + oy(rss)) / 2 + 4, text: `RSS ${fmt2(rss)}` },
+  ].filter(d => pen > 0.005 || !d.text.startsWith("penalty"));   // no penalty slice to label at λ = 0 or β = 0
+  // Keep labels at least 14px apart (the penalty slice can be very thin).
+  for (let i = 1; i < lbl.length; i++) lbl[i].y = Math.max(lbl[i].y, lbl[i - 1].y + 14);
+  oLabels.selectAll("text").data(lbl).join("text").attr("class", "line-label")
+    .attr("x", ax).attr("y", d => d.y).attr("text-anchor", anchor).style("font-weight", d => (d.bold ? 600 : 400))
+    .style("paint-order", "stroke").style("stroke", "#fff").style("stroke-width", "3px").text(d => d.text);
+
+  document.getElementById("o-pen-key").textContent = method === "ridge" ? "penalty λβ²" : "penalty λ|β|";
+
+  const name = method === "ridge" ? "Ridge" : "Lasso";
+  const zero = method === "lasso" && b === 0;
+  oneTitle.text(`${name} loss for one predictor at λ = ${lam}`);
+  oneDesc.text(
+    `Loss against the coefficient β from −1 to 3, on a fixed vertical scale from 0 to 200. ` +
+    `A dashed grey parabola is the RSS, 20 + 20(β − 2)², lowest at the least-squares value β = 2. ` +
+    (method === "ridge"
+      ? `A dotted orange parabola is the penalty λβ². The solid blue loss is their sum, also a parabola, narrower than the RSS. `
+      : `A dotted orange V is the penalty λ|β|. The solid blue loss is their sum, with a corner at β = 0. `) +
+    `At λ = ${lam} its minimum is at β = ${fmt3(b)}${zero ? ", exactly zero" : ""}, with loss ${fmt2(loss)}: ` +
+    `RSS ${fmt2(rss)} plus penalty ${fmt2(pen)}, shown as a stacked bar under the minimum. ` +
+    `As λ grows the minimum moves toward 0 and rises.`);
+
+  document.getElementById("o-pen-name").innerHTML =
+    method === "ridge" ? "penalty, λβ̂<sub>λ</sub>²" : "penalty, λ|β̂<sub>λ</sub>|";
+  clearTimeout(oneLive);
+  oneLive = setTimeout(() => {
+    document.getElementById("o-beta").textContent = fmt3(b) + (zero ? " (exactly 0)" : "");
+    document.getElementById("o-rss").textContent = fmt2(rss);
+    document.getElementById("o-pen").textContent = fmt2(pen);
+    document.getElementById("o-loss").textContent = fmt2(loss);
+  }, liveDelay());
+}
+document.querySelectorAll("input[name=omethod]").forEach(el => el.addEventListener("change", updateOne));
+document.getElementById("olam-slider").addEventListener("input", updateOne);
+document.getElementById("reset-one").addEventListener("click", () => {
+  document.getElementById("olam-slider").value = 20;
+  document.querySelector("input[name=omethod][value=ridge]").checked = true;
+  updateOne();
+});
+
+// =====================================================================
 // Loss view: level curves of the penalized loss
 //   L(β) = ½(β − b̂)ᵀR(β − b̂) + λ[ρ|β|₁ + (1−ρ)/2 |β|²],   R = [[1, r], [r, 1]].
 // For two standardized predictors this is the Paths view's loss (1/2n)RSS + λ·penalty up to an
@@ -797,5 +904,6 @@ rebuildPaths();
 lamSlider.value = bestIndex();
 updatePaths();
 updateGeom();
+updateOne();
 updateLoss();
 started = true;

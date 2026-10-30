@@ -67,6 +67,10 @@
     th, td { border: 1px solid #ccc; padding: 0.2rem 0.5rem; text-align: right; }
     th { background: #f4f4f4; }
     td.zero { font-weight: 700; }
+    #one-table th { text-align: left; font-weight: 400; }
+    .panel .legend svg { display: inline; width: 30px; }
+    #panel-one .legend { padding-left: 0.5rem; }
+    #one-table tr:last-child th, #one-table tr:last-child td { font-weight: 700; }
     .sr-only {
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -77,7 +81,7 @@
   <a class="back" href="../../">&larr; All topics</a>
   <h1>Shrinkage: Ridge, Lasso and Elastic Net</h1>
   <p id="instructions" class="instructions">
-    Penalize the size of the coefficients and they shrink toward zero. (Lecture notes §2–§5; ISL 6.2, ESL 3.4.)
+    Penalize the size of the coefficients and they shrink toward zero. (ISL 6.2, ESL 3.4.)
   </p>
   <p id="a11y-instructions" class="instructions a11y-instructions">
     Keyboard: Left/Right arrow switches tabs. Sliders step with the arrow keys (Shift for ×10).
@@ -87,6 +91,7 @@
   <div role="tablist" aria-label="Views">
     <button role="tab" id="tab-paths" aria-controls="panel-paths" aria-selected="true">Paths</button>
     <button role="tab" id="tab-geom" aria-controls="panel-geom" aria-selected="false" tabindex="-1">Geometry</button>
+    <button role="tab" id="tab-one" aria-controls="panel-one" aria-selected="false" tabindex="-1">One predictor</button>
     <button role="tab" id="tab-loss" aria-controls="panel-loss" aria-selected="false" tabindex="-1">Loss</button>
   </div>
 
@@ -174,6 +179,44 @@
       <span class="stat"><span id="g-msg" class="stat-value">–</span></span>
     </div>
     <figure class="panel"><div id="geom"></div></figure>
+  </section>
+
+  <!-- ================= One predictor ================= -->
+  <section role="tabpanel" id="panel-one" aria-labelledby="tab-one" hidden>
+    <p class="instructions" id="one-help">
+      One standardized predictor, n = 20: the loss is RSS(β) + λ·penalty. The least-squares slope is β̂ = 2, with RSS = 20 there.
+      Increase λ and watch the minimum move toward 0.
+    </p>
+    <div class="controls">
+      <fieldset>
+        <legend>Penalty</legend>
+        <label><input type="radio" name="omethod" value="ridge" checked> Ridge, λβ²</label>
+        <label><input type="radio" name="omethod" value="lasso"> Lasso, λ|β|</label>
+      </fieldset>
+    </div>
+    <div class="controls">
+      <label for="olam-slider">λ</label>
+      <input type="range" id="olam-slider" min="0" max="100" step="1" value="20" aria-describedby="one-help">
+      <output id="olam-out" for="olam-slider">λ = 20</output>
+      <button id="reset-one" type="button">Reset</button>
+    </div>
+    <figure class="panel">
+      <ul class="legend" aria-hidden="true">
+        <li><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#1a5fb4" stroke-width="3"/></svg>loss = RSS + penalty</li>
+        <li><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#5e5c64" stroke-width="2" stroke-dasharray="7 4"/></svg>RSS</li>
+        <li><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#c64600" stroke-width="2" stroke-dasharray="2 3"/></svg><span id="o-pen-key">penalty λβ²</span></li>
+      </ul>
+      <div id="one"></div>
+    </figure>
+    <table id="one-table" aria-live="polite" aria-atomic="true">
+      <caption class="sr-only">The loss at its minimum, split into its two parts</caption>
+      <tbody>
+        <tr><th scope="row">minimizer β̂<sub>λ</sub></th><td id="o-beta">–</td></tr>
+        <tr><th scope="row">sum of squares, RSS(β̂<sub>λ</sub>)</th><td id="o-rss">–</td></tr>
+        <tr><th scope="row" id="o-pen-name">penalty, λβ̂<sub>λ</sub>²</th><td id="o-pen">–</td></tr>
+        <tr><th scope="row">minimum loss = RSS + penalty</th><td id="o-loss">–</td></tr>
+      </tbody>
+    </table>
   </section>
 
   <!-- ================= Loss ================= -->
