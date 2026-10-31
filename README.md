@@ -65,17 +65,18 @@ uv sync
 
 | # | Topic | ESL Ch. | ISL Ch. |
 |---|---|---|---|
-| 1 | Bias-variance tradeoff, curse of dimensionality | 2 | 2 |
+| 1 | Bias-variance tradeoff, curse of dimensionality | 2, 7 | 2, 3 |
 | 2 | Ridge, lasso, elastic net | 3 | 6 |
 | 3 | LDA, QDA, naive Bayes vs. logistic regression | 4 | 4 |
 | 4 | Basis expansions: polynomial regression, splines | 5 | 7 |
-| 5 | Kernel smoothing / local regression | 6 | 7 |
-| 6 | Trees (CART) | 9.2 | 8 |
-| 7 | Bagging and Random Forests | 8.7, 15 | 8 |
-| 8 | Boosting | 10 | 8 |
-| 9 | Probability calibration | — | — |
-| 10 | Clustering: k-means, hierarchical | 14.3 | 12 |
+| 5 | Smoothers: smoothing splines and local regression | 5, 6 | 7 |
+| 6 | Generalized additive models (GAMs) | 9 | 7 |
+| 7 | Trees (CART) | 9 | 8 |
+| 8 | Bagging and Random Forests | 8, 15 | 8 |
+| 9 | Boosting | 10 | 8 |
+| 10 | Probability calibration | — | — |
 | 11 | PCA + recommender systems intro | 14.5 | 12 |
+| 12 | Clustering: k-means, hierarchical | 14.3 | 12 |
 
 ## Quizzes
 
