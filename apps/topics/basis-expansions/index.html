@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Basis Expansions: Polynomials, Steps and Splines — DSAI 621</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      max-width: 760px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #222;
+      background: #fff;
+      color-scheme: light;
+    }
+    a.back { font-size: 0.9rem; color: #1a5fb4; text-decoration: none; }
+    a.back:hover { text-decoration: underline; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1rem; margin: 1rem 0 0.25rem; }
+    p.instructions { color: #555; font-size: 0.95rem; margin-top: 0; }
+    p.a11y-instructions {
+      border-left: 3px solid #1a5fb4;
+      padding-left: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .controls {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem;
+      margin: 0.75rem 0;
+    }
+    .controls label { font-weight: 600; }
+    .controls input[type=range] { flex: 1 1 200px; min-width: 150px; accent-color: #1a5fb4; }
+    .controls output { font-variant-numeric: tabular-nums; min-width: 8ch; }
+    .controls label.check { font-weight: 400; display: inline-flex; align-items: center; gap: 0.3rem; }
+    select { font-size: 0.9rem; padding: 0.2rem; max-width: 100%; }
+    button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
+    :focus-visible { outline: 3px solid #1a5fb4; outline-offset: 2px; }
+    fieldset.basis { border: 1px solid #ddd; border-radius: 4px; padding: 0.4rem 0.6rem; margin: 0.75rem 0 0;
+      display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
+    fieldset.basis legend { font-weight: 600; padding: 0 0.25rem; }
+    fieldset.basis label, fieldset.view label { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+    fieldset.view { border: none; padding: 0; margin: 0 0 0.4rem; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; align-items: center; }
+    fieldset.view legend { font-weight: 600; float: left; margin-right: 0.5rem; padding: 0; }
+    .panel { border: 1px solid #ddd; border-radius: 4px; padding: 0.25rem; }
+    .panel svg { display: block; width: 100%; height: auto; touch-action: none; }
+    figure { margin: 0; }
+    figcaption { font-size: 0.85rem; color: #555; margin-top: 0.25rem; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.85rem; margin: 0.35rem 0; padding: 0; list-style: none; }
+    .legend li { display: flex; align-items: center; gap: 0.35rem; }
+    #stats { font-size: 0.95rem; margin-top: 0.75rem; font-variant-numeric: tabular-nums; }
+    #stats .stat { margin-right: 0.5rem; white-space: nowrap; }
+    #stats .stat:not(:last-child)::after { content: " | "; color: #999; font-weight: 400; }
+    #stats .stat-value { font-weight: 600; }
+    #warning { color: #a51d2d; font-size: 0.9rem; margin: 0.4rem 0 0; }
+    #warning:empty { display: none; }
+    #basis-readout { font-size: 0.9rem; min-height: 1.3em; margin: 0.3rem 0 0; font-variant-numeric: tabular-nums; }
+    .axis text { font-size: 11px; }
+    .axis-label { font-size: 12px; fill: #333; }
+    .knot-handle { cursor: ew-resize; }
+    .knot-handle:focus { outline: none; }
+    .knot-handle:focus-visible path { stroke: #111; stroke-width: 3; }
+    svg:focus { outline: none; }
+    svg:focus-visible { outline: 3px solid #1a5fb4; outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <a class="back" href="../../">&larr; All topics</a>
+  <h1>Basis Expansions: Polynomials, Step Functions and Splines</h1>
+  <p id="instructions" class="instructions">
+    Every fit on this page is ordinary least squares of y on new columns h<sub>1</sub>(x), …, h<sub>M</sub>(x);
+    only the columns change. Pick a basis and move the slider. Watch the edges: a high-degree
+    polynomial flails there and its ±2 SE band blows up, while a natural spline with the same df stays calm.
+    Drag the orange knot handles to move a knot: a spline changes near that knot, but a polynomial has no knots
+    and every coefficient affects the whole curve. The middle panel shows the basis functions, or switch it to
+    β̂<sub>j</sub>h<sub>j</sub>(x) to see the fit as their sum. The bottom panel sweeps df for the current basis,
+    with knots at quantiles of x.
+    Here df counts every coefficient, including the intercept, and K is the number of interior knots
+    (boundary knots sit at x = 0 and 1). ESL's "natural spline with K knots has K basis functions" counts the
+    two boundary knots, so its K is our K + 2. (ISL 7.1–7.4, ESL 5.1–5.2.)
+  </p>
+  <p id="a11y-instructions" class="instructions a11y-instructions">
+    Keyboard and screen reader users: use the arrow keys in the "Basis" group to change the basis, and on
+    the sliders to change the degree, the number of knots or n (Shift+arrow moves 5 steps). Each knot handle in
+    the top chart is a slider: Tab to it and use Left/Right to move it by 0.01 (Shift for 0.05). Tab to the
+    basis-functions chart and use the arrow keys to step through the basis functions; the selected one is
+    highlighted and described below the chart, and Escape clears it. The statistics line is announced when it
+    changes.
+  </p>
+
+  <fieldset class="basis" id="basis-group">
+    <legend>Basis</legend>
+    <label><input type="radio" name="method" value="poly" checked> Polynomial</label>
+    <label><input type="radio" name="method" value="step"> Step functions</label>
+    <label><input type="radio" name="method" value="pwcubic"> Piecewise cubic</label>
+    <label><input type="radio" name="method" value="cubic"> Cubic spline</label>
+    <label><input type="radio" name="method" value="natural"> Natural cubic spline</label>
+  </fieldset>
+
+  <div class="controls">
+    <label for="param-slider" id="param-label">Degree d</label>
+    <input type="range" id="param-slider" min="1" max="15" step="1" value="3"
+           aria-describedby="param-out">
+    <output id="param-out" for="param-slider">d = 3</output>
+    <label class="check"><input type="checkbox" id="keep-df"> Keep df when switching basis</label>
+  </div>
+  <div class="controls">
+    <label for="preset">True f</label>
+    <select id="preset">
+      <option value="esl">ESL wave: sin(12(x + 0.2)) / (x + 0.2), σ = 1</option>
+      <option value="sine">Sine: sin(2πx), σ = 0.3</option>
+      <option value="kink">Kink: 1 − 4|x − 0.6|, σ = 0.3</option>
+      <option value="flat">Flat tails: steep logistic, σ = 0.3</option>
+    </select>
+    <label for="n-slider">n</label>
+    <input type="range" id="n-slider" min="30" max="500" step="10" value="100">
+    <output id="n-out" for="n-slider">n = 100</output>
+  </div>
+  <div class="controls">
+    <button id="resample" type="button">New sample</button>
+    <button id="reknot" type="button">Knots at quantiles</button>
+    <button id="reset" type="button">Reset</button>
+  </div>
+
+  <div id="stats" aria-live="polite" aria-atomic="true"></div>
+  <p id="warning" role="status"></p>
+
+  <h2 id="fit-heading">The fit</h2>
+  <ul class="legend" aria-hidden="true">
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="3"/></svg>fit f̂(x) (solid)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="2" stroke-dasharray="6 4"/></svg>true f(x) (dashed)</li>
+    <li><svg width="30" height="12"><rect x="0" y="1" width="30" height="10" fill="#1a5fb4" fill-opacity="0.15"/><line x1="0" x2="30" y1="1" y2="1" stroke="#1a5fb4" stroke-dasharray="2 2"/><line x1="0" x2="30" y1="11" y2="11" stroke="#1a5fb4" stroke-dasharray="2 2"/></svg>±2 SE band (shaded, dotted edges)</li>
+    <li><svg width="14" height="10"><circle cx="7" cy="5" r="3" fill="none" stroke="#666"/></svg>data (open circles)</li>
+    <li><svg width="30" height="14"><line x1="15" x2="15" y1="0" y2="14" stroke="#c64600" stroke-dasharray="3 3"/><path d="M15,6 l-5,8 h10 z" fill="#c64600"/></svg>knot (triangle handle)</li>
+  </ul>
+  <figure class="panel"><div id="fit"></div></figure>
+
+  <h2 id="basis-heading">The basis functions</h2>
+  <fieldset class="view">
+    <legend>Show:</legend>
+    <label><input type="radio" name="bview" value="raw" checked> <span>h<sub>j</sub>(x)</span></label>
+    <label><input type="radio" name="bview" value="scaled"> <span>β̂<sub>j</sub>h<sub>j</sub>(x), and their sum</span></label>
+  </fieldset>
+  <figure class="panel"><div id="basis"></div></figure>
+  <p id="basis-readout" aria-live="polite"></p>
+  <figcaption id="basis-caption">Each line is one column of the basis matrix, drawn as a function of x. Lines alternate between dash patterns so neighbours can be told apart. Hover or use the arrow keys to pick one out.</figcaption>
+
+  <h2 id="err-heading">Error against df for this basis</h2>
+  <ul class="legend" aria-hidden="true">
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c01c28" stroke-width="2.5"/></svg>test error (solid)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="2" stroke-dasharray="6 4"/><circle cx="15" cy="5" r="3" fill="#fff" stroke="#1a5fb4"/></svg>LOOCV (dashed, circles)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#555" stroke-width="2" stroke-dasharray="2 3"/></svg>training MSE (dotted)</li>
+    <li><svg width="16" height="14"><path d="M8,1 l6,6 l-6,6 l-6,-6 z" fill="#c64600"/></svg>current fit (diamond)</li>
+  </ul>
+  <figure class="panel"><div id="errors"></div></figure>
+  <figcaption>Test error is the exact expected squared error of this fit on a new (x, Y): σ² + ∫(f̂ − f)² dx. LOOCV uses the hat-matrix shortcut, mean of (e<sub>i</sub> / (1 − h<sub>ii</sub>))². The grey line is σ². Points outside the chart are clipped at the top.</figcaption>
+
+  <script src="app.js"></script>
+</body>
+</html>
