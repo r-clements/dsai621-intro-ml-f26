@@ -10,6 +10,7 @@
 
 **Work on:**
 - [Practice Problems 2](problem_sets/PP2.pdf) ([solutions](problem_sets/PP2_sol.pdf)). These aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
+- [Practice Problems 3](problem_sets/PP3.pdf) ([solutions](problem_sets/PP3_sol.pdf)): problems 1, 2, 7 and 8.
 - Notebook: [`notebooks/ridge_lasso.ipynb`](notebooks/ridge_lasso.ipynb). Run `git pull` and then `uv sync` first.
 - Interactive demo: [Shrinkage: Ridge, Lasso and Elastic Net](https://robertclements.org/dsai621-intro-ml-f26/topics/shrinkage-paths/). 
 - If you haven't finished them yet, the Week 1 problems are below under Past weeks.
