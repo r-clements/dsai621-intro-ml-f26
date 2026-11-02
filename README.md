@@ -1,22 +1,45 @@
 # Introduction to Machine Learning - DSAI 621
 
-## This Week: Week 2 (Mon 10/26 & Thu 10/29)
+## This Week: Week 3 (Mon 11/2 & Thu 11/5)
 
-**Quiz 1 is this Thursday, 10/29.** Bring your hand-written cheat sheet (8.5x11, one side, with your name on it). No phones, calculators or other devices.
+**Quiz 2 is Thursday 11/5 at 3:40PM.** It covers ridge and the lasso, logistic regression, and LDA. Bring your hand-written cheat sheet (8.5x11, one side, with your name on it). No phones, calculators or other devices.
 
-**Topic:** Shrinkage: ridge regression, the lasso and the elastic net.
+**Topics:** LDA, QDA and naive Bayes; polynomial regression and splines.
 
-**Read:** ISL 6.2 (and 6.1 for a review of subset selection); ESL 3.4.
+**Read:** ISL 4.4–4.5 and 7.1–7.4; ESL 4.3, 6.6.3 and 5.1–5.2.
 
 **Work on:**
-- [Practice Problems 2](problem_sets/PP2.pdf) ([solutions](problem_sets/PP2_sol.pdf)). These aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
-- [Practice Problems 3](problem_sets/PP3.pdf) ([solutions](problem_sets/PP3_sol.pdf)): problems 1, 2, 7 and 8.
-- Notebook: [`notebooks/ridge_lasso.ipynb`](notebooks/ridge_lasso.ipynb). Run `git pull` and then `uv sync` first.
-- Interactive demo: [Shrinkage: Ridge, Lasso and Elastic Net](https://robertclements.org/dsai621-intro-ml-f26/topics/shrinkage-paths/). 
-- If you haven't finished them yet, the Week 1 problems are below under Past weeks.
+- [Quiz 2 practice questions](problem_sets/ML-Quiz2-practice.pdf)
+- Finish [Practice Problems 3](problem_sets/PP3.pdf) ([solutions](problem_sets/PP3_sol.pdf))
+- Practice Problems 4 (released Tuesday 11/3)
+- Practice Problems 5 (released Friday 11/6)
+
+The practice problems aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
+
+**Notebooks** (run `git pull` and then `uv sync` first):
+- Finish [`notebooks/lda_vs_logistic.ipynb`](notebooks/lda_vs_logistic.ipynb) and [`notebooks/qda_vs_naive_bayes.ipynb`](notebooks/qda_vs_naive_bayes.ipynb)
+- Splines notebook (released before Thursday's class)
+
+**Interactive demos:**
+- [LDA, QDA, Naive Bayes and Logistic Regression](https://robertclements.org/dsai621-intro-ml-f26/topics/lda-qda-boundaries/)
+- [Basis Expansions: Polynomials, Step Functions and Splines](https://robertclements.org/dsai621-intro-ml-f26/topics/basis-expansions/)
+- For Quiz 2 review: [Shrinkage: Ridge, Lasso and Elastic Net](https://robertclements.org/dsai621-intro-ml-f26/topics/shrinkage-paths/)
+- [All demos](https://robertclements.org/dsai621-intro-ml-f26/)
 
 <details>
 <summary>Past weeks</summary>
+
+### Week 2 (Mon 10/26 & Thu 10/29)
+
+**Topics:** The curse of dimensionality, ridge regression and the lasso; classification with logistic regression, generative models and LDA.
+
+**Read:** ISL 6.2 and 4.4; ESL 3.4 and 4.3.
+
+- Class notes, Day 1: [handwritten](notes/hand-written/ML_week_2_day_1.pdf) · [accessible HTML](notes/html/ML_week_2_day_1.html)
+- Class notes, Day 2: [handwritten](notes/hand-written/ML_week_2_day_2.pdf) · [accessible HTML](notes/html/ML_week_2_day_2.html)
+- [Practice Problems 2](problem_sets/PP2.pdf) ([solutions](problem_sets/PP2_sol.pdf))
+- Notebook: [`notebooks/ridge_lasso.ipynb`](notebooks/ridge_lasso.ipynb)
+- Interactive demo: [Shrinkage: Ridge, Lasso and Elastic Net](https://robertclements.org/dsai621-intro-ml-f26/topics/shrinkage-paths/)
 
 ### Week 1 (Thu 10/22)
 
