@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LDA, QDA, and Naive Bayes — Week 3, Day 1 | DSAI 621</title>
+<meta name="description" content="Accessible class notes finishing linear discriminant analysis (the discriminant function for one and several predictors, parameter estimates, the linear boundary), then quadratic discriminant analysis and its tradeoffs, and naive Bayes with a worked spam example.">
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #4a4a4a;
+    --rule: #c9c9c9;
+    --accent: #0b4f8a;
+    --accent-bg: #eef4fa;
+    --focus: #0b4f8a;
+    --pop: #a4262c;   /* population / true  — 5.9:1 on white */
+    --est: #5b2d8e;   /* estimate / fitted  — 8.5:1 on white */
+    --err: #8a5000;   /* errors / residuals — 5.1:1 on white */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f2; --muted: #cfcfcf; --rule: #555;
+      --accent: #8ab8e0; --accent-bg: #182430; --focus: #8ab8e0;
+      --pop: #ff9f99; --est: #cbb0ff; --err: #f0b458;
+    }
+    body { background: #131313; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--ink);
+    background: #fff;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #131313; } }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 5rem; }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible, :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--accent); color: #fff;
+    padding: .75rem 1rem; z-index: 10; text-decoration: none;
+  }
+  .skip:focus { left: .5rem; top: .5rem; }
+  h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; line-height: 1.3; margin: 2.5rem 0 .5rem;
+       padding-top: .75rem; border-top: 2px solid var(--rule); }
+  h3 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  p, li { max-width: 42rem; }
+  .lede { color: var(--muted); margin-top: 0; }
+  nav.toc {
+    background: var(--accent-bg); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 1rem 1.25rem; margin: 2rem 0;
+  }
+  nav.toc h2 { font-size: 1.05rem; margin: 0 0 .5rem; border: 0; padding: 0; }
+  nav.toc ol { margin: 0; padding-left: 1.25rem; }
+  nav.toc li { margin: .3rem 0; }
+  nav.toc a { display: inline-block; min-height: 24px; padding: 2px 0; }
+  table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+  caption { text-align: left; font-weight: 600; padding-bottom: .5rem; }
+  th, td { border: 1px solid var(--rule); padding: .5rem .7rem; text-align: left; }
+  thead th { background: var(--accent-bg); }
+  figure { margin: 1.5rem 0; }
+  figcaption { font-size: .95rem; color: var(--muted); margin-top: .5rem; }
+  svg { max-width: 100%; height: auto; display: block; }
+  details {
+    border: 1px solid var(--rule); border-radius: 6px;
+    padding: .5rem .85rem; margin: .75rem 0; background: var(--accent-bg);
+  }
+  summary { cursor: pointer; font-weight: 600; min-height: 24px; padding: .25rem 0; }
+  details[open] summary { margin-bottom: .5rem; }
+  math { font-size: 1.15em; }
+  math[display="block"] { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }
+  .eq { margin: 1.25rem 0; }
+  .note {
+    border-left: 4px solid var(--accent); background: var(--accent-bg);
+    padding: .75rem 1rem; margin: 1.25rem 0; border-radius: 0 6px 6px 0;
+  }
+  .note > :first-child { margin-top: 0; }
+  .note > :last-child { margin-bottom: 0; }
+  .tag {
+    display: inline-block; font-size: .8rem; font-weight: 700;
+    letter-spacing: .02em; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 4px;
+    padding: 0 .4em; white-space: nowrap;
+  }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 2px solid var(--rule);
+           color: var(--muted); font-size: .95rem; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps > li { margin: .75rem 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<div class="wrap">
+<header>
+  <p class="lede"><strong>DSAI 621 — Intro to Machine Learning</strong> · Fall 2026 · Week 3, Day 1</p>
+  <h1>LDA, QDA, and Naive Bayes</h1>
+  <p class="lede">Accessible transcription of the handwritten class notes. All equations are marked up in MathML so they can be read by a screen reader, magnified, or rendered in braille. All figures have text descriptions. Annotations written in a second pen colour in the original are reproduced here as labelled callouts, so none of their meaning depends on colour.</p>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+  <h2 id="toc-h">On this page</h2>
+  <ol>
+    <li><a href="#agenda">Agenda</a></li>
+    <li><a href="#lda">1. LDA</a></li>
+    <li><a href="#recap">1.1 Recap</a></li>
+    <li><a href="#lda-p1">1.2 Generally, for class <em>k</em></a></li>
+    <li><a href="#lda-p">1.3 More than one predictor</a></li>
+    <li><a href="#qda">2. Quadratic discriminant analysis (QDA)</a></li>
+    <li><a href="#tradeoffs">2.2 Tradeoffs</a></li>
+    <li><a href="#nb">3. Naive Bayes</a></li>
+    <li><a href="#nb-example">3.2 Example (binary predictors)</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+
+<h2 id="agenda">Agenda</h2>
+
+<div class="note">
+  <p><strong>Quiz:</strong> Thursday, 3:40–4:00.</p>
+</div>
+
+<ul>
+  <li>Finish LDA</li>
+  <li>QDA</li>
+  <li>Naive Bayes – activity</li>
+</ul>
+
+<h2 id="lda">1. LDA</h2>
+
+<h3 id="recap">1.1 Recap</h3>
+
+<p>Assume</p>
+<div class="eq">
+<math display="block" alttext="X given Y equals k is distributed normal with mean mu sub k and covariance Sigma">
+  <mrow><mi>X</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>∼</mo><mi>N</mi><mo>(</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>,</mo><mi>Σ</mi><mo>)</mo></mrow>
+</math>
+</div>
+<p>An arrow labels this <strong>Gaussian</strong>.</p>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> An arrow points to <math alttext="Sigma"><mi>Σ</mi></math>: <strong>same for all classes <math alttext="k"><mi>k</mi></math></strong>.</p>
+</div>
+
+<p>With <math alttext="p equals 1"><mrow><mi>p</mi><mo>=</mo><mn>1</mn></mrow></math> and <math alttext="K equals 2"><mrow><mi>K</mi><mo>=</mo><mn>2</mn></mrow></math>:</p>
+
+<figure>
+<svg viewBox="0 0 540 250" role="img" aria-labelledby="fig1-t fig1-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig1-t">Two bell-shaped class densities along the number of words: nonspam centred at mu ns, spam centred at mu spam</title>
+  <desc id="fig1-d">A horizontal axis labelled number of words. A solid bell curve labelled nonspam is centred at a tick marked mu sub ns; a dashed bell curve labelled spam, about the same width, is centred further right at a tick marked mu sub spam. The two curves overlap between the means.</desc>
+  <line x1="40" y1="190" x2="500" y2="190" stroke="currentColor" stroke-width="2"/><text x="496.0" y="236.0" font-size="15" fill="currentColor" text-anchor="end"># of words</text><path d="M40.0,185.7 L41.5,185.5 L42.9,185.1 L44.4,184.8 L45.9,184.5 L47.4,184.1 L48.8,183.7 L50.3,183.3 L51.8,182.9 L53.2,182.4 L54.7,181.9 L56.2,181.4 L57.7,180.9 L59.1,180.4 L60.6,179.8 L62.1,179.2 L63.5,178.5 L65.0,177.9 L66.5,177.2 L68.0,176.5 L69.4,175.7 L70.9,174.9 L72.4,174.1 L73.8,173.2 L75.3,172.3 L76.8,171.4 L78.3,170.4 L79.7,169.4 L81.2,168.4 L82.7,167.3 L84.1,166.2 L85.6,165.1 L87.1,163.9 L88.6,162.7 L90.0,161.4 L91.5,160.1 L93.0,158.8 L94.4,157.4 L95.9,156.0 L97.4,154.5 L98.9,153.1 L100.3,151.5 L101.8,150.0 L103.3,148.4 L104.7,146.7 L106.2,145.1 L107.7,143.4 L109.2,141.6 L110.6,139.9 L112.1,138.1 L113.6,136.2 L115.1,134.4 L116.5,132.5 L118.0,130.6 L119.5,128.7 L120.9,126.8 L122.4,124.8 L123.9,122.8 L125.4,120.8 L126.8,118.8 L128.3,116.8 L129.8,114.8 L131.2,112.8 L132.7,110.7 L134.2,108.7 L135.7,106.7 L137.1,104.7 L138.6,102.6 L140.1,100.6 L141.5,98.7 L143.0,96.7 L144.5,94.8 L146.0,92.8 L147.4,90.9 L148.9,89.1 L150.4,87.2 L151.8,85.5 L153.3,83.7 L154.8,82.0 L156.3,80.3 L157.7,78.7 L159.2,77.1 L160.7,75.6 L162.1,74.1 L163.6,72.7 L165.1,71.4 L166.6,70.1 L168.0,68.9 L169.5,67.8 L171.0,66.7 L172.4,65.7 L173.9,64.8 L175.4,64.0 L176.9,63.2 L178.3,62.5 L179.8,61.9 L181.3,61.4 L182.7,60.9 L184.2,60.6 L185.7,60.3 L187.2,60.1 L188.6,60.0 L190.1,60.0 L191.6,60.1 L193.0,60.2 L194.5,60.5 L196.0,60.8 L197.5,61.2 L198.9,61.7 L200.4,62.3 L201.9,63.0 L203.3,63.7 L204.8,64.5 L206.3,65.4 L207.8,66.4 L209.2,67.4 L210.7,68.6 L212.2,69.7 L213.6,71.0 L215.1,72.3 L216.6,73.7 L218.1,75.1 L219.5,76.6 L221.0,78.2 L222.5,79.8 L223.9,81.4 L225.4,83.1 L226.9,84.9 L228.4,86.7 L229.8,88.5 L231.3,90.3 L232.8,92.2 L234.2,94.1 L235.7,96.1 L237.2,98.0 L238.7,100.0 L240.1,102.0 L241.6,104.0 L243.1,106.0 L244.5,108.0 L246.0,110.1 L247.5,112.1 L249.0,114.1 L250.4,116.2 L251.9,118.2 L253.4,120.2 L254.8,122.2 L256.3,124.2 L257.8,126.1 L259.3,128.1 L260.7,130.0 L262.2,131.9 L263.7,133.8 L265.2,135.7 L266.6,137.5 L268.1,139.3 L269.6,141.1 L271.0,142.8 L272.5,144.5 L274.0,146.2 L275.5,147.9 L276.9,149.5 L278.4,151.0 L279.9,152.6 L281.3,154.1 L282.8,155.5 L284.3,157.0 L285.8,158.4 L287.2,159.7 L288.7,161.0 L290.2,162.3 L291.6,163.5 L293.1,164.7 L294.6,165.9 L296.1,167.0 L297.5,168.1 L299.0,169.1 L300.5,170.1 L301.9,171.1 L303.4,172.0 L304.9,172.9 L306.4,173.8 L307.8,174.6 L309.3,175.4 L310.8,176.2 L312.2,176.9 L313.7,177.7 L315.2,178.3 L316.7,179.0 L318.1,179.6 L319.6,180.2 L321.1,180.7 L322.5,181.3 L324.0,181.8 L325.5,182.3 L327.0,182.7 L328.4,183.2 L329.9,183.6 L331.4,184.0 L332.8,184.3 L334.3,184.7 L335.8,185.0 L337.3,185.4 L338.7,185.7 L340.2,185.9 L341.7,186.2 L343.1,186.5 L344.6,186.7 L346.1,186.9 L347.6,187.1 L349.0,187.3 L350.5,187.5 L352.0,187.7 L353.4,187.9 L354.9,188.0 L356.4,188.1 L357.9,188.3 L359.3,188.4 L360.8,188.5 L362.3,188.6 L363.7,188.7 L365.2,188.8 L366.7,188.9 L368.2,189.0 L369.6,189.1 L371.1,189.2 L372.6,189.2 L374.0,189.3 L375.5,189.3 L377.0,189.4 L378.5,189.4 L379.9,189.5 L381.4,189.5 L382.9,189.6 L384.3,189.6 L385.8,189.6 L387.3,189.7 L388.8,189.7 L390.2,189.7 L391.7,189.7 L393.2,189.8 L394.6,189.8 L396.1,189.8 L397.6,189.8 L399.1,189.8 L400.5,189.9 L402.0,189.9 L403.5,189.9 L404.9,189.9 L406.4,189.9 L407.9,189.9 L409.4,189.9 L410.8,189.9 L412.3,189.9 L413.8,189.9 L415.3,189.9 L416.7,190.0 L418.2,190.0 L419.7,190.0 L421.1,190.0 L422.6,190.0 L424.1,190.0 L425.6,190.0 L427.0,190.0 L428.5,190.0 L430.0,190.0 L431.4,190.0 L432.9,190.0 L434.4,190.0 L435.9,190.0 L437.3,190.0 L438.8,190.0 L440.3,190.0 L441.7,190.0 L443.2,190.0 L444.7,190.0 L446.2,190.0 L447.6,190.0 L449.1,190.0 L450.6,190.0 L452.0,190.0 L453.5,190.0 L455.0,190.0 L456.5,190.0 L457.9,190.0 L459.4,190.0 L460.9,190.0 L462.3,190.0 L463.8,190.0 L465.3,190.0 L466.8,190.0 L468.2,190.0 L469.7,190.0 L471.2,190.0 L472.6,190.0 L474.1,190.0 L475.6,190.0 L477.1,190.0 L478.5,190.0 L480.0,190.0" fill="none" stroke="var(--pop)" stroke-width="3"/><path d="M40.0,190.0 L41.5,190.0 L42.9,190.0 L44.4,190.0 L45.9,190.0 L47.4,190.0 L48.8,190.0 L50.3,190.0 L51.8,190.0 L53.2,190.0 L54.7,190.0 L56.2,190.0 L57.7,190.0 L59.1,190.0 L60.6,190.0 L62.1,190.0 L63.5,190.0 L65.0,190.0 L66.5,190.0 L68.0,190.0 L69.4,190.0 L70.9,190.0 L72.4,190.0 L73.8,190.0 L75.3,190.0 L76.8,190.0 L78.3,190.0 L79.7,190.0 L81.2,190.0 L82.7,190.0 L84.1,190.0 L85.6,190.0 L87.1,190.0 L88.6,190.0 L90.0,190.0 L91.5,189.9 L93.0,189.9 L94.4,189.9 L95.9,189.9 L97.4,189.9 L98.9,189.9 L100.3,189.9 L101.8,189.9 L103.3,189.9 L104.7,189.9 L106.2,189.9 L107.7,189.8 L109.2,189.8 L110.6,189.8 L112.1,189.8 L113.6,189.8 L115.1,189.7 L116.5,189.7 L118.0,189.7 L119.5,189.7 L120.9,189.6 L122.4,189.6 L123.9,189.6 L125.4,189.5 L126.8,189.5 L128.3,189.4 L129.8,189.4 L131.2,189.3 L132.7,189.3 L134.2,189.2 L135.7,189.2 L137.1,189.1 L138.6,189.0 L140.1,188.9 L141.5,188.8 L143.0,188.7 L144.5,188.6 L146.0,188.5 L147.4,188.4 L148.9,188.3 L150.4,188.2 L151.8,188.0 L153.3,187.9 L154.8,187.7 L156.3,187.5 L157.7,187.3 L159.2,187.1 L160.7,186.9 L162.1,186.7 L163.6,186.5 L165.1,186.2 L166.6,185.9 L168.0,185.7 L169.5,185.4 L171.0,185.0 L172.4,184.7 L173.9,184.4 L175.4,184.0 L176.9,183.6 L178.3,183.2 L179.8,182.7 L181.3,182.3 L182.7,181.8 L184.2,181.3 L185.7,180.8 L187.2,180.2 L188.6,179.6 L190.1,179.0 L191.6,178.3 L193.0,177.7 L194.5,177.0 L196.0,176.2 L197.5,175.5 L198.9,174.7 L200.4,173.8 L201.9,173.0 L203.3,172.1 L204.8,171.1 L206.3,170.2 L207.8,169.2 L209.2,168.1 L210.7,167.0 L212.2,165.9 L213.6,164.8 L215.1,163.6 L216.6,162.3 L218.1,161.1 L219.5,159.7 L221.0,158.4 L222.5,157.0 L223.9,155.6 L225.4,154.1 L226.9,152.6 L228.4,151.1 L229.8,149.5 L231.3,147.9 L232.8,146.3 L234.2,144.6 L235.7,142.9 L237.2,141.1 L238.7,139.4 L240.1,137.5 L241.6,135.7 L243.1,133.9 L244.5,132.0 L246.0,130.1 L247.5,128.1 L249.0,126.2 L250.4,124.2 L251.9,122.2 L253.4,120.2 L254.8,118.2 L256.3,116.2 L257.8,114.2 L259.3,112.2 L260.7,110.1 L262.2,108.1 L263.7,106.1 L265.2,104.1 L266.6,102.1 L268.1,100.1 L269.6,98.1 L271.0,96.1 L272.5,94.2 L274.0,92.3 L275.5,90.4 L276.9,88.5 L278.4,86.7 L279.9,84.9 L281.3,83.2 L282.8,81.5 L284.3,79.8 L285.8,78.2 L287.2,76.7 L288.7,75.2 L290.2,73.7 L291.6,72.4 L293.1,71.0 L294.6,69.8 L296.1,68.6 L297.5,67.5 L299.0,66.4 L300.5,65.4 L301.9,64.5 L303.4,63.7 L304.9,63.0 L306.4,62.3 L307.8,61.7 L309.3,61.2 L310.8,60.8 L312.2,60.5 L313.7,60.2 L315.2,60.1 L316.7,60.0 L318.1,60.0 L319.6,60.1 L321.1,60.3 L322.5,60.6 L324.0,60.9 L325.5,61.4 L327.0,61.9 L328.4,62.5 L329.9,63.2 L331.4,63.9 L332.8,64.8 L334.3,65.7 L335.8,66.7 L337.3,67.8 L338.7,68.9 L340.2,70.1 L341.7,71.4 L343.1,72.7 L344.6,74.1 L346.1,75.6 L347.6,77.1 L349.0,78.6 L350.5,80.3 L352.0,81.9 L353.4,83.6 L354.9,85.4 L356.4,87.2 L357.9,89.0 L359.3,90.9 L360.8,92.8 L362.3,94.7 L363.7,96.6 L365.2,98.6 L366.7,100.6 L368.2,102.6 L369.6,104.6 L371.1,106.6 L372.6,108.6 L374.0,110.7 L375.5,112.7 L377.0,114.7 L378.5,116.7 L379.9,118.8 L381.4,120.8 L382.9,122.8 L384.3,124.7 L385.8,126.7 L387.3,128.6 L388.8,130.6 L390.2,132.5 L391.7,134.3 L393.2,136.2 L394.6,138.0 L396.1,139.8 L397.6,141.6 L399.1,143.3 L400.5,145.0 L402.0,146.7 L403.5,148.3 L404.9,149.9 L406.4,151.5 L407.9,153.0 L409.4,154.5 L410.8,156.0 L412.3,157.4 L413.8,158.7 L415.3,160.1 L416.7,161.4 L418.2,162.6 L419.7,163.9 L421.1,165.1 L422.6,166.2 L424.1,167.3 L425.6,168.4 L427.0,169.4 L428.5,170.4 L430.0,171.4 L431.4,172.3 L432.9,173.2 L434.4,174.1 L435.9,174.9 L437.3,175.7 L438.8,176.4 L440.3,177.2 L441.7,177.9 L443.2,178.5 L444.7,179.2 L446.2,179.8 L447.6,180.3 L449.1,180.9 L450.6,181.4 L452.0,181.9 L453.5,182.4 L455.0,182.9 L456.5,183.3 L457.9,183.7 L459.4,184.1 L460.9,184.5 L462.3,184.8 L463.8,185.1 L465.3,185.4 L466.8,185.7 L468.2,186.0 L469.7,186.3 L471.2,186.5 L472.6,186.8 L474.1,187.0 L475.6,187.2 L477.1,187.4 L478.5,187.6 L480.0,187.7" fill="none" stroke="var(--err)" stroke-width="3" stroke-dasharray="10 5"/><line x1="189.6" y1="183" x2="189.6" y2="197" stroke="var(--pop)" stroke-width="2.5"/><text x="189.6" y="216.0" font-size="16" fill="var(--pop)" text-anchor="middle">μ<tspan baseline-shift="sub" font-size="11">ns</tspan></text><line x1="317.2" y1="183" x2="317.2" y2="197" stroke="var(--err)" stroke-width="2.5"/><text x="317.2" y="216.0" font-size="16" fill="var(--err)" text-anchor="middle">μ<tspan baseline-shift="sub" font-size="11">spam</tspan></text><text x="127.6" y="62.0" font-size="14" fill="var(--pop)" text-anchor="end">nonspam</text><line x1="131.6" y1="58" x2="151.6" y2="90" stroke="var(--pop)" stroke-width="1.5"/><text x="379.2" y="62.0" font-size="14" fill="var(--err)" text-anchor="start">spam</text><line x1="375.2" y1="58" x2="355.2" y2="90" stroke="var(--err)" stroke-width="1.5"/>
+</svg>
+<figcaption>Figure 1. One normal density per class, centred at the class means <math alttext="mu sub ns"><msub><mi>μ</mi><mtext>ns</mtext></msub></math> and <math alttext="mu sub spam"><msub><mi>μ</mi><mtext>spam</mtext></msub></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 1</summary>
+  <p>A horizontal axis labelled “# of words”. Two bell-shaped curves sit on it. The left one is labelled nonspam, with its centre marked by a tick labelled <math alttext="mu sub ns"><msub><mi>μ</mi><mtext>ns</mtext></msub></math>. The right one is labelled spam, with its centre marked <math alttext="mu sub spam"><msub><mi>μ</mi><mtext>spam</mtext></msub></math>. In the sketch the spam curve is drawn slightly taller, with a longer right tail. The curves cross between the two means.</p>
+</details>
+
+<div class="eq">
+<math display="block" alttext="p sub spam of x equals pi sub spam f sub spam of x, over pi sub spam f sub spam of x plus pi sub ns f sub ns of x">
+  <mrow>
+    <msub><mi>p</mi><mtext>spam</mtext></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mfrac>
+      <mrow><msub><mi>π</mi><mtext>spam</mtext></msub><msub><mi>f</mi><mtext>spam</mtext></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+      <mrow><msub><mi>π</mi><mtext>spam</mtext></msub><msub><mi>f</mi><mtext>spam</mtext></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>+</mo><msub><mi>π</mi><mtext>ns</mtext></msub><msub><mi>f</mi><mtext>ns</mtext></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Annotation</span> The numerator is highlighted: <strong>highest numerator wins</strong>.</p>
+</div>
+
+<div class="eq">
+<math display="block" alttext="f sub spam of x equals N of mu sub spam, sigma squared; f sub ns of x equals N of mu sub ns, sigma squared">
+  <mrow>
+    <msub><mi>f</mi><mtext>spam</mtext></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mi>N</mi><mo>(</mo><msub><mi>μ</mi><mtext>spam</mtext></msub><mo>,</mo><msup><mi>σ</mi><mn>2</mn></msup><mo>)</mo>
+    <mspace width="2em"></mspace>
+    <msub><mi>f</mi><mtext>ns</mtext></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mi>N</mi><mo>(</mo><msub><mi>μ</mi><mtext>ns</mtext></msub><mo>,</mo><msup><mi>σ</mi><mn>2</mn></msup><mo>)</mo>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Both <math alttext="sigma squared"><msup><mi>σ</mi><mn>2</mn></msup></math>s are highlighted and joined by a brace: <strong>share <math alttext="sigma squared"><msup><mi>σ</mi><mn>2</mn></msup></math></strong>.</p>
+</div>
+
+<h3 id="lda-p1">1.2 Generally (<em>k</em>), <math alttext="p equals 1"><mrow><mi>p</mi><mo>=</mo><mn>1</mn></mrow></math>, <math alttext="K equals 2"><mrow><mi>K</mi><mo>=</mo><mn>2</mn></mrow></math></h3>
+
+<div class="eq">
+<math display="block" alttext="f sub k of x equals 1 over the square root of 2 pi sigma squared, times e to the minus the quantity x minus mu sub k squared over 2 sigma squared">
+  <mrow>
+    <msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mfrac><mn>1</mn><msqrt><mn>2</mn><mi>π</mi><msup><mi>σ</mi><mn>2</mn></msup></msqrt></mfrac>
+    <mi>exp</mi><mrow><mo>(</mo><mo>−</mo><mfrac><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>)</mo></mrow><mn>2</mn></msup><mrow><mn>2</mn><msup><mi>σ</mi><mn>2</mn></msup></mrow></mfrac><mo>)</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="log of pi sub k f sub k of x equals log pi sub k plus log f sub k of x, which equals log pi sub k minus one half log 2 pi minus log sigma minus the quantity x minus mu sub k squared over 2 sigma squared">
+  <mtable columnalign="right left">
+    <mtr><mtd><mi>log</mi><mrow><mo>[</mo><msub><mi>π</mi><mi>k</mi></msub><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>]</mo></mrow></mtd>
+      <mtd><mo>=</mo><mi>log</mi><msub><mi>π</mi><mi>k</mi></msub><mo>+</mo><mi>log</mi><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mtd></mtr>
+    <mtr><mtd></mtd>
+      <mtd><mo>=</mo><mi>log</mi><msub><mi>π</mi><mi>k</mi></msub><mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mi>log</mi><mn>2</mn><mi>π</mi><mo>−</mo><mi>log</mi><mi>σ</mi><mo>−</mo><mfrac><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>)</mo></mrow><mn>2</mn></msup><mrow><mn>2</mn><msup><mi>σ</mi><mn>2</mn></msup></mrow></mfrac></mtd></mtr>
+  </mtable>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> The terms <math alttext="minus one half log 2 pi"><mrow><mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mi>log</mi><mn>2</mn><mi>π</mi></mrow></math> and <math alttext="minus log sigma"><mrow><mo>−</mo><mi>log</mi><mi>σ</mi></mrow></math> are crossed out: <strong>don't depend on <math alttext="k"><mi>k</mi></math></strong>.</p>
+</div>
+
+<div class="eq">
+<math display="block" alttext="delta sub k of x equals x times mu sub k over sigma squared, minus mu sub k squared over 2 sigma squared, plus log pi sub k">
+  <mrow>
+    <msub><mi>δ</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mi>x</mi><mrow><mo>(</mo><mfrac><msub><mi>μ</mi><mi>k</mi></msub><msup><mi>σ</mi><mn>2</mn></msup></mfrac><mo>)</mo></mrow>
+    <mo>−</mo><mfrac><msubsup><mi>μ</mi><mi>k</mi><mn>2</mn></msubsup><mrow><mn>2</mn><msup><mi>σ</mi><mn>2</mn></msup></mrow></mfrac>
+    <mo>+</mo><mi>log</mi><msub><mi>π</mi><mi>k</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Beside <math alttext="delta sub k of x"><mrow><msub><mi>δ</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math>: <strong>discriminant function</strong>.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> Going from the line above to <math alttext="delta sub k of x"><mrow><msub><mi>δ</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math>, the square <math alttext="the quantity x minus mu sub k squared"><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>)</mo></mrow><mn>2</mn></msup></math> is expanded and the term <math alttext="minus x squared over 2 sigma squared"><mrow><mo>−</mo><mfrac><msup><mi>x</mi><mn>2</mn></msup><mrow><mn>2</mn><msup><mi>σ</mi><mn>2</mn></msup></mrow></mfrac></mrow></math> is dropped, because it also doesn't depend on <math alttext="k"><mi>k</mi></math>. The notes don't show this step.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Where</p>
+  <math display="block" alttext="mu hat sub k equals 1 over n sub k times the sum over i such that y sub i equals k of x sub i">
+    <mrow><msub><mover><mi>μ</mi><mo>^</mo></mover><mi>k</mi></msub><mo>=</mo><mfrac><mn>1</mn><msub><mi>n</mi><mi>k</mi></msub></mfrac><munder><mo>∑</mo><mrow><mi>i</mi><mo>:</mo><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><mi>k</mi></mrow></munder><msub><mi>x</mi><mi>i</mi></msub></mrow>
+  </math>
+  <math display="block" alttext="sigma hat squared equals 1 over n minus K times the sum from k equals 1 to K of the sum over i such that y sub i equals k of the quantity x sub i minus mu hat sub k, squared">
+    <mrow><msup><mover><mi>σ</mi><mo>^</mo></mover><mn>2</mn></msup><mo>=</mo><mfrac><mn>1</mn><mrow><mi>n</mi><mo>−</mo><mi>K</mi></mrow></mfrac><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><munder><mo>∑</mo><mrow><mi>i</mi><mo>:</mo><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><mi>k</mi></mrow></munder><msup><mrow><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>μ</mi><mo>^</mo></mover><mi>k</mi></msub><mo>)</mo></mrow><mn>2</mn></msup></mrow>
+  </math>
+  <p>with an arrow: <strong>weighted average of the sample variance for each class</strong>.</p>
+  <math display="block" alttext="pi hat sub k equals n sub k over n">
+    <mrow><msub><mover><mi>π</mi><mo>^</mo></mover><mi>k</mi></msub><mo>=</mo><mfrac><msub><mi>n</mi><mi>k</mi></msub><mi>n</mi></mfrac></mrow>
+  </math>
+</div>
+
+<h3 id="lda-p">1.3 <math alttext="p greater than 1"><mrow><mi>p</mi><mo>&gt;</mo><mn>1</mn></mrow></math></h3>
+
+<div class="eq">
+<math display="block" alttext="X given Y equals k is distributed normal with mean mu sub k and covariance Sigma">
+  <mrow><mi>X</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>∼</mo><mi>N</mi><mo>(</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>,</mo><mi>Σ</mi><mo>)</mo></mrow>
+</math>
+</div>
+
+<p><math alttext="mu sub k"><msub><mi>μ</mi><mi>k</mi></msub></math> is <math alttext="p by 1"><mrow><mi>p</mi><mo>×</mo><mn>1</mn></mrow></math>; <math alttext="Sigma"><mi>Σ</mi></math> is <math alttext="p by p"><mrow><mi>p</mi><mo>×</mo><mi>p</mi></mrow></math>, the same for all <math alttext="k"><mi>k</mi></math>.</p>
+
+<div class="eq">
+<math display="block" alttext="f sub k of x equals 1 over 2 pi to the p over 2 times the determinant of Sigma to the one half, times e to the minus one half the quantity x minus mu sub k transpose, Sigma inverse, the quantity x minus mu sub k">
+  <mrow>
+    <msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mrow><mo>(</mo><mfrac><mn>1</mn><mrow><msup><mrow><mo>(</mo><mn>2</mn><mi>π</mi><mo>)</mo></mrow><mrow><mi>p</mi><mo>/</mo><mn>2</mn></mrow></msup><msup><mrow><mo>|</mo><mi>Σ</mi><mo>|</mo></mrow><mrow><mn>1</mn><mo>/</mo><mn>2</mn></mrow></msup></mrow></mfrac><mo>)</mo></mrow>
+    <mi>exp</mi><mrow><mo>[</mo><mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>)</mo></mrow><mi>T</mi></msup><msup><mi>Σ</mi><mrow><mo>−</mo><mn>1</mn></mrow></msup><mo>(</mo><mi>x</mi><mo>−</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>)</mo><mo>]</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<p>Under the first <math alttext="x minus mu sub k"><mrow><mi>x</mi><mo>−</mo><msub><mi>μ</mi><mi>k</mi></msub></mrow></math>, both <math alttext="x"><mi>x</mi></math> and <math alttext="mu sub k"><msub><mi>μ</mi><mi>k</mi></msub></math> are labelled <math alttext="p by 1"><mrow><mi>p</mi><mo>×</mo><mn>1</mn></mrow></math>.</p>
+
+<div class="eq">
+<math display="block" alttext="which implies delta sub k of x equals x transpose Sigma inverse mu sub k, minus one half mu sub k transpose Sigma inverse mu sub k, plus log pi sub k">
+  <mrow>
+    <mo>⇒</mo><mspace width="0.5em"></mspace>
+    <msub><mi>δ</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <msup><mi>x</mi><mi>T</mi></msup><msup><mi>Σ</mi><mrow><mo>−</mo><mn>1</mn></mrow></msup><msub><mi>μ</mi><mi>k</mi></msub>
+    <mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><msubsup><mi>μ</mi><mi>k</mi><mi>T</mi></msubsup><msup><mi>Σ</mi><mrow><mo>−</mo><mn>1</mn></mrow></msup><msub><mi>μ</mi><mi>k</mi></msub>
+    <mo>+</mo><mi>log</mi><msub><mi>π</mi><mi>k</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Dimensions are written under each factor: in both <math alttext="x transpose Sigma inverse mu sub k"><mrow><msup><mi>x</mi><mi>T</mi></msup><msup><mi>Σ</mi><mrow><mo>−</mo><mn>1</mn></mrow></msup><msub><mi>μ</mi><mi>k</mi></msub></mrow></math> and <math alttext="mu sub k transpose Sigma inverse mu sub k"><mrow><msubsup><mi>μ</mi><mi>k</mi><mi>T</mi></msubsup><msup><mi>Σ</mi><mrow><mo>−</mo><mn>1</mn></mrow></msup><msub><mi>μ</mi><mi>k</mi></msub></mrow></math>, the three factors are <math alttext="1 by p"><mrow><mn>1</mn><mo>×</mo><mi>p</mi></mrow></math>, <math alttext="p by p"><mrow><mi>p</mi><mo>×</mo><mi>p</mi></mrow></math> and <math alttext="p by 1"><mrow><mi>p</mi><mo>×</mo><mn>1</mn></mrow></math>.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> The estimate of the shared covariance matrix:</p>
+  <math display="block" alttext="Sigma hat equals 1 over n minus K times the sum from k equals 1 to K of the sum over i such that y sub i equals k of the quantity x sub i minus mu hat sub k, times the quantity x sub i minus mu hat sub k, transpose">
+    <mrow><mover><mi>Σ</mi><mo>^</mo></mover><mo>=</mo><mfrac><mn>1</mn><mrow><mi>n</mi><mo>−</mo><mi>K</mi></mrow></mfrac><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><munder><mo>∑</mo><mrow><mi>i</mi><mo>:</mo><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><mi>k</mi></mrow></munder><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>μ</mi><mo>^</mo></mover><mi>k</mi></msub><mo>)</mo><msup><mrow><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>μ</mi><mo>^</mo></mover><mi>k</mi></msub><mo>)</mo></mrow><mi>T</mi></msup></mrow>
+  </math>
+  <p>Under it, <math alttext="x sub i"><msub><mi>x</mi><mi>i</mi></msub></math> and <math alttext="mu hat sub k"><msub><mover><mi>μ</mi><mo>^</mo></mover><mi>k</mi></msub></math> are each labelled <math alttext="p by 1"><mrow><mi>p</mi><mo>×</mo><mn>1</mn></mrow></math>; the first factor is <math alttext="p by 1"><mrow><mi>p</mi><mo>×</mo><mn>1</mn></mrow></math> and the transposed factor is <math alttext="1 by p"><mrow><mn>1</mn><mo>×</mo><mi>p</mi></mrow></math>.</p>
+</div>
+
+<p><strong>Notice</strong> <math alttext="delta sub k of x"><mrow><msub><mi>δ</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math> is linear.</p>
+
+<figure>
+<svg viewBox="0 0 460 300" role="img" aria-labelledby="fig2-t fig2-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig2-t">LDA decision boundary for two predictors: a straight line between the class 1 points and the class 2 points</title>
+  <desc id="fig2-d">A rectangle with axes x one and x two holds training points written as the digits 1 and 2. The 1s are mostly on the left and the 2s mostly on the right. A dashed straight line runs from the bottom edge, left of centre, up toward the top right, separating the two groups; near the line a few points of each class sit on the other side.</desc>
+  <rect x="60.0" y="30.0" width="364.0" height="240.0" fill="none" stroke="currentColor" stroke-width="2"/><line x1="170.0" y1="266.0" x2="320.0" y2="46.0" stroke="var(--pop)" stroke-width="2.5" stroke-dasharray="3 4" stroke-linecap="round"/><text x="52.0" y="70.0" font-size="15" fill="currentColor" text-anchor="end">x₂</text><text x="242.0" y="294.0" font-size="15" fill="currentColor" text-anchor="middle">x₁</text><text x="120.0" y="80.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="156.0" y="86.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="196.0" y="96.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="260.0" y="76.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="316.0" y="72.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="96.0" y="126.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="130.0" y="122.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="196.0" y="116.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="224.0" y="136.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="104.0" y="186.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="144.0" y="186.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="170.0" y="182.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="124.0" y="230.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="156.0" y="230.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="316.0" y="196.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="356.0" y="100.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="384.0" y="100.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="244.0" y="140.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="300.0" y="136.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="340.0" y="150.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="384.0" y="150.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="196.0" y="180.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="260.0" y="190.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="324.0" y="216.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="380.0" y="200.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="230.0" y="256.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="276.0" y="242.0" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text>
+</svg>
+<figcaption>Figure 2. With two predictors, the LDA decision boundary is a straight line.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 2</summary>
+  <p>A rectangle with <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> on the horizontal axis and <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math> on the vertical axis. Training points are written as the digits 1 and 2: the 1s fill the left part and the 2s the right part. A dashed straight line runs from the bottom edge, left of centre, up toward the top right between the two groups. Close to the line, a few points of each class are on the other class's side.</p>
+</details>
+
+<p><strong>Boundary:</strong> <math alttext="delta sub 1 of x equals delta sub 2 of x"><mrow><msub><mi>δ</mi><mn>1</mn></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><msub><mi>δ</mi><mn>2</mn></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math> (<math alttext="K equals 2"><mrow><mi>K</mi><mo>=</mo><mn>2</mn></mrow></math>).</p>
+<p>If <math alttext="delta sub 1 of x is greater than delta sub 2 of x"><mrow><msub><mi>δ</mi><mn>1</mn></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>&gt;</mo><msub><mi>δ</mi><mn>2</mn></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math>, classify as <math alttext="Y equals 1"><mrow><mi>Y</mi><mo>=</mo><mn>1</mn></mrow></math>; else <math alttext="Y equals 2"><mrow><mi>Y</mi><mo>=</mo><mn>2</mn></mrow></math>.</p>
+
+<h2 id="qda">2. Quadratic discriminant analysis (QDA)</h2>
+
+<h3 id="qda-diff">2.1 One difference</h3>
+
+<div class="eq">
+<math display="block" alttext="X given Y equals k is distributed normal with mean mu sub k and covariance Sigma sub k">
+  <mrow><mi>X</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>∼</mo><mi>N</mi><mo>(</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>,</mo><msub><mi>Σ</mi><mi>k</mi></msub><mo>)</mo></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> An arrow points to <math alttext="Sigma sub k"><msub><mi>Σ</mi><mi>k</mi></msub></math>: <strong>depends on <math alttext="k"><mi>k</mi></math></strong>.</p>
+</div>
+
+<div class="eq">
+<math display="block" alttext="which implies delta sub k of x equals minus one half log of the determinant of Sigma sub k, minus one half the quantity x minus mu sub k transpose, Sigma sub k inverse, the quantity x minus mu sub k, plus log pi sub k">
+  <mrow>
+    <mo>⇒</mo><mspace width="0.5em"></mspace>
+    <msub><mi>δ</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo>
+    <mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mi>log</mi><mrow><mo>|</mo><msub><mi>Σ</mi><mi>k</mi></msub><mo>|</mo></mrow>
+    <mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>)</mo></mrow><mi>T</mi></msup><msubsup><mi>Σ</mi><mi>k</mi><mrow><mo>−</mo><mn>1</mn></mrow></msubsup><mo>(</mo><mi>x</mi><mo>−</mo><msub><mi>μ</mi><mi>k</mi></msub><mo>)</mo>
+    <mo>+</mo><mi>log</mi><msub><mi>π</mi><mi>k</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<p><strong>Notice:</strong> <math alttext="x transpose Sigma sub k inverse x"><mrow><msup><mi>x</mi><mi>T</mi></msup><msubsup><mi>Σ</mi><mi>k</mi><mrow><mo>−</mo><mn>1</mn></mrow></msubsup><mi>x</mi></mrow></math> is quadratic in <math alttext="x"><mi>x</mi></math>.</p>
+
+<h3 id="tradeoffs">2.2 Tradeoffs</h3>
+
+<table>
+  <caption>Number of covariance parameters to estimate</caption>
+  <thead><tr><th scope="col">Method</th><th scope="col">Covariances</th><th scope="col">With <math alttext="p equals 2"><mrow><mi>p</mi><mo>=</mo><mn>2</mn></mrow></math>, <math alttext="K equals 2"><mrow><mi>K</mi><mo>=</mo><mn>2</mn></mrow></math></th></tr></thead>
+  <tbody>
+    <tr><th scope="row">LDA</th><td><math alttext="p times p plus 1 over 2"><mrow><mi>p</mi><mo>(</mo><mi>p</mi><mo>+</mo><mn>1</mn><mo>)</mo><mo>/</mo><mn>2</mn></mrow></math></td><td>3</td></tr>
+    <tr><th scope="row">QDA</th><td><math alttext="K p times p plus 1 over 2"><mrow><mi>K</mi><mi>p</mi><mo>(</mo><mi>p</mi><mo>+</mo><mn>1</mn><mo>)</mo><mo>/</mo><mn>2</mn></mrow></math></td><td>6</td></tr>
+  </tbody>
+</table>
+
+<ul>
+  <li>QDA requires <math alttext="n sub k greater than p"><mrow><msub><mi>n</mi><mi>k</mi></msub><mo>&gt;</mo><mi>p</mi></mrow></math>, or else <math alttext="Sigma hat sub k"><msub><mover><mi>Σ</mi><mo>^</mo></mover><mi>k</mi></msub></math> is singular.</li>
+  <li>QDA: more flexible, higher variance, lower bias.</li>
+  <li>Use QDA if <math alttext="n"><mi>n</mi></math> is large or <math alttext="Sigma"><mi>Σ</mi></math> is different for each <math alttext="k"><mi>k</mi></math>.</li>
+</ul>
+
+<h2 id="nb">3. Naive Bayes</h2>
+
+<h3 id="nb-assumption">3.1 Naive assumption: predictors are independent!</h3>
+
+<div class="eq">
+<math display="block" alttext="f sub k of x equals f sub k 1 of x sub 1 times f sub k 2 of x sub 2 times dot dot dot times f sub k p of x sub p">
+  <mrow><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><msub><mi>f</mi><mrow><mi>k</mi><mn>1</mn></mrow></msub><mo>(</mo><msub><mi>x</mi><mn>1</mn></msub><mo>)</mo><msub><mi>f</mi><mrow><mi>k</mi><mn>2</mn></mrow></msub><mo>(</mo><msub><mi>x</mi><mn>2</mn></msub><mo>)</mo><mo>⋯</mo><msub><mi>f</mi><mrow><mi>k</mi><mi>p</mi></mrow></msub><mo>(</mo><msub><mi>x</mi><mi>p</mi></msub><mo>)</mo></mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="p sub k of x is proportional to pi sub k f sub k 1 of x sub 1 times dot dot dot times f sub k p of x sub p">
+  <mrow><msub><mi>p</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>∝</mo><msub><mi>π</mi><mi>k</mi></msub><msub><mi>f</mi><mrow><mi>k</mi><mn>1</mn></mrow></msub><mo>(</mo><msub><mi>x</mi><mn>1</mn></msub><mo>)</mo><mo>⋯</mo><msub><mi>f</mi><mrow><mi>k</mi><mi>p</mi></mrow></msub><mo>(</mo><msub><mi>x</mi><mi>p</mi></msub><mo>)</mo></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Possible error in original</span> As the formula for <math alttext="f sub k of x"><mrow><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math> shows, the assumption is that the predictors are independent <em>within each class</em>, that is, conditional on <math alttext="Y equals k"><mrow><mi>Y</mi><mo>=</mo><mi>k</mi></mrow></math> (ISL 4.4.4). The predictors need not be independent overall.</p>
+</div>
+
+<ul>
+  <li><math alttext="f sub k of x"><mrow><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math> is no longer multivariate normal.</li>
+  <li>Each predictor gets its own <math alttext="f sub k j"><msub><mi>f</mi><mrow><mi>k</mi><mi>j</mi></mrow></msub></math>.</li>
+  <li>We can mix quantitative and qualitative predictors.</li>
+</ul>
+
+<h3 id="nb-example">3.2 Example (binary predictors)</h3>
+
+<p><math alttext="n equals 10"><mrow><mi>n</mi><mo>=</mo><mn>10</mn></mrow></math>, <math alttext="K equals 2"><mrow><mi>K</mi><mo>=</mo><mn>2</mn></mrow></math> (spam, ns), <math alttext="p equals 3"><mrow><mi>p</mi><mo>=</mo><mn>3</mn></mrow></math>.</p>
+
+<table>
+  <caption>Training data: ten emails, their class (S = spam, NS = not spam) and three binary predictors</caption>
+  <thead><tr><th scope="col">Email</th><th scope="col">Class (<math alttext="Y"><mi>Y</mi></math>)</th><th scope="col"><math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math>: free</th><th scope="col"><math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math>: link</th><th scope="col"><math alttext="x sub 3"><msub><mi>x</mi><mn>3</mn></msub></math>: contact</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">1</th><td>S</td><td>1</td><td>1</td><td>0</td></tr>
+    <tr><th scope="row">2</th><td>S</td><td>1</td><td>1</td><td>0</td></tr>
+    <tr><th scope="row">3</th><td>S</td><td>1</td><td>0</td><td>1</td></tr>
+    <tr><th scope="row">4</th><td>S</td><td>0</td><td>1</td><td>0</td></tr>
+    <tr><th scope="row">5</th><td>NS</td><td>1</td><td>0</td><td>1</td></tr>
+    <tr><th scope="row">6</th><td>NS</td><td>0</td><td>1</td><td>1</td></tr>
+    <tr><th scope="row">7</th><td>NS</td><td>0</td><td>1</td><td>1</td></tr>
+    <tr><th scope="row">8</th><td>NS</td><td>0</td><td>0</td><td>1</td></tr>
+    <tr><th scope="row">9</th><td>NS</td><td>0</td><td>1</td><td>0</td></tr>
+    <tr><th scope="row">10</th><td>NS</td><td>0</td><td>0</td><td>0</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Step 1: priors</strong> (<math alttext="pi hat sub k"><msub><mover><mi>π</mi><mo>^</mo></mover><mi>k</mi></msub></math>)</p>
+<div class="eq">
+<math display="block" alttext="pi hat sub spam equals 4 over 10, pi hat sub ns equals 6 over 10">
+  <mrow><msub><mover><mi>π</mi><mo>^</mo></mover><mtext>spam</mtext></msub><mo>=</mo><mfrac><mn>4</mn><mn>10</mn></mfrac><mspace width="2em"></mspace><msub><mover><mi>π</mi><mo>^</mo></mover><mtext>ns</mtext></msub><mo>=</mo><mfrac><mn>6</mn><mn>10</mn></mfrac></mrow>
+</math>
+</div>
+
+<p><strong>Step 2:</strong> <math alttext="f hat sub k of x equals P hat of X equals x given Y equals k"><mrow><msub><mover><mi>f</mi><mo>^</mo></mover><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mover><mi>P</mi><mo>^</mo></mover><mo>(</mo><mi>X</mi><mo>=</mo><mi>x</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mi>k</mi><mo>)</mo></mrow></math></p>
+
+<table>
+  <caption>Estimated probability that each predictor is true (T), by class</caption>
+  <thead><tr><th scope="col">Class</th><th scope="col">P(free = T | <em>k</em>)</th><th scope="col">P(link = T | <em>k</em>)</th><th scope="col">P(contact = T | <em>k</em>)</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">SPAM</th><td>3/4</td><td>3/4</td><td>1/4</td></tr>
+    <tr><th scope="row">NS</th><td>1/6</td><td>3/6</td><td>4/6</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Step 3:</strong> classify a new email with “free”, a link, and not in contacts: <math alttext="x equals 1, 1, 0"><mrow><mi>x</mi><mo>=</mo><mo>(</mo><mn>1</mn><mo>,</mo><mn>1</mn><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math>.</p>
+
+<div class="eq">
+<math display="block" alttext="pi hat sub k times f hat sub k 1 of x sub 1 times f hat sub k 2 of x sub 2 times f hat sub k 3 of x sub 3">
+  <mrow><msub><mover><mi>π</mi><mo>^</mo></mover><mi>k</mi></msub><msub><mover><mi>f</mi><mo>^</mo></mover><mrow><mi>k</mi><mn>1</mn></mrow></msub><mo>(</mo><msub><mi>x</mi><mn>1</mn></msub><mo>)</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mrow><mi>k</mi><mn>2</mn></mrow></msub><mo>(</mo><msub><mi>x</mi><mn>2</mn></msub><mo>)</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mrow><mi>k</mi><mn>3</mn></mrow></msub><mo>(</mo><msub><mi>x</mi><mn>3</mn></msub><mo>)</mo></mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="SPAM equals 4 over 10 times 3 over 4 times 3 over 4 times 3 over 4, equals 0.169. NS equals 6 over 10 times 1 over 6 times 3 over 6 times 2 over 6, equals 0.02">
+  <mtable columnalign="left">
+    <mtr><mtd><mtext>SPAM</mtext><mo>=</mo><mfrac><mn>4</mn><mn>10</mn></mfrac><mo>×</mo><mfrac><mn>3</mn><mn>4</mn></mfrac><mo>×</mo><mfrac><mn>3</mn><mn>4</mn></mfrac><mo>×</mo><mfrac><mn>3</mn><mn>4</mn></mfrac><mo>=</mo><mn>.169</mn></mtd></mtr>
+    <mtr><mtd><mtext>NS</mtext><mo>=</mo><mfrac><mn>6</mn><mn>10</mn></mfrac><mo>×</mo><mfrac><mn>1</mn><mn>6</mn></mfrac><mo>×</mo><mfrac><mn>3</mn><mn>6</mn></mfrac><mo>×</mo><mfrac><mn>2</mn><mn>6</mn></mfrac><mo>=</mo><mn>.02</mn></mtd></mtr>
+  </mtable>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Annotation</span> The value .169 is highlighted: <strong>classify as SPAM</strong>.</p>
+</div>
+
+<p><strong>Step 4</strong> (optional):</p>
+<div class="eq">
+<math display="block" alttext="p hat sub spam of x equals 0.169 over 0.169 plus 0.02, which is approximately 0.91">
+  <mrow><msub><mover><mi>p</mi><mo>^</mo></mover><mtext>spam</mtext></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mfrac><mn>.169</mn><mrow><mn>.169</mn><mo>+</mo><mn>.02</mn></mrow></mfrac><mo>≈</mo><mn>.91</mn></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Possible error in original</span> The NS product is exactly <math alttext="1 over 60, about 0.0167"><mrow><mn>1</mn><mo>/</mo><mn>60</mn><mo>≈</mo><mn>.0167</mn></mrow></math>, shown rounded to .02. With the rounded values as written, the fraction is <math alttext="0.169 over 0.189, about 0.89"><mrow><mn>.169</mn><mo>/</mo><mn>.189</mn><mo>≈</mo><mn>.89</mn></mrow></math>. The .91 comes from the unrounded values, <math alttext="0.16875 over 0.16875 plus 0.01667, about 0.91"><mrow><mn>.16875</mn><mo>/</mo><mo>(</mo><mn>.16875</mn><mo>+</mo><mn>.01667</mn><mo>)</mo><mo>≈</mo><mn>.91</mn></mrow></math>. Either way the email is classified as spam.</p>
+</div>
+
+</main>
+
+<footer>
+  <p>Transcribed from the handwritten notes <em>ML_week_3_day_1.pdf</em> (6 pages). Equations are MathML; figures are inline SVG with title, description, and an expandable long description. Conforms to WCAG 2.2 Level AA.</p>
+</footer>
+</div>
+</body>
+</html>
