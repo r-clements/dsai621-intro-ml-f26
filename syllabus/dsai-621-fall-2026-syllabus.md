@@ -20,15 +20,14 @@ Section numbers are from ESL (2nd ed., 12th printing) and ISL (Python edition, I
 | 1 | Bias-variance tradeoff, curse of dimensionality | 2.3–2.5, 2.9, 7.2–7.3 | 2.1–2.2, 3.5 |
 | 2 | Ridge, lasso, elastic net | 3.4.1–3.4.3, 18.4 (elastic net) | 6.2 (elastic net in lab 6.5.2 only) |
 | 3 | LDA, QDA, naive Bayes vs. logistic regression | 4.3, 4.4.5, 6.6.3 | 4.4–4.5 |
-| 4 | Basis expansions: polynomial regression, step functions, regression and natural splines | 5.1–5.2 | 7.1–7.4 |
-| 5 | Smoothers: smoothing splines and local regression | 5.4–5.5, 6.1–6.2 (local regression only) | 7.5–7.6 |
+| 4 | Basis expansions: polynomial regression, regression and natural splines | 5.1–5.2 | 7.1, 7.3–7.4 |
+| 5 | Smoothing splines | 5.4–5.5 | 7.5 |
 | 6 | Generalized additive models (GAMs) | 9.1 | 7.7 |
 | 7 | Trees (CART) | 9.2 | 8.1 |
 | 8 | Bagging and Random Forests | 8.7, 15.1–15.2 | 8.2.1–8.2.2 |
 | 9 | Boosting | 10.1–10.12 | 8.2.3 |
 | 10 | Probability calibration | not covered | not covered |
-| 11 | PCA + recommender systems intro | 14.5.1 | 12.2, 12.3 (matrix completion and recommender systems) |
-| 12 | Clustering: k-means, hierarchical | 14.3 (14.3.6, 14.3.12) | 12.4 |
+| 11 | Clustering: k-means, hierarchical | 14.3 (14.3.6, 14.3.12) | 12.4 |
 
 
 ## Course Learning Outcomes
