@@ -11,7 +11,7 @@
 **Work on:**
 - [Quiz 2 practice questions](problem_sets/ML-Quiz2-practice.pdf)
 - Finish [Practice Problems 3](problem_sets/PP3.pdf) ([solutions](problem_sets/PP3_sol.pdf))
-- Practice Problems 4 (released Tuesday 11/3)
+- [Practice Problems 4](problem_sets/PP4.pdf) ([solutions](problem_sets/PP4_sol.pdf))
 - Practice Problems 5 (released Friday 11/6)
 
 The practice problems aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
