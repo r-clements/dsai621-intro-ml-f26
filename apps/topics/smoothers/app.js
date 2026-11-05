@@ -1,6 +1,6 @@
-// Smoothers (ISL 7.5–7.6, ESL 5.4–5.5, 6.1–6.2). Two linear smoothers, f̂ = S y:
+// Smoothing splines (ISL 7.5, ESL 5.4–5.5). A linear smoother, f̂ = S_λ y.
 //
-// Smoothing spline. Minimizes Σ(y_i − g(x_i))² + λ∫g″² (SciPy's make_smoothing_spline convention).
+// Minimizes Σ(y_i − g(x_i))² + λ∫g″² (SciPy's make_smoothing_spline convention).
 // Reinsch form (ESL 5.17): S_λ = (I + λK), K = Q R⁻¹ Qᵀ with Q (n × n−2) and R (n−2 × n−2)
 // tridiagonal (Green and Silverman 1994, §2.1). K is very badly conditioned for random x (close
 // points give huge eigenvalues), so instead of eigendecomposing K we eigendecompose the
@@ -9,13 +9,8 @@
 // df(λ) = Σρ_k, and f̂ = Σ ρ_k (u_kᵀy) u_k. The fitted curve between the x_i is the natural cubic
 // spline through f̂ with second derivatives γ = R⁻¹Qᵀf̂, linear outside [x_1, x_n].
 //
-// Loess. At target t: the k = s·n nearest x_i, h = distance to the k-th nearest, tri-cube weights
-// (1 − (|x_i − t|/h)³)³, weighted least squares fit of a degree-q polynomial in (x_i − t),
-// f̂(t) = intercept (ISL Algorithm 7.1, ESL 6.1). With q = 1 and it=0 this is statsmodels' lowess.
-// df = tr(S) = Σ_i ℓ_i(x_i), tabulated for every k so the span can be matched to a target df.
-//
-// LOOCV uses the shortcut mean((y_i − f̂_i)/(1 − S_ii))², exact for both smoothers (notes §4.1,
-// §5.5); GCV replaces S_ii by df/n.
+// LOOCV uses the shortcut mean((y_i − f̂_i)/(1 − S_ii))², exact for the smoothing spline (notes
+// §4.1); GCV replaces S_ii by df/n.
 
 const N_MAX = 300;
 const GRID_N = 401;           // grid on [0, 1] for curves and the ISE integral
@@ -29,7 +24,6 @@ const PRESETS = {
   sine: { f: x => Math.sin(2 * Math.PI * x), sigma: 0.3, y: [-2, 2], name: "sine" },
   line: { f: x => 2 * x, sigma: 0.3, y: [-1, 3], name: "straight line" },
 };
-const DEGREE_NAMES = ["local constant", "local linear", "local quadratic"];
 
 // ---------- seeded RNG (mulberry32 + Box–Muller) ----------
 function mulberry32(seed) {
@@ -171,28 +165,6 @@ function solveTridiag(a, b, rhs) {
     x[i] = (rhs[i] - b[i - 1] * x[i - 1]) / w;
   }
   for (let i = m - 2; i >= 0; i--) x[i] -= c[i] * x[i + 1];
-  return x;
-}
-
-// Small dense solve (Gaussian elimination with partial pivoting); A is (q+1)×(q+1), copied.
-function solveSmall(A, b) {
-  const m = b.length, M = A.map(r => r.slice()), x = b.slice();
-  for (let c = 0; c < m; c++) {
-    let p = c;
-    for (let r = c + 1; r < m; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
-    if (Math.abs(M[p][c]) < 1e-300) return null;
-    [M[c], M[p]] = [M[p], M[c]]; [x[c], x[p]] = [x[p], x[c]];
-    for (let r = c + 1; r < m; r++) {
-      const f = M[r][c] / M[c][c];
-      for (let k = c; k < m; k++) M[r][k] -= f * M[c][k];
-      x[r] -= f * x[c];
-    }
-  }
-  for (let c = m - 1; c >= 0; c--) {
-    let s = x[c];
-    for (let k = c + 1; k < m; k++) s -= M[c][k] * x[k];
-    x[c] = s / M[c][c];
-  }
   return x;
 }
 
@@ -344,96 +316,6 @@ function splineEval(pre, fhat, gam, t) {
   return (a * fhat[i + 1] + b * fhat[i]) / hi - a * b / 6 * ((1 + a / hi) * gam[i + 1] + (1 + b / hi) * gam[i]);
 }
 
-// ---------- loess ----------
-function loessKmin(q) { return q + 3; }
-// The k nearest x_i to t (x sorted): a contiguous index range [a, b], and h = the k-th distance.
-function knnWindow(x, t, k) {
-  const n = x.length;
-  let r = d3.bisectLeft(x, t), l = r - 1;
-  for (let c = 0; c < k; c++) {
-    if (r >= n || (l >= 0 && t - x[l] <= x[r] - t)) l--; else r++;
-  }
-  const a = l + 1, b = r - 1;
-  return { a, b, h: Math.max(t - x[a], x[b] - t) };
-}
-// Local polynomial of degree q at t with the k nearest points. Returns the window, weights
-// ℓ_i(t) for i in [a, b] (zero elsewhere), and the solve for the local coefficients.
-function loessAt(x, t, k, q) {
-  const { a, b, h } = knnWindow(x, t, k);
-  const len = b - a + 1, K = new Float64Array(len), P = q + 1;
-  const A = Array.from({ length: P }, () => new Array(P).fill(0));
-  for (let i = 0; i < len; i++) {
-    const u = (x[a + i] - t) / h, au = Math.abs(u);
-    K[i] = au < 1 ? (1 - au * au * au) ** 3 : 0;
-    let pw = 1;
-    const pows = [];
-    for (let j = 0; j <= 2 * q; j++) { pows.push(pw); pw *= u; }
-    for (let r = 0; r < P; r++) for (let c = 0; c < P; c++) A[r][c] += K[i] * pows[r + c];
-  }
-  const e1 = new Array(P).fill(0); e1[0] = 1;
-  const cvec = solveSmall(A, e1);
-  if (!cvec) return null;
-  const ell = new Float64Array(len);
-  for (let i = 0; i < len; i++) {
-    const u = (x[a + i] - t) / h;
-    let s = 0, pw = 1;
-    for (let j = 0; j < P; j++) { s += cvec[j] * pw; pw *= u; }
-    ell[i] = K[i] * s;
-  }
-  return { a, b, h, ell, A, K };
-}
-// df(k) = tr S = Σ_i ℓ_i(x_i). At t = x_i, u_i = 0 and K_i = 1, so ℓ_i(x_i) = (A⁻¹)_00, with A the
-// moment matrix m_{r+c}, m_r = Σ_j K_j u_j^r. Closed forms for q ≤ 2; no allocation.
-function loessTrace(x, k, q) {
-  const n = x.length;
-  let tr = 0;
-  for (let i = 0; i < n; i++) {
-    const t = x[i], { a, b, h } = knnWindow(x, t, k);
-    let m0 = 0, m1 = 0, m2 = 0, m3 = 0, m4 = 0;
-    for (let j = a; j <= b; j++) {
-      const u = (x[j] - t) / h, au = Math.abs(u);
-      if (au >= 1) continue;
-      const w = (1 - au * au * au) ** 3, u2 = u * u;
-      m0 += w; m1 += w * u; m2 += w * u2; m3 += w * u2 * u; m4 += w * u2 * u2;
-    }
-    if (q === 0) tr += 1 / m0;
-    else if (q === 1) tr += m2 / (m0 * m2 - m1 * m1);
-    else {
-      const c00 = m2 * m4 - m3 * m3;
-      tr += c00 / (m0 * c00 - m1 * (m1 * m4 - m2 * m3) + m2 * (m1 * m3 - m2 * m2));
-    }
-  }
-  return tr;
-}
-function loessFit(x, y, k, q) {
-  const n = x.length, fhat = new Float64Array(n), Sii = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    const L = loessAt(x, x[i], k, q);
-    let s = 0;
-    for (let j = 0; j < L.ell.length; j++) s += L.ell[j] * y[L.a + j];
-    fhat[i] = s;
-    Sii[i] = L.ell[i - L.a];
-  }
-  return { k, q, fhat, Sii, df: d3.sum(Sii) };
-}
-function loessPredict(x, y, k, q, t) {
-  const L = loessAt(x, t, k, q);
-  let s = 0;
-  for (let j = 0; j < L.ell.length; j++) s += L.ell[j] * y[L.a + j];
-  return s;
-}
-// The local polynomial itself at target t, for drawing over its window.
-function loessLocalPoly(x, y, k, q, t) {
-  const L = loessAt(x, t, k, q), P = q + 1, rhs = new Array(P).fill(0);
-  for (let i = 0; i < L.ell.length; i++) {
-    const u = (x[L.a + i] - t) / L.h;
-    let pw = 1;
-    for (let j = 0; j < P; j++) { rhs[j] += L.K[i] * pw * y[L.a + i]; pw *= u; }
-  }
-  const beta = solveSmall(L.A, rhs);
-  return { L, beta, at: s => { const u = (s - t) / L.h; let v = 0, pw = 1; for (const bj of beta) { v += bj * pw; pw *= u; } return v; } };
-}
-
 // ---------- criteria ----------
 function cvStats(y, fhat, Sii, df) {
   const n = y.length;
@@ -455,10 +337,10 @@ function ise(fGrid, curve) {   // trapezoid rule for ∫_0^1 (f̂ − f)²
 }
 
 // ---------- state ----------
-const DEFAULTS = { df: 10, degree: 1, preset: "esl", n: 100, seed: 1, i0: 0, eigSel: 2 };
+const DEFAULTS = { df: 10, preset: "esl", n: 100, seed: 1, i0: 0, eigSel: 2 };
 const S = { ...DEFAULTS };
 let D = draws(S.seed);
-let data, pre, dfTabs, sp, lo, grid, fGrid, curves;
+let data, pre, sp, grid, fGrid, curves;
 
 function makeData() {
   const idx = Array.from({ length: S.n }, (_, i) => i).sort((a, b) => D.x[a] - D.x[b]);
@@ -469,50 +351,25 @@ function makeData() {
 }
 function precomputeX() {         // after x changes (new seed or n)
   pre = splinePrecompute(data.x);
-  dfTabs = [new Map(), new Map(), new Map()];
-}
-function loessDf(q, k) {          // cached tr S for span k/n
-  const m = dfTabs[q];
-  if (!m.has(k)) m.set(k, loessTrace(data.x, k, q));
-  return m.get(k);
-}
-// df(k) decreases (almost always strictly) as the span grows. Binary-search for the crossing,
-// then check a few neighbours in case it is not exactly monotone.
-function bestK(q, target) {
-  let lo_ = loessKmin(q), hi = S.n;
-  while (hi - lo_ > 1) {
-    const mid = (lo_ + hi) >> 1;
-    if (loessDf(q, mid) >= target) lo_ = mid; else hi = mid;
-  }
-  let best = lo_;
-  for (let k = Math.max(loessKmin(q), lo_ - 3); k <= Math.min(S.n, lo_ + 4); k++) {
-    if (Math.abs(loessDf(q, k) - target) < Math.abs(loessDf(q, best) - target)) best = k;
-  }
-  return best;
 }
 function refit() {
-  const { x, y } = data;
+  const { y } = data;
   const lam = lambdaForDf(pre, S.df);
   sp = splineFit(pre, y, lam);
   Object.assign(sp, cvStats(y, sp.fhat, sp.Sii, sp.df));
-  const k = bestK(S.degree, S.df);
-  lo = loessFit(x, y, k, S.degree);
-  Object.assign(lo, cvStats(y, lo.fhat, lo.Sii, lo.df));
   const P = PRESETS[S.preset];
   grid = d3.range(GRID_N).map(g => g / (GRID_N - 1));
   fGrid = grid.map(P.f);
   curves = {
     spline: grid.map(t => splineEval(pre, sp.fhat, sp.gam, t)),
-    loess: grid.map(t => loessPredict(x, y, k, S.degree, t)),
   };
   sp.ise = ise(fGrid, curves.spline);
-  lo.ise = ise(fGrid, curves.loess);
 }
 
 // ---------- drawing ----------
 const W = 740;
 const MG = { top: 14, right: 16, bottom: 40, left: 54 };
-const BLUE = "#1a5fb4", ORANGE = "#c64600";
+const BLUE = "#1a5fb4";
 
 function makeChart(id, height, label) {
   const svg = d3.select(`#${id}`).append("svg")
@@ -547,27 +404,21 @@ const fitC = makeChart("fit", 350, "");
 axisLabels(fitC, "x", "y");
 fitC.gx.call(d3.axisBottom(xS).ticks(10));
 const fitY = d3.scaleLinear().range([fitC.height - MG.bottom, MG.top]);
-const winRect = fitC.plot.append("rect").attr("fill", ORANGE).attr("fill-opacity", 0.07)
-  .attr("stroke", ORANGE).attr("stroke-dasharray", "3 2").attr("stroke-opacity", 0.7);
 const x0Line = fitC.plot.append("line").attr("stroke", "#555").attr("stroke-dasharray", "1 3");
 const pointsG = fitC.plot.append("g");
 const truePath = fitC.plot.append("path").attr("fill", "none").attr("stroke", "#111")
   .attr("stroke-width", 2).attr("stroke-dasharray", "2 3");
 const splinePath = fitC.plot.append("path").attr("fill", "none").attr("stroke", BLUE).attr("stroke-width", 3);
-const loessPath = fitC.plot.append("path").attr("fill", "none").attr("stroke", ORANGE)
-  .attr("stroke-width", 3).attr("stroke-dasharray", "9 4");
-const localPath = fitC.plot.append("path").attr("fill", "none").attr("stroke", ORANGE).attr("stroke-width", 1.5);
 const selPoint = fitC.plot.append("circle").attr("r", 6).attr("fill", "none").attr("stroke", "#111").attr("stroke-width", 2);
 fitC.svg.attr("tabindex", 0).attr("aria-describedby", "x0-text");
 
-// Kernel chart: two strips sharing the x axis.
-const kerC = makeChart("kernel", 330, "");
+// Kernel chart: the weights in row i0 of S_λ.
+const kerC = makeChart("kernel", 220, "");
 axisLabels(kerC, "x", "");
 kerC.gx.call(d3.axisBottom(xS).ticks(10));
-const STRIP_GAP = 26;
-const stripH = (kerC.height - MG.top - MG.bottom - STRIP_GAP) / 2;
-const strips = [0, 1].map(s => {
-  const top = MG.top + s * (stripH + STRIP_GAP);
+const stripH = kerC.height - MG.top - MG.bottom;
+const strips = [0].map(() => {
+  const top = MG.top;
   const yS = d3.scaleLinear().range([top + stripH, top + 16]);
   const g = kerC.svg.append("g");
   const gy = kerC.svg.append("g").attr("class", "axis").attr("transform", `translate(${MG.left},0)`);
@@ -606,49 +457,35 @@ const evPts = evC.plot.append("g");
 
 function drawFit() {
   const { x, y } = data, P = PRESETS[S.preset];
-  const ext = d3.extent([...y, ...curves.spline, ...curves.loess]);
+  const ext = d3.extent([...y, ...curves.spline]);
   fitY.domain([Math.min(P.y[0], ext[0]), Math.max(P.y[1], ext[1])]).nice();
   fitC.gy.call(d3.axisLeft(fitY).ticks(6));
   const line = arr => d3.line().x((_, g) => xS(grid[g])).y(v => fitY(v))(arr);
   truePath.attr("d", line(fGrid));
   splinePath.attr("d", line(curves.spline));
-  loessPath.attr("d", line(curves.loess));
   pointsG.selectAll("circle").data(d3.range(S.n)).join("circle")
     .attr("r", 3).attr("fill", "none").attr("stroke", "#777")
     .attr("cx", i => xS(x[i])).attr("cy", i => fitY(y[i]));
   drawX0OnFit();
   fitC.svg.attr("aria-label",
-    `Scatterplot of ${S.n} points with the true function (dotted), the smoothing spline (solid) and the ` +
-    `${DEGREE_NAMES[S.degree]} loess fit (dashed), both with about ${S.df} degrees of freedom. ` +
-    `The selected target point is circled and the loess window around it is shaded. Use the arrow keys to move the target point.`);
+    `Scatterplot of ${S.n} points with the true function (dotted) and the smoothing spline (solid) with ` +
+    `${S.df} degrees of freedom. The selected target point is circled. Use the arrow keys to move the target point.`);
 }
 function drawX0OnFit() {
   const { x, y } = data, i = S.i0, t = x[i];
-  const lp = loessLocalPoly(x, y, lo.k, S.degree, t);
-  const a = Math.max(0, t - lp.L.h), b = Math.min(1, t + lp.L.h);
   const [y0, y1] = fitY.range();
-  winRect.attr("x", xS(t - lp.L.h)).attr("width", xS(t + lp.L.h) - xS(t - lp.L.h)).attr("y", y1).attr("height", y0 - y1);
   x0Line.attr("x1", xS(t)).attr("x2", xS(t)).attr("y1", y1).attr("y2", y0);
-  const ss = d3.range(61).map(j => a + (b - a) * j / 60);
-  localPath.attr("d", d3.line().x(s => xS(s)).y(s => fitY(lp.at(s)))(ss));
   selPoint.attr("cx", xS(t)).attr("cy", fitY(y[i]));
 }
 
 function kernelRows() {
-  const { x } = data, i = S.i0, n = S.n;
-  const sRow = splineRow(pre, sp.rho, i);
-  const L = loessAt(x, x[i], lo.k, S.degree);
-  const lRow = new Float64Array(n);
-  for (let j = 0; j < L.ell.length; j++) lRow[L.a + j] = L.ell[j];
-  return { sRow, lRow, L };
+  return { sRow: splineRow(pre, sp.rho, S.i0) };
 }
 function drawKernel(rows) {
   const { x } = data, t = x[S.i0];
   const series = [
-    { row: rows.sRow, colour: BLUE, title: `Smoothing spline: row ${S.i0 + 1} of S(λ), λ = ${fmtLam(sp.lam)}` },
-    { row: rows.lRow, colour: ORANGE, title: `Loess, ${DEGREE_NAMES[S.degree]}, span ${(lo.k / S.n).toFixed(2)} (k = ${lo.k})` },
+    { row: rows.sRow, colour: BLUE, title: `Row ${S.i0 + 1} of S(λ), λ = ${fmtLam(sp.lam)}` },
   ];
-  // Shared y scale so the two kernels can be compared.
   let mx = 0, mn = 0;
   for (const s of series) for (const v of s.row) { mx = Math.max(mx, v); mn = Math.min(mn, v); }
   const lo_ = Math.min(mn * 1.15, -0.1 * mx);
@@ -688,24 +525,22 @@ function kernelSummary(row) {
 }
 function drawX0Readout(rows) {
   const { x } = data, t = x[S.i0], P = PRESETS[S.preset];
-  const a = kernelSummary(rows.sRow), b = kernelSummary(rows.lRow);
+  const a = kernelSummary(rows.sRow);
   document.getElementById("x0-text").textContent =
     `x₀ = ${t.toFixed(3)}, point ${S.i0 + 1} of ${S.n} (sorted by x); f(x₀) = ${P.f(t).toFixed(3)}. ` +
-    `Weights below −0.001: spline ${a.neg}, loess ${b.neg}.`;
+    `Weights below −0.001: ${a.neg}.`;
   const r = v => (Math.abs(v) < 5e-13 ? "0.000" : fmt3(v));
   const cell = (s) => `<td>${r(s.fh)}</td><td>${r(s.sii)}</td><td>${r(s.mn)}</td><td>${r(s.mom)}</td><td>${r(s.bias)}</td><td>${r(s.sd)}</td>`;
   document.getElementById("x0-table").innerHTML =
     `<table class="stats"><caption>Weights at x₀</caption><thead><tr><th scope="col">Smoother</th>` +
     `<th scope="col">f̂(x₀)</th><th scope="col">own weight Sᵢᵢ</th><th scope="col">smallest weight</th>` +
     `<th scope="col">Σℓᵢ(xᵢ − x₀)</th><th scope="col">bias</th><th scope="col">SD</th></tr></thead><tbody>` +
-    `<tr><th scope="row">Smoothing spline</th>${cell(a)}</tr>` +
-    `<tr><th scope="row">Loess (${DEGREE_NAMES[S.degree]})</th>${cell(b)}</tr></tbody></table>`;
+    `<tr><th scope="row">Smoothing spline</th>${cell(a)}</tr></tbody></table>`;
   document.getElementById("x0-out").textContent = `x₀ = ${t.toFixed(3)} (point ${S.i0 + 1})`;
   const sl = document.getElementById("x0-slider");
   sl.setAttribute("aria-valuetext", `x0 = ${t.toFixed(3)}, point ${S.i0 + 1} of ${S.n}`);
   kerC.svg.attr("aria-label",
-    `Equivalent kernels at x0 = ${t.toFixed(3)}. Top strip: smoothing spline weights, ${a.neg} below −0.001, smallest ${r(a.mn)}. ` +
-    `Bottom strip: ${DEGREE_NAMES[S.degree]} loess weights on its ${lo.k} nearest points, ${b.neg} below −0.001, smallest ${r(b.mn)}. ` +
+    `Equivalent kernel of the smoothing spline at x0 = ${t.toFixed(3)}: ${a.neg} weights below −0.001, smallest ${r(a.mn)}. ` +
     `Positive weights are filled dots above the zero line; negative weights are open squares on dashed stems below it.`);
 }
 function drawX0() {
@@ -767,16 +602,9 @@ function drawStats() {
     `<th scope="col">training MSE</th><th scope="col">LOOCV</th><th scope="col">GCV</th>` +
     `<th scope="col">ISE ∫(f̂ − f)²</th></tr></thead><tbody>` +
     `<tr><th scope="row">Smoothing spline</th>${r(sp, `λ = ${fmtLam(sp.lam)}`)}</tr>` +
-    `<tr><th scope="row">Loess (${DEGREE_NAMES[S.degree]})</th>${r(lo, `s = ${(lo.k / S.n).toFixed(2)} (k = ${lo.k})`)}</tr>` +
     `</tbody></table>`;
   const el = document.getElementById("stats");
   if (html !== lastStats) { el.innerHTML = html; lastStats = html; }
-  const lo_df = loessDf(S.degree, S.n), hi_df = loessDf(S.degree, loessKmin(S.degree));
-  const note = document.getElementById("note");
-  note.textContent = Math.abs(lo.df - S.df) > 0.25
-    ? `Loess can't hit df = ${S.df} exactly: its span moves in steps of 1/n, and with ${DEGREE_NAMES[S.degree]} fits ` +
-      `its df runs from ${lo_df.toFixed(2)} (s = 1) to ${hi_df.toFixed(1)} (k = ${loessKmin(S.degree)}). This is the closest span.`
-    : "";
 }
 
 function drawAll() {
@@ -797,7 +625,6 @@ function syncControls() {
   nSlider.value = S.n; nOut.textContent = `n = ${S.n}`;
   x0Slider.max = S.n; x0Slider.value = S.i0 + 1;
   presetSel.value = S.preset;
-  document.querySelector(`input[name=degree][value="${S.degree}"]`).checked = true;
 }
 function update(newX) {
   makeData();
@@ -817,10 +644,6 @@ dfSlider.addEventListener("input", () => {
   S.df = +dfSlider.value;
   refit(); syncControls(); drawAll();
 });
-document.querySelectorAll("input[name=degree]").forEach(r => r.addEventListener("change", () => {
-  S.degree = +r.value;
-  refit(); drawAll();
-}));
 presetSel.addEventListener("change", () => { S.preset = presetSel.value; update(false); });
 nSlider.addEventListener("input", () => {
   S.n = +nSlider.value; nOut.textContent = `n = ${S.n}`;
@@ -888,10 +711,10 @@ document.querySelectorAll("input[type=range]").forEach(sl => sl.addEventListener
   sl.dispatchEvent(new Event("input"));
 }));
 
-// Exposed for checking against SciPy and statsmodels.
+// Exposed for checking against SciPy.
 window.__smoothers = {
-  S, data: () => data, pre: () => pre, sp: () => sp, lo: () => lo, curves: () => curves, grid: () => grid,
-  splineFit, lambdaForDf, splineRow, splineEval, loessFit, loessAt, loessPredict, loessDf, loessTrace,
+  S, data: () => data, pre: () => pre, sp: () => sp, curves: () => curves, grid: () => grid,
+  splineFit, lambdaForDf, splineRow, splineEval,
 };
 
 update(true);

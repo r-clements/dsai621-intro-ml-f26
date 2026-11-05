@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Smoothers: Smoothing Splines and Local Regression — DSAI 621</title>
+  <title>Smoothing Splines — DSAI 621</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
@@ -35,10 +35,6 @@
     select { font-size: 0.9rem; padding: 0.2rem; max-width: 100%; }
     button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
     :focus-visible { outline: 3px solid #1a5fb4; outline-offset: 2px; }
-    fieldset.group { border: 1px solid #ddd; border-radius: 4px; padding: 0.4rem 0.6rem; margin: 0.75rem 0 0;
-      display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
-    fieldset.group legend { font-weight: 600; padding: 0 0.25rem; }
-    fieldset.group label { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
     .panel { border: 1px solid #ddd; border-radius: 4px; padding: 0.25rem; }
     .panel svg { display: block; width: 100%; height: auto; touch-action: manipulation; }
     figure { margin: 0; }
@@ -51,8 +47,6 @@
     table.stats th, table.stats td { border-bottom: 1px solid #e3e3e3; padding: 0.2rem 0.45rem; text-align: right; white-space: nowrap; }
     table.stats th[scope=row], table.stats thead th:first-child { text-align: left; }
     table.stats thead th { font-weight: 600; color: #333; border-bottom: 2px solid #ccc; }
-    #note { color: #555; font-size: 0.88rem; margin: 0.35rem 0 0; }
-    #note:empty { display: none; }
     #x0-text { font-size: 0.92rem; margin: 0.4rem 0 0; font-variant-numeric: tabular-nums; }
     #eig-readout { font-size: 0.9rem; min-height: 1.3em; margin: 0.3rem 0 0; font-variant-numeric: tabular-nums; }
     .axis text { font-size: 11px; }
@@ -64,23 +58,20 @@
 </head>
 <body>
   <a class="back" href="../../">&larr; All topics</a>
-  <h1>Smoothers: Smoothing Splines and Local Regression</h1>
+  <h1>Smoothing Splines</h1>
   <p id="instructions" class="instructions">
-    Both fits on this page are linear smoothers, ŷ = <b>S</b>y. One slider sets the degrees of freedom
-    df = tr(<b>S</b>). The app finds the smoothing spline's λ that gives exactly that df, and the loess span
-    s = k/n (tri-cube weights on the k nearest points) whose df is closest to it. At matched df the two fits are nearly the same
-    curve. Click the top chart to choose a target point x<sub>0</sub>. The middle chart shows the
-    weights ℓ<sub>i</sub>(x<sub>0</sub>) each smoother puts on each y<sub>i</sub>: its equivalent kernel. Look at the edges.
-    Local-constant loess there averages points that all lie on one side and is badly biased. Local linear
-    removes that bias by giving the far points negative weights, and so does the smoothing spline. The bottom
-    chart is the spline's eigen-picture: <b>S</b><sub>λ</sub> = Σ ρ<sub>k</sub>(λ) <b>u</b><sub>k</sub><b>u</b><sub>k</sub><sup>T</sup>.
+    A smoothing spline minimizes Σ(y<sub>i</sub> − g(x<sub>i</sub>))² + λ∫g″², and its fitted values are a linear
+    smoother, ŷ = <b>S</b><sub>λ</sub>y. The slider sets the degrees of freedom df = tr(<b>S</b><sub>λ</sub>), and the app
+    finds the λ that gives exactly that df. Click the top chart to choose a target point x<sub>0</sub>. The middle
+    chart shows the weights ℓ<sub>i</sub>(x<sub>0</sub>) the spline puts on each y<sub>i</sub>: its equivalent kernel, a
+    bump centred at x<sub>0</sub> with small negative side lobes. Look at the edges: there all the neighbours lie on one
+    side, and the spline gives the far points negative weights so that it still fits straight lines exactly. The bottom
+    chart is the eigen-picture: <b>S</b><sub>λ</sub> = Σ ρ<sub>k</sub>(λ) <b>u</b><sub>k</sub><b>u</b><sub>k</sub><sup>T</sup>.
     The two line directions are never shrunk (ρ<sub>1</sub> = ρ<sub>2</sub> = 1), and wigglier eigenvectors
-    are shrunk harder. λ here is SciPy's: Σ(y<sub>i</sub> − g(x<sub>i</sub>))² + λ∫g″², with x on [0, 1].
-    (ISL 7.5–7.6, ESL 5.4–5.5, 6.1–6.2.)
+    are shrunk harder. λ here is SciPy's, with x on [0, 1]. (ISL 7.5, ESL 5.4–5.5.)
   </p>
   <p id="a11y-instructions" class="instructions a11y-instructions">
-    Keyboard and screen reader users: use the arrow keys on the sliders (Shift+arrow moves 5 steps) and in the
-    radio groups. The "Target point" slider chooses x<sub>0</sub>, and so do the arrow keys when the top chart
+    Keyboard and screen reader users: use the arrow keys on the sliders (Shift+arrow moves 5 steps). The "Target point" slider chooses x<sub>0</sub>, and so do the arrow keys when the top chart
     has focus (Shift moves 10 points; Home and End go to the ends). The weights at x<sub>0</sub> are summarised in the
     table under the middle chart. Tab to the eigenvalue chart and use Left/Right to step through the
     eigenvectors; the selected one is drawn below the bars and described in text. The fit statistics table is
@@ -92,12 +83,6 @@
     <input type="range" id="df-slider" min="2.5" max="30" step="0.5" value="10">
     <output id="df-out" for="df-slider">df = 10</output>
   </div>
-  <fieldset class="group" id="degree-group">
-    <legend>Loess local fit</legend>
-    <label><input type="radio" name="degree" value="0"> Local constant (Nadaraya–Watson)</label>
-    <label><input type="radio" name="degree" value="1" checked> Local linear (ISL's loess)</label>
-    <label><input type="radio" name="degree" value="2"> Local quadratic</label>
-  </fieldset>
   <div class="controls">
     <label for="preset">True f</label>
     <select id="preset">
@@ -111,20 +96,17 @@
   </div>
   <div class="controls">
     <button id="resample" type="button">New sample</button>
-    <button id="gcv" type="button">Set df by the spline's GCV</button>
+    <button id="gcv" type="button">Set df by GCV</button>
     <button id="reset" type="button">Reset</button>
   </div>
 
   <div id="stats" class="table-wrap" aria-live="polite" aria-atomic="true"></div>
-  <p id="note" role="status"></p>
 
-  <h2 id="fit-heading">The fits</h2>
+  <h2 id="fit-heading">The fit</h2>
   <ul class="legend" aria-hidden="true">
     <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="3"/></svg>smoothing spline (solid)</li>
-    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c64600" stroke-width="3" stroke-dasharray="9 4"/></svg>loess (long dashes)</li>
     <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="2" stroke-dasharray="2 3"/></svg>true f(x) (dotted)</li>
     <li><svg width="14" height="10"><circle cx="7" cy="5" r="3" fill="none" stroke="#777"/></svg>data (open circles)</li>
-    <li><svg width="30" height="14"><rect x="0" y="1" width="30" height="12" fill="#c64600" fill-opacity="0.08" stroke="#c64600" stroke-dasharray="3 2"/><line x1="2" x2="28" y1="11" y2="3" stroke="#c64600" stroke-width="1.5"/></svg>loess window at x<sub>0</sub> and its local fit</li>
   </ul>
   <figure class="panel"><div id="fit"></div></figure>
   <div class="controls">
@@ -133,7 +115,7 @@
     <output id="x0-out" for="x0-slider"></output>
   </div>
 
-  <h2 id="kernel-heading">Equivalent kernels at x<sub>0</sub>: the weight on each y<sub>i</sub></h2>
+  <h2 id="kernel-heading">Equivalent kernel at x<sub>0</sub>: the weight on each y<sub>i</sub></h2>
   <ul class="legend" aria-hidden="true">
     <li><svg width="16" height="16"><line x1="8" x2="8" y1="15" y2="5" stroke="#444" stroke-width="1.5"/><circle cx="8" cy="4" r="3" fill="#444"/></svg>positive weight (solid stem, filled dot, above the line)</li>
     <li><svg width="16" height="16"><line x1="8" x2="8" y1="1" y2="11" stroke="#444" stroke-width="1.5" stroke-dasharray="2 2"/><rect x="5" y="10" width="6" height="6" fill="#fff" stroke="#444" stroke-width="1.5"/></svg>negative weight (dashed stem, open square, below the line)</li>
@@ -144,17 +126,17 @@
     <div id="x0-table"></div>
   </div>
   <p class="caption">ℓ<sub>i</sub>(x<sub>0</sub>) is the coefficient of y<sub>i</sub> in f̂(x<sub>0</sub>) = Σ ℓ<sub>i</sub>(x<sub>0</sub>) y<sub>i</sub>.
-    Both kernels sum to 1. Σℓ<sub>i</sub>(x<sub>i</sub> − x<sub>0</sub>) = 0 means the smoother reproduces straight lines, so its bias involves only f″.
+    The weights sum to 1, and Σℓ<sub>i</sub>(x<sub>i</sub> − x<sub>0</sub>) = 0 because the spline reproduces straight lines, so its bias involves only f″.
     Bias and SD are exact for this design: E f̂(x<sub>0</sub>) − f(x<sub>0</sub>) = Σℓ<sub>i</sub>f(x<sub>i</sub>) − f(x<sub>0</sub>) and
-    SD = σ‖ℓ(x<sub>0</sub>)‖ (ESL 6.1.1).</p>
+    SD = σ‖ℓ(x<sub>0</sub>)‖ (ESL 5.4.1).</p>
 
-  <h2 id="eig-heading">The smoothing spline's eigenvalues ρ<sub>k</sub>(λ) = 1 / (1 + λd<sub>k</sub>)</h2>
+  <h2 id="eig-heading">Eigenvalues ρ<sub>k</sub>(λ) = 1 / (1 + λd<sub>k</sub>)</h2>
   <figure class="panel"><div id="eig"></div></figure>
   <p id="eig-readout" aria-live="polite"></p>
   <figure class="panel"><div id="evec"></div></figure>
   <p class="caption">Top: how much <b>S</b><sub>λ</sub> keeps of each eigen-direction of the penalty matrix <b>K</b>, for the first 30 (ESL 5.19–5.20, Figure 5.7). df = Σρ<sub>k</sub>.
     The eigenvectors do not depend on λ; moving the df slider only changes the bar heights. Bottom: the selected
-    eigenvector <b>u</b><sub>k</sub>, plotted against x<sub>i</sub>. Loess has no picture like this: its <b>S</b> is not symmetric.</p>
+    eigenvector <b>u</b><sub>k</sub>, plotted against x<sub>i</sub>.</p>
 
   <script src="app.js"></script>
 </body>
