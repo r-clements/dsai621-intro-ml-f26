@@ -54,6 +54,7 @@
     table.errors th:first-child, table.errors td:first-child { text-align: left; }
     table.errors td.key { text-align: left; }
     table.errors tr.best td { font-weight: 700; }
+    p.error-def { font-size: 0.9rem; color: #444; margin: 0.2rem 0 0.4rem; }
     table.errors caption { text-align: left; font-size: 0.85rem; color: #555; caption-side: bottom; padding-top: 0.35rem; }
     .sr-only {
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -108,7 +109,15 @@
   <div id="stats" aria-live="polite" aria-atomic="true"></div>
 
   <h2 id="table-heading">Test error</h2>
-  <table class="errors" aria-labelledby="table-heading">
+  <p id="error-def" class="error-def">
+    Test error here is the <strong>misclassification rate</strong>: the fraction of 50,000 test
+    points, drawn from the true class distributions, that a classifier puts in the wrong class.
+    <em>This sample</em> is the error of the classifier fit to the training points shown.
+    <em>Average of 100 samples</em> averages it over 100 new training sets of the same size, which
+    estimates the expected test error at this <i>n</i>. The Bayes row is the lowest error any
+    classifier can reach (the Bayes error rate).
+  </p>
+  <table class="errors" aria-labelledby="table-heading" aria-describedby="error-def">
     <thead>
       <tr>
         <th scope="col">Method</th>
