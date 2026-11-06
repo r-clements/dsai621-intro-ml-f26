@@ -18,11 +18,10 @@ The practice problems aren't turned in, but the quizzes draw on them, so try eac
 
 **Notebooks** (run `git pull` and then `uv sync` first):
 - Finish [`notebooks/lda_vs_logistic.ipynb`](notebooks/lda_vs_logistic.ipynb) and [`notebooks/qda_vs_naive_bayes.ipynb`](notebooks/qda_vs_naive_bayes.ipynb)
-- Splines notebook (released before Thursday's class)
+
 
 **Interactive demos:**
-- [LDA, QDA, Naive Bayes and Logistic Regression](https://robertclements.org/dsai621-intro-ml-f26/topics/lda-qda-boundaries/)
-- [Basis Expansions: Polynomials, Step Functions and Splines](https://robertclements.org/dsai621-intro-ml-f26/topics/basis-expansions/)
+- [LDA, QDA, Naive Bayes and Logistic Regression](https://robertclements.org/dsai621-intro-ml-f26/topics/lda-qda-boundaries/)  
 - For Quiz 2 review: [Shrinkage: Ridge, Lasso and Elastic Net](https://robertclements.org/dsai621-intro-ml-f26/topics/shrinkage-paths/)
 - [All demos](https://robertclements.org/dsai621-intro-ml-f26/)
 
