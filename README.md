@@ -8,11 +8,11 @@
 
 **Read:** ISL 4.4–4.5 and 7.1–7.4; ESL 4.3, 6.6.3 and 5.1–5.2.
 
+**Practice problems are now organized by quiz.** The weekly Practice Problems files (PP1–PP4) have been removed from `problem_sets/` and replaced by one set per quiz: `Quiz1_practice_problems.pdf`, `Quiz2_practice_problems.pdf` and `Quiz3_practice_problems.pdf`, each with a `_sol` solutions file. Run `git pull` to get them.
+
 **Work on:**
-- [Quiz 2 practice questions](problem_sets/ML-Quiz2-practice.pdf)
-- Finish [Practice Problems 3](problem_sets/PP3.pdf) ([solutions](problem_sets/PP3_sol.pdf))
-- [Practice Problems 4](problem_sets/PP4.pdf) ([solutions](problem_sets/PP4_sol.pdf))
-- Practice Problems 5 (released Friday 11/6)
+- [Quiz 2 practice questions](problem_sets/ML-Quiz2-constraint-practice.pdf) ([solutions](problem_sets/ML-Quiz2-constraint-practice_sol.pdf))
+- Work on [Quiz 3 practice problems](problem_sets/Quiz3_practice_problems.pdf) ([solutions](problem_sets/Quiz3_practice_problems_sol.pdf))
 
 The practice problems aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
 
@@ -37,7 +37,7 @@ The practice problems aren't turned in, but the quizzes draw on them, so try eac
 
 - Class notes, Day 1: [handwritten](notes/hand-written/ML_week_2_day_1.pdf) · [accessible HTML](notes/html/ML_week_2_day_1.html)
 - Class notes, Day 2: [handwritten](notes/hand-written/ML_week_2_day_2.pdf) · [accessible HTML](notes/html/ML_week_2_day_2.html)
-- [Practice Problems 2](problem_sets/PP2.pdf) ([solutions](problem_sets/PP2_sol.pdf))
+- [Quiz 1 practice problems](problem_sets/Quiz1_practice_problems.pdf) ([solutions](problem_sets/Quiz1_practice_problems_sol.pdf)), Part 2, and [Quiz 2 practice problems](problem_sets/Quiz2_practice_problems.pdf) ([solutions](problem_sets/Quiz2_practice_problems_sol.pdf))
 - Notebook: [`notebooks/ridge_lasso.ipynb`](notebooks/ridge_lasso.ipynb)
 - Interactive demo: [Shrinkage: Ridge, Lasso and Elastic Net](https://robertclements.org/dsai621-intro-ml-f26/topics/shrinkage-paths/)
 
@@ -48,7 +48,7 @@ The practice problems aren't turned in, but the quizzes draw on them, so try eac
 **Read:** ISL 2.1–2.2 and 3.5; ESL 2.1–2.5 and 7.2–7.3.
 
 - Class notes: [handwritten](notes/hand-written/ML_week_1_day_1.pdf) · [accessible HTML](notes/html/ML_week_1_day_1.html)
-- [Practice Problems 1](problem_sets/PP1.pdf) ([solutions](problem_sets/PP1_sol.pdf))
+- [Quiz 1 practice problems](problem_sets/Quiz1_practice_problems.pdf) ([solutions](problem_sets/Quiz1_practice_problems_sol.pdf)), Part 1
 - Interactive demo: [Bias–Variance Tradeoff with KNN Regression](https://robertclements.org/dsai621-intro-ml-f26/topics/bias-variance-knn/)
 
 </details>
