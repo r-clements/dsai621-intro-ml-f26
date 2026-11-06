@@ -11,7 +11,7 @@
 **Practice problems are now organized by quiz.** The weekly Practice Problems files (PP1–PP4) have been removed from `problem_sets/` and replaced by one set per quiz: `Quiz1_practice_problems.pdf`, `Quiz2_practice_problems.pdf` and `Quiz3_practice_problems.pdf`, each with a `_sol` solutions file. Run `git pull` to get them.
 
 **Work on:**
-- [Quiz 2 practice questions](problem_sets/ML-Quiz2-constraint-practice.pdf) ([solutions](problem_sets/ML-Quiz2-constraint-practice_sol.pdf))
+- Quiz 2 practice: [practice problems](problem_sets/Quiz2_practice_problems.pdf) ([solutions](problem_sets/Quiz2_practice_problems_sol.pdf)) and [constraint pictures](problem_sets/ML-Quiz2-constraint-practice.pdf) ([solutions](problem_sets/ML-Quiz2-constraint-practice_sol.pdf))
 - Work on [Quiz 3 practice problems](problem_sets/Quiz3_practice_problems.pdf) ([solutions](problem_sets/Quiz3_practice_problems_sol.pdf))
 
 The practice problems aren't turned in, but the quizzes draw on them, so try each problem before you look at the solutions.
@@ -37,7 +37,7 @@ The practice problems aren't turned in, but the quizzes draw on them, so try eac
 
 - Class notes, Day 1: [handwritten](notes/hand-written/ML_week_2_day_1.pdf) · [accessible HTML](notes/html/ML_week_2_day_1.html)
 - Class notes, Day 2: [handwritten](notes/hand-written/ML_week_2_day_2.pdf) · [accessible HTML](notes/html/ML_week_2_day_2.html)
-- [Quiz 1 practice problems](problem_sets/Quiz1_practice_problems.pdf) ([solutions](problem_sets/Quiz1_practice_problems_sol.pdf)), Part 2, and [Quiz 2 practice problems](problem_sets/Quiz2_practice_problems.pdf) ([solutions](problem_sets/Quiz2_practice_problems_sol.pdf))
+- [Quiz 1 practice problems](problem_sets/Quiz1_practice_problems.pdf) ([solutions](problem_sets/Quiz1_practice_problems_sol.pdf)), Part 2; [Quiz 2 practice problems](problem_sets/Quiz2_practice_problems.pdf) ([solutions](problem_sets/Quiz2_practice_problems_sol.pdf)); and [Quiz 2 constraint pictures](problem_sets/ML-Quiz2-constraint-practice.pdf) ([solutions](problem_sets/ML-Quiz2-constraint-practice_sol.pdf))
 - Notebook: [`notebooks/ridge_lasso.ipynb`](notebooks/ridge_lasso.ipynb)
 - Interactive demo: [Shrinkage: Ridge, Lasso and Elastic Net](https://robertclements.org/dsai621-intro-ml-f26/topics/shrinkage-paths/)
 
