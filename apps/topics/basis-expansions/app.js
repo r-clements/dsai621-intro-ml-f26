@@ -1,14 +1,15 @@
-// Basis expansions (ISL 7.1–7.4, ESL 5.1–5.2). Every fit is OLS of y on basis columns
-// h_1(x), …, h_M(x), solved by QR (modified Gram–Schmidt, reorthogonalized). Only the columns
+// Basis expansions (ISL 7.1–7.4, ESL 5.1–5.2). Every fit is OLS of y on the M = df columns of a
+// basis matrix that spans the constant (so no separate intercept column; ISL's β0 + Σ βj bj(x) is
+// the same fit by a change of basis), solved by QR (modified Gram–Schmidt, reorthogonalized). Only the columns
 // change between methods:
 //   polynomial    Legendre P_0..P_d on 2x − 1 (same column space as 1, x, …, x^d)   M = d + 1
-//   step          indicators of the K + 1 regions                                    M = K + 1
 //   piecewise     Legendre P_0..P_3 on each region, zero outside it                   M = 4(K + 1)
 //   cubic spline  cubic B-splines, boundary knots 0 and 1 repeated four times         M = K + 4
 //   natural       the B-spline space with f''(0) = f''(1) = 0 (ESL 5.2.1)             M = K + 2
 // K = number of interior knots. Natural-spline basis for K ≥ 2: keep the interior B-splines and
 // replace the three at each end by two combinations with zero second derivative at the boundary;
-// for K ≤ 1, ESL eq. 5.4–5.5. SE band: Var f̂(x0) = σ̂² h(x0)ᵀ(HᵀH)⁻¹h(x0) = σ̂² ‖R⁻ᵀh(x0)‖².
+// for K ≤ 1, ESL eq. 5.4–5.5. SE band: Var f̂(x0) = σ̂² b(x0)ᵀ(BᵀB)⁻¹b(x0) = σ̂² ‖R⁻ᵀb(x0)‖²,
+// with b(x0) the row of basis values at x0.
 
 const N_MAX = 500;
 const GRID_N = 1001;          // grid on [0, 1] for the test-error integral
@@ -28,8 +29,6 @@ const PRESETS = {
 const METHODS = {
   poly:    { label: "Polynomial", param: "Degree d", sym: "d", min: 1, max: 15, def: 3,
              df: p => p + 1, formula: p => `d + 1 = ${p + 1}` },
-  step:    { label: "Step functions", param: "Cutpoints K", sym: "K", min: 0, max: 20, def: 4,
-             df: p => p + 1, formula: p => `K + 1 = ${p + 1}` },
   pwcubic: { label: "Piecewise cubic", param: "Knots K", sym: "K", min: 0, max: 8, def: 2,
              df: p => 4 * (p + 1), formula: p => `4(K + 1) = ${4 * (p + 1)}` },
   cubic:   { label: "Cubic spline", param: "Knots K", sym: "K", min: 0, max: 15, def: 3,
@@ -128,11 +127,6 @@ function makeBasis(method, p, knots) {
       row(x) { const o = new Float64Array(p + 1); legendre(2 * x - 1, p, o, 0); return o; },
       describe: j => `orthogonal polynomial of degree ${j}` };
   }
-  if (method === "step") {
-    return { M: p + 1, edges, discontinuous: true,
-      row(x) { const o = new Float64Array(p + 1); o[region(x)] = 1; return o; },
-      describe: j => `indicator of the region from x = ${fmt(edges[j])} to ${fmt(edges[j + 1])}` };
-  }
   if (method === "pwcubic") {
     return { M: 4 * (p + 1), edges, discontinuous: true,
       row(x) {
@@ -160,7 +154,7 @@ function makeBasis(method, p, knots) {
         for (let k = 0; k < Kp - 2; k++) o[k + 2] = dk(x, k) - dk(x, Kp - 2);
         return o;
       },
-      describe: j => ["constant", "linear term x", "ESL natural-spline term N₃(x)"][j] };
+      describe: j => ["constant (the intercept)", "linear term b₁(x) = x", "natural-spline term b₂(x) = d₀(x) − d₁(x) (lecture Result 5.1)"][j] };
   }
   // Only B_0..B_2 have nonzero f'' at 0 and only B_{nb−3}..B_{nb−1} at 1, and the three values
   // at each end sum to 0 (the B-splines sum to 1). So B_0 + B_1 + B_2 and c_2B_1 − c_1B_2 are
@@ -521,8 +515,8 @@ function drawBasis() {
   basisLines.selectAll("path").filter(j => j === S.sel).raise();
   basisSum.attr("d", scaled ? lineFor(basisY, d => d.f)(g) : null);
 
-  const what = scaled ? "β̂ⱼhⱼ(x), with their sum (the fit) as a thick translucent blue line" : "hⱼ(x)";
-  basisC.svg.attr("aria-label", `${M} basis functions ${what} for the ${METHODS[S.method].label.toLowerCase()}.`);
+  const what = scaled ? "each multiplied by its coefficient, with their sum (the fit) as a thick translucent blue line" : "";
+  basisC.svg.attr("aria-label", `The ${M} columns of the basis matrix${what ? ", " + what : ""}, for the ${METHODS[S.method].label.toLowerCase()}.`);
   drawReadout();
 }
 function drawReadout() {
@@ -532,7 +526,7 @@ function drawReadout() {
   let peak = null;
   for (const d of current.grid) if (d.h && (!peak || Math.abs(d.h[j]) > Math.abs(peak.h[j]))) peak = d;
   const coef = current.fit.dropped.includes(j) ? "not identified (no data where it is nonzero)" : `β̂ = ${b.toFixed(3)}`;
-  el.textContent = `Basis function ${j + 1} of ${current.basis.M}: ${current.basis.describe(j)}; ` +
+  el.textContent = `Column ${j + 1} of ${current.basis.M}: ${current.basis.describe(j)}; ` +
     `largest in size at x = ${peak ? peak.x.toFixed(2) : "–"}; ${coef}.`;
 }
 function selectBasis(j) {
