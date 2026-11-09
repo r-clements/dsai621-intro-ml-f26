@@ -68,14 +68,14 @@
   <a class="back" href="../../">&larr; All topics</a>
   <h1>Basis Expansions: Polynomials and Splines</h1>
   <p id="instructions" class="instructions">
-    Every fit on this page is ordinary least squares,
+    Every fit here is ordinary least squares,
     y<sub>i</sub> = β<sub>0</sub> + β<sub>1</sub>b<sub>1</sub>(x<sub>i</sub>) + … + β<sub>J</sub>b<sub>J</sub>(x<sub>i</sub>) + ε<sub>i</sub>
     (ISL 7.7); only the basis functions b<sub>j</sub> change. Pick a basis and move the slider. Watch the edges: a high-degree
     polynomial flails there and its ±2 SE band blows up, while a natural spline with the same df stays calm.
-    Drag the orange knot handles to move a knot: a spline changes near that knot, but a polynomial has no knots
-    and every coefficient affects the whole curve. The middle panel shows the columns of the basis matrix, or each column
-    times its coefficient, to see the fit as their sum. The bottom panel sweeps df for the current basis,
-    with knots at quantiles of x.
+    Drag an orange knot handle: a spline changes near that knot, but a polynomial has no knots
+    and every coefficient affects the whole curve. The middle panel shows the basis columns, or each column
+    times its coefficient; these sum to the fit. The bottom panel is a bias–variance plot with df as flexibility
+    (quantile knots): test error is U-shaped; LOOCV estimates it.
     Here df counts every coefficient, including the intercept (df = J + 1), and K is the number of interior knots
     (boundary knots sit at x = 0 and 1). To keep the fit numerically stable the app uses an equivalent set of df
     columns that already contains the constant (orthogonal polynomials, B-splines), so there is
