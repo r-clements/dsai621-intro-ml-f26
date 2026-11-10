@@ -17,7 +17,6 @@ const GRID_N = 401;           // grid on [0, 1] for curves and the ISE integral
 // Reference λ for the eigendecomposition. Error in d_k is about ε/λ0 for small d_k and relative
 // ε(1 + λ0 d_k) for large ones; 1e-6 keeps both below ~1e-8 for the λ the df slider reaches.
 const LAMBDA0 = 1e-6;
-const N_EIG_SHOW = 30;
 
 const PRESETS = {
   esl:  { f: x => Math.sin(12 * (x + 0.2)) / (x + 0.2), sigma: 1, y: [-5.5, 6.5], name: "ESL wave" },
@@ -337,7 +336,7 @@ function ise(fGrid, curve) {   // trapezoid rule for ∫_0^1 (f̂ − f)²
 }
 
 // ---------- state ----------
-const DEFAULTS = { df: 10, preset: "esl", n: 100, seed: 1, i0: 0, eigSel: 2 };
+const DEFAULTS = { df: 10, preset: "esl", n: 100, seed: 1, i0: 0 };
 const S = { ...DEFAULTS };
 let D = draws(S.seed);
 let data, pre, sp, grid, fGrid, curves;
@@ -432,29 +431,6 @@ kerC.svg.append("text").attr("class", "axis-label")
   .attr("transform", `translate(14,${(kerC.height - MG.bottom + MG.top) / 2}) rotate(-90)`)
   .attr("text-anchor", "middle").text("weight ℓᵢ(x₀)");
 
-// Eigenvalue bars and eigenvector
-const eigC = makeChart("eig", 220, "");
-axisLabels(eigC, "k (eigen-direction, smoothest first)", "ρₖ(λ)");
-const eigX = d3.scaleBand().domain(d3.range(1, N_EIG_SHOW + 1)).range([MG.left, W - MG.right]).padding(0.2);
-const eigY = d3.scaleLinear().domain([0, 1.05]).range([eigC.height - MG.bottom, MG.top]);
-eigC.gx.call(d3.axisBottom(eigX).tickValues([1, 2, 5, 10, 15, 20, 25, 30]));
-eigC.gy.call(d3.axisLeft(eigY).ticks(5));
-const barsG = eigC.plot.append("g");
-const eigDfText = eigC.svg.append("text").attr("class", "sub-title").attr("text-anchor", "end")
-  .attr("x", W - MG.right - 6).attr("y", MG.top + 12);
-eigC.svg.append("text").attr("class", "axis-label").attr("text-anchor", "middle")
-  .attr("x", (eigX(1) + eigX(2) + eigX.bandwidth()) / 2).attr("y", MG.top + 4).attr("dy", "-0.1em")
-  .text("1, x: never shrunk");
-eigC.svg.attr("tabindex", 0).attr("aria-describedby", "eig-readout");
-
-const evC = makeChart("evec", 190, "");
-axisLabels(evC, "xᵢ", "uₖ");
-evC.gx.call(d3.axisBottom(xS).ticks(10));
-const evY = d3.scaleLinear().range([evC.height - MG.bottom, MG.top]);
-const evZero = evC.plot.append("line").attr("stroke", "#bbb").attr("x1", MG.left).attr("x2", W - MG.right);
-const evPath = evC.plot.append("path").attr("fill", "none").attr("stroke", BLUE).attr("stroke-width", 2);
-const evPts = evC.plot.append("g");
-
 function drawFit() {
   const { x, y } = data, P = PRESETS[S.preset];
   const ext = d3.extent([...y, ...curves.spline]);
@@ -548,51 +524,6 @@ function drawX0() {
   drawX0OnFit(); drawKernel(rows); drawX0Readout(rows);
 }
 
-function drawEig() {
-  const ks = d3.range(1, Math.min(N_EIG_SHOW, S.n) + 1);
-  barsG.selectAll("rect").data(ks).join("rect")
-    .attr("x", k => eigX(k)).attr("width", eigX.bandwidth())
-    .attr("y", k => eigY(sp.rho[k - 1])).attr("height", k => eigY(0) - eigY(sp.rho[k - 1]))
-    .attr("fill", k => (k <= 2 ? "#6b8fc9" : BLUE))
-    .attr("stroke", k => (k - 1 === S.eigSel ? "#111" : "none")).attr("stroke-width", 3)
-    .style("cursor", "pointer")
-    .on("mouseenter click", (_, k) => selectEig(k - 1));
-  eigDfText.text(`df = Σρₖ = ${sp.df.toFixed(2)} (over all ${S.n})`);
-  const first = sp.rho.slice(0, 8).map(v => v.toFixed(2)).join(", ");
-  eigC.svg.attr("aria-label",
-    `Bar chart of the first ${ks.length} eigenvalues of the smoother matrix: ${first}, and so on. ` +
-    `The first two are exactly 1. Use the Left and Right arrow keys to pick an eigenvector.`);
-  drawEvec();
-}
-function signChanges(u) {
-  let c = 0;
-  for (let r = 1; r < u.length; r++) if (u[r] * u[r - 1] < 0) c++;
-  return c;
-}
-function drawEvec() {
-  const k = S.eigSel, u = pre.U[k], { x } = data;
-  const m = d3.max(u, Math.abs) * 1.1;
-  evY.domain([-m, m]);
-  evC.gy.call(d3.axisLeft(evY).ticks(4));
-  evZero.attr("y1", evY(0)).attr("y2", evY(0));
-  evPath.attr("d", d3.line().x((_, r) => xS(x[r])).y(v => evY(v))(u));
-  evPts.selectAll("circle").data(u).join("circle").attr("r", 2).attr("fill", BLUE)
-    .attr("cx", (_, r) => xS(x[r])).attr("cy", v => evY(v));
-  barsG.selectAll("rect").attr("stroke", kk => (kk - 1 === k ? "#111" : "none"));
-  const what = k === 0 ? "the constant direction" : k === 1 ? "the linear direction (centred x)"
-    : `changes sign ${signChanges(u)} times`;
-  const txt = `Eigenvector u${supSub(k + 1)}: ${what}; d = ${k < 2 ? "0" : pre.d[k].toPrecision(3)}, ` +
-    `ρ(λ) = ${sp.rho[k].toFixed(3)}, so ${(100 * sp.rho[k]).toFixed(1)}% of y's component along it is kept.`;
-  document.getElementById("eig-readout").textContent = txt;
-  evC.svg.attr("aria-label", `Line plot of eigenvector ${k + 1} against x. It ${k < 2 ? "is " + what : what}.`);
-}
-const SUB = { 0: "₀", 1: "₁", 2: "₂", 3: "₃", 4: "₄", 5: "₅", 6: "₆", 7: "₇", 8: "₈", 9: "₉" };
-const supSub = v => [...String(v)].map(ch => SUB[ch]).join("");
-function selectEig(k) {
-  S.eigSel = Math.max(0, Math.min(Math.min(N_EIG_SHOW, S.n) - 1, k));
-  drawEvec();
-}
-
 let lastStats = "";
 function drawStats() {
   const r = (o, tuning) => `<td>${tuning}</td><td>${o.df.toFixed(2)}</td><td>${fmt3(o.trainMSE)}</td>` +
@@ -608,7 +539,7 @@ function drawStats() {
 }
 
 function drawAll() {
-  drawFit(); drawX0(); drawEig(); drawStats();
+  drawFit(); drawX0(); drawStats();
 }
 
 // ---------- controls ----------
@@ -691,14 +622,6 @@ fitC.svg.on("keydown", event => {
   else return;
   event.preventDefault();
   // Keyboard users get the x0 summary announced through its live region.
-});
-eigC.svg.on("keydown", event => {
-  const moves = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 };
-  if (event.key in moves) selectEig(S.eigSel + moves[event.key]);
-  else if (event.key === "Home") selectEig(0);
-  else if (event.key === "End") selectEig(N_EIG_SHOW - 1);
-  else return;
-  event.preventDefault();
 });
 // Shift+arrow moves a slider by 5 steps.
 document.querySelectorAll("input[type=range]").forEach(sl => sl.addEventListener("keydown", event => {

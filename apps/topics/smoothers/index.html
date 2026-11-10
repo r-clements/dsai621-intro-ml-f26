@@ -48,7 +48,6 @@
     table.stats th[scope=row], table.stats thead th:first-child { text-align: left; }
     table.stats thead th { font-weight: 600; color: #333; border-bottom: 2px solid #ccc; }
     #x0-text { font-size: 0.92rem; margin: 0.4rem 0 0; font-variant-numeric: tabular-nums; }
-    #eig-readout { font-size: 0.9rem; min-height: 1.3em; margin: 0.3rem 0 0; font-variant-numeric: tabular-nums; }
     .axis text { font-size: 11px; }
     .axis-label { font-size: 12px; fill: #333; }
     .sub-title { font-size: 12px; font-weight: 600; fill: #222; }
@@ -65,17 +64,13 @@
     finds the λ that gives exactly that df. Click the top chart to choose a target point x<sub>0</sub>. The middle
     chart shows the weights ℓ<sub>i</sub>(x<sub>0</sub>) the spline puts on each y<sub>i</sub>: its equivalent kernel, a
     bump centred at x<sub>0</sub> with small negative side lobes. Look at the edges: there all the neighbours lie on one
-    side, and the spline gives the far points negative weights so that it still fits straight lines exactly. The bottom
-    chart is the eigen-picture: <b>S</b><sub>λ</sub> = Σ ρ<sub>k</sub>(λ) <b>u</b><sub>k</sub><b>u</b><sub>k</sub><sup>T</sup>.
-    The two line directions are never shrunk (ρ<sub>1</sub> = ρ<sub>2</sub> = 1), and wigglier eigenvectors
-    are shrunk harder. λ here is SciPy's, with x on [0, 1]. (ISL 7.5, ESL 5.4–5.5.)
+    side, and the spline gives the far points negative weights so that it still fits straight lines exactly.
+    λ here is SciPy's, with x on [0, 1]. (ISL 7.5, ESL 5.4–5.5.)
   </p>
   <p id="a11y-instructions" class="instructions a11y-instructions">
     Keyboard and screen reader users: use the arrow keys on the sliders (Shift+arrow moves 5 steps). The "Target point" slider chooses x<sub>0</sub>, and so do the arrow keys when the top chart
     has focus (Shift moves 10 points; Home and End go to the ends). The weights at x<sub>0</sub> are summarised in the
-    table under the middle chart. Tab to the eigenvalue chart and use Left/Right to step through the
-    eigenvectors; the selected one is drawn below the bars and described in text. The fit statistics table is
-    announced when it changes.
+    table under the middle chart. The fit statistics table is announced when it changes.
   </p>
 
   <div class="controls">
@@ -129,14 +124,6 @@
     The weights sum to 1, and Σℓ<sub>i</sub>(x<sub>i</sub> − x<sub>0</sub>) = 0 because the spline reproduces straight lines, so its bias involves only f″.
     Bias and SD are exact for this design: E f̂(x<sub>0</sub>) − f(x<sub>0</sub>) = Σℓ<sub>i</sub>f(x<sub>i</sub>) − f(x<sub>0</sub>) and
     SD = σ‖ℓ(x<sub>0</sub>)‖ (ESL 5.4.1).</p>
-
-  <h2 id="eig-heading">Eigenvalues ρ<sub>k</sub>(λ) = 1 / (1 + λd<sub>k</sub>)</h2>
-  <figure class="panel"><div id="eig"></div></figure>
-  <p id="eig-readout" aria-live="polite"></p>
-  <figure class="panel"><div id="evec"></div></figure>
-  <p class="caption">Top: how much <b>S</b><sub>λ</sub> keeps of each eigen-direction of the penalty matrix <b>K</b>, for the first 30 (ESL 5.19–5.20, Figure 5.7). df = Σρ<sub>k</sub>.
-    The eigenvectors do not depend on λ; moving the df slider only changes the bar heights. Bottom: the selected
-    eigenvector <b>u</b><sub>k</sub>, plotted against x<sub>i</sub>.</p>
 
   <script src="app.js"></script>
 </body>
