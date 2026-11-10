@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polynomial Regression and Splines — Week 4, Day 1 | DSAI 621</title>
+<meta name="description" content="Accessible class notes on a QDA example with unequal variances, polynomial regression (degrees of freedom, pointwise variance and confidence bands, why global fits fail at the edges), piecewise polynomials, knot constraints and cubic splines with the truncated power basis.">
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #4a4a4a;
+    --rule: #c9c9c9;
+    --accent: #0b4f8a;
+    --accent-bg: #eef4fa;
+    --focus: #0b4f8a;
+    --pop: #a4262c;   /* population / true  — 5.9:1 on white */
+    --est: #5b2d8e;   /* estimate / fitted  — 8.5:1 on white */
+    --err: #8a5000;   /* errors / residuals — 5.1:1 on white */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f2; --muted: #cfcfcf; --rule: #555;
+      --accent: #8ab8e0; --accent-bg: #182430; --focus: #8ab8e0;
+      --pop: #ff9f99; --est: #cbb0ff; --err: #f0b458;
+    }
+    body { background: #131313; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--ink);
+    background: #fff;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #131313; } }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 5rem; }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible, :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--accent); color: #fff;
+    padding: .75rem 1rem; z-index: 10; text-decoration: none;
+  }
+  .skip:focus { left: .5rem; top: .5rem; }
+  h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; line-height: 1.3; margin: 2.5rem 0 .5rem;
+       padding-top: .75rem; border-top: 2px solid var(--rule); }
+  h3 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  p, li { max-width: 42rem; }
+  .lede { color: var(--muted); margin-top: 0; }
+  nav.toc {
+    background: var(--accent-bg); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 1rem 1.25rem; margin: 2rem 0;
+  }
+  nav.toc h2 { font-size: 1.05rem; margin: 0 0 .5rem; border: 0; padding: 0; }
+  nav.toc ol { margin: 0; padding-left: 1.25rem; }
+  nav.toc li { margin: .3rem 0; }
+  nav.toc a { display: inline-block; min-height: 24px; padding: 2px 0; }
+  table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+  caption { text-align: left; font-weight: 600; padding-bottom: .5rem; }
+  th, td { border: 1px solid var(--rule); padding: .5rem .7rem; text-align: left; }
+  thead th { background: var(--accent-bg); }
+  figure { margin: 1.5rem 0; }
+  figcaption { font-size: .95rem; color: var(--muted); margin-top: .5rem; }
+  svg { max-width: 100%; height: auto; display: block; }
+  details {
+    border: 1px solid var(--rule); border-radius: 6px;
+    padding: .5rem .85rem; margin: .75rem 0; background: var(--accent-bg);
+  }
+  summary { cursor: pointer; font-weight: 600; min-height: 24px; padding: .25rem 0; }
+  details[open] summary { margin-bottom: .5rem; }
+  math { font-size: 1.15em; }
+  math[display="block"] { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }
+  .eq { margin: 1.25rem 0; }
+  .note {
+    border-left: 4px solid var(--accent); background: var(--accent-bg);
+    padding: .75rem 1rem; margin: 1.25rem 0; border-radius: 0 6px 6px 0;
+  }
+  .note > :first-child { margin-top: 0; }
+  .note > :last-child { margin-bottom: 0; }
+  .tag {
+    display: inline-block; font-size: .8rem; font-weight: 700;
+    letter-spacing: .02em; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 4px;
+    padding: 0 .4em; white-space: nowrap;
+  }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 2px solid var(--rule);
+           color: var(--muted); font-size: .95rem; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps > li { margin: .75rem 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<div class="wrap">
+<header>
+  <p class="lede"><strong>DSAI 621 — Intro to Machine Learning</strong> · Fall 2026 · Week 4, Day 1</p>
+  <h1>Polynomial Regression, Piecewise Polynomials and Cubic Splines</h1>
+  <p class="lede">Accessible transcription of the handwritten class notes. All equations are marked up in MathML so they can be read by a screen reader, magnified, or rendered in braille. All figures have text descriptions. Annotations written in a second pen colour in the original are reproduced here as labelled callouts, so none of their meaning depends on colour. A few short callouts marked <strong>Commentary</strong> were added in this transcription; they are not in the handwritten notes.</p>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+  <h2 id="toc-h">On this page</h2>
+  <ol>
+    <li><a href="#agenda">Agenda</a></li>
+    <li><a href="#example">Example: does the dough rise?</a></li>
+    <li><a href="#poly">1. Polynomial regression</a></li>
+    <li><a href="#model">1.1 Model</a></li>
+    <li><a href="#dist">1.2 Distribution of the fitted values</a></li>
+    <li><a href="#failure">1.3 Failure points</a></li>
+    <li><a href="#choose-d">1.4 Choosing <em>d</em></a></li>
+    <li><a href="#piecewise">2. Piecewise polynomials and regression splines</a></li>
+    <li><a href="#knots">2.1 Knots</a></li>
+    <li><a href="#cubic">2.2 Cubic splines</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+
+<h2 id="agenda">Agenda</h2>
+<ul>
+  <li>Example</li>
+  <li>Polynomial regression</li>
+  <li>Piecewise polynomials</li>
+  <li>Cubic splines</li>
+</ul>
+
+<h2 id="example">Example: does the dough rise?</h2>
+
+<ul>
+  <li><math alttext="Y equals 1"><mrow><mi>Y</mi><mo>=</mo><mn>1</mn></mrow></math>: dough rose</li>
+  <li><math alttext="Y equals 2"><mrow><mi>Y</mi><mo>=</mo><mn>2</mn></mrow></math>: dough didn’t rise</li>
+  <li><math alttext="X"><mi>X</mi></math>: proofing time (centered)</li>
+</ul>
+
+<div class="eq">
+<math display="block" alttext="P of Y equals 1 equals 0.5, which is pi hat sub 1; P of Y equals 2 equals 0.5, which is pi hat sub 2">
+  <mrow>
+    <mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mn>1</mn><mo>)</mo><mo>=</mo><mn>.5</mn><mo>:</mo><msub><mover><mi>π</mi><mo>^</mo></mover><mn>1</mn></msub>
+    <mspace width="2em"></mspace>
+    <mi>P</mi><mo>(</mo><mi>Y</mi><mo>=</mo><mn>2</mn><mo>)</mo><mo>=</mo><mn>.5</mn><mo>:</mo><msub><mover><mi>π</mi><mo>^</mo></mover><mn>2</mn></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="X given Y equals 1 is distributed normal with mean 0 and variance 1; X given Y equals 2 is distributed normal with mean 0 and variance 4">
+  <mrow>
+    <mi>X</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mn>1</mn><mo>∼</mo><mi>N</mi><mo>(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>)</mo>
+    <mspace width="2em"></mspace>
+    <mi>X</mi><mo>|</mo><mi>Y</mi><mo>=</mo><mn>2</mn><mo>∼</mo><mi>N</mi><mo>(</mo><mn>0</mn><mo>,</mo><mn>4</mn><mo>)</mo>
+  </mrow>
+</math>
+</div>
+
+<figure>
+<svg viewBox="0 0 560 240" role="img" aria-labelledby="fig1-t fig1-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig1-t">Two class densities centred at zero: a narrow one for Y equals 1 and a wide one for Y equals 2, with the interval from minus 1.36 to 1.36 marked</title>
+  <desc id="fig1-d">A horizontal x axis. A solid, tall, narrow bell curve labelled Y equals 1 and a dashed, low, wide bell curve labelled Y equals 2 are both centred at 0. The narrow curve is above the wide one between about minus 1.36 and 1.36, where the curves cross. That interval is marked by a thick bar on the axis with end ticks labelled minus 1.36 and 1.36.</desc>
+  <line x1="30" y1="200" x2="530" y2="200" stroke="currentColor" stroke-width="2"/><polygon points="530,200 522,196 522,204" fill="currentColor"/><text x="536.0" y="205.0" font-size="15" fill="currentColor" text-anchor="start">x</text><path d="M31.6,197.9 L33.3,197.8 L34.9,197.7 L36.6,197.6 L38.2,197.5 L39.9,197.4 L41.6,197.2 L43.2,197.1 L44.9,197.0 L46.6,196.8 L48.2,196.7 L49.9,196.5 L51.5,196.3 L53.2,196.2 L54.9,196.0 L56.5,195.8 L58.2,195.6 L59.8,195.4 L61.5,195.2 L63.2,195.0 L64.8,194.8 L66.5,194.6 L68.2,194.4 L69.8,194.1 L71.5,193.9 L73.1,193.6 L74.8,193.4 L76.5,193.1 L78.1,192.8 L79.8,192.5 L81.4,192.2 L83.1,191.9 L84.8,191.6 L86.4,191.3 L88.1,190.9 L89.8,190.6 L91.4,190.2 L93.1,189.9 L94.7,189.5 L96.4,189.1 L98.1,188.7 L99.7,188.3 L101.4,187.9 L103.0,187.5 L104.7,187.0 L106.4,186.6 L108.0,186.1 L109.7,185.6 L111.4,185.1 L113.0,184.6 L114.7,184.1 L116.3,183.6 L118.0,183.1 L119.7,182.5 L121.3,182.0 L123.0,181.4 L124.6,180.8 L126.3,180.2 L128.0,179.6 L129.6,179.0 L131.3,178.4 L133.0,177.8 L134.6,177.1 L136.3,176.4 L137.9,175.8 L139.6,175.1 L141.3,174.4 L142.9,173.7 L144.6,173.0 L146.2,172.3 L147.9,171.5 L149.6,170.8 L151.2,170.0 L152.9,169.3 L154.6,168.5 L156.2,167.7 L157.9,166.9 L159.5,166.1 L161.2,165.3 L162.9,164.5 L164.5,163.7 L166.2,162.9 L167.8,162.0 L169.5,161.2 L171.2,160.4 L172.8,159.5 L174.5,158.7 L176.2,157.8 L177.8,156.9 L179.5,156.1 L181.1,155.2 L182.8,154.3 L184.5,153.5 L186.1,152.6 L187.8,151.7 L189.4,150.8 L191.1,150.0 L192.8,149.1 L194.4,148.2 L196.1,147.4 L197.8,146.5 L199.4,145.6 L201.1,144.8 L202.7,143.9 L204.4,143.1 L206.1,142.2 L207.7,141.4 L209.4,140.6 L211.0,139.7 L212.7,138.9 L214.4,138.1 L216.0,137.3 L217.7,136.6 L219.4,135.8 L221.0,135.0 L222.7,134.3 L224.3,133.6 L226.0,132.8 L227.7,132.1 L229.3,131.4 L231.0,130.8 L232.6,130.1 L234.3,129.5 L236.0,128.8 L237.6,128.2 L239.3,127.7 L241.0,127.1 L242.6,126.5 L244.3,126.0 L245.9,125.5 L247.6,125.0 L249.3,124.5 L250.9,124.1 L252.6,123.7 L254.2,123.3 L255.9,122.9 L257.6,122.5 L259.2,122.2 L260.9,121.9 L262.6,121.6 L264.2,121.4 L265.9,121.1 L267.5,120.9 L269.2,120.8 L270.9,120.6 L272.5,120.5 L274.2,120.4 L275.8,120.3 L277.5,120.2 L279.2,120.2 L280.8,120.2 L282.5,120.2 L284.2,120.3 L285.8,120.4 L287.5,120.5 L289.1,120.6 L290.8,120.8 L292.5,120.9 L294.1,121.1 L295.8,121.4 L297.4,121.6 L299.1,121.9 L300.8,122.2 L302.4,122.5 L304.1,122.9 L305.8,123.3 L307.4,123.7 L309.1,124.1 L310.7,124.5 L312.4,125.0 L314.1,125.5 L315.7,126.0 L317.4,126.5 L319.0,127.1 L320.7,127.7 L322.4,128.2 L324.0,128.8 L325.7,129.5 L327.4,130.1 L329.0,130.8 L330.7,131.4 L332.3,132.1 L334.0,132.8 L335.7,133.6 L337.3,134.3 L339.0,135.0 L340.6,135.8 L342.3,136.6 L344.0,137.3 L345.6,138.1 L347.3,138.9 L349.0,139.7 L350.6,140.6 L352.3,141.4 L353.9,142.2 L355.6,143.1 L357.3,143.9 L358.9,144.8 L360.6,145.6 L362.2,146.5 L363.9,147.4 L365.6,148.2 L367.2,149.1 L368.9,150.0 L370.6,150.8 L372.2,151.7 L373.9,152.6 L375.5,153.5 L377.2,154.3 L378.9,155.2 L380.5,156.1 L382.2,156.9 L383.8,157.8 L385.5,158.7 L387.2,159.5 L388.8,160.4 L390.5,161.2 L392.2,162.0 L393.8,162.9 L395.5,163.7 L397.1,164.5 L398.8,165.3 L400.5,166.1 L402.1,166.9 L403.8,167.7 L405.4,168.5 L407.1,169.3 L408.8,170.0 L410.4,170.8 L412.1,171.5 L413.8,172.3 L415.4,173.0 L417.1,173.7 L418.7,174.4 L420.4,175.1 L422.1,175.8 L423.7,176.4 L425.4,177.1 L427.0,177.8 L428.7,178.4 L430.4,179.0 L432.0,179.6 L433.7,180.2 L435.4,180.8 L437.0,181.4 L438.7,182.0 L440.3,182.5 L442.0,183.1 L443.7,183.6 L445.3,184.1 L447.0,184.6 L448.6,185.1 L450.3,185.6 L452.0,186.1 L453.6,186.6 L455.3,187.0 L457.0,187.5 L458.6,187.9 L460.3,188.3 L461.9,188.7 L463.6,189.1 L465.3,189.5 L466.9,189.9 L468.6,190.2 L470.2,190.6 L471.9,190.9 L473.6,191.3 L475.2,191.6 L476.9,191.9 L478.6,192.2 L480.2,192.5 L481.9,192.8 L483.5,193.1 L485.2,193.4 L486.9,193.6 L488.5,193.9 L490.2,194.1 L491.8,194.4 L493.5,194.6 L495.2,194.8 L496.8,195.0 L498.5,195.2 L500.2,195.4 L501.8,195.6 L503.5,195.8 L505.1,196.0 L506.8,196.2 L508.5,196.3 L510.1,196.5 L511.8,196.7 L513.4,196.8 L515.1,197.0 L516.8,197.1 L518.4,197.2 L520.1,197.4 L521.8,197.5 L523.4,197.6 L525.1,197.7 L526.7,197.8 L528.4,197.9" fill="none" stroke="var(--est)" stroke-width="3" stroke-dasharray="9 5"/><path d="M31.6,200.0 L33.3,200.0 L34.9,200.0 L36.6,200.0 L38.2,200.0 L39.9,200.0 L41.6,200.0 L43.2,200.0 L44.9,200.0 L46.6,200.0 L48.2,200.0 L49.9,200.0 L51.5,200.0 L53.2,200.0 L54.9,200.0 L56.5,200.0 L58.2,200.0 L59.8,200.0 L61.5,200.0 L63.2,200.0 L64.8,200.0 L66.5,200.0 L68.2,200.0 L69.8,200.0 L71.5,200.0 L73.1,200.0 L74.8,200.0 L76.5,200.0 L78.1,200.0 L79.8,200.0 L81.4,200.0 L83.1,200.0 L84.8,200.0 L86.4,200.0 L88.1,200.0 L89.8,200.0 L91.4,200.0 L93.1,200.0 L94.7,200.0 L96.4,199.9 L98.1,199.9 L99.7,199.9 L101.4,199.9 L103.0,199.9 L104.7,199.9 L106.4,199.9 L108.0,199.9 L109.7,199.8 L111.4,199.8 L113.0,199.8 L114.7,199.7 L116.3,199.7 L118.0,199.7 L119.7,199.6 L121.3,199.6 L123.0,199.5 L124.6,199.5 L126.3,199.4 L128.0,199.3 L129.6,199.2 L131.3,199.1 L133.0,199.0 L134.6,198.9 L136.3,198.8 L137.9,198.6 L139.6,198.5 L141.3,198.3 L142.9,198.1 L144.6,197.9 L146.2,197.7 L147.9,197.4 L149.6,197.1 L151.2,196.8 L152.9,196.5 L154.6,196.1 L156.2,195.7 L157.9,195.3 L159.5,194.8 L161.2,194.3 L162.9,193.8 L164.5,193.2 L166.2,192.5 L167.8,191.8 L169.5,191.1 L171.2,190.3 L172.8,189.4 L174.5,188.5 L176.2,187.5 L177.8,186.5 L179.5,185.3 L181.1,184.2 L182.8,182.9 L184.5,181.5 L186.1,180.1 L187.8,178.6 L189.4,177.0 L191.1,175.3 L192.8,173.6 L194.4,171.7 L196.1,169.8 L197.8,167.7 L199.4,165.6 L201.1,163.4 L202.7,161.1 L204.4,158.7 L206.1,156.2 L207.7,153.6 L209.4,150.9 L211.0,148.1 L212.7,145.3 L214.4,142.3 L216.0,139.3 L217.7,136.2 L219.4,133.1 L221.0,129.9 L222.7,126.6 L224.3,123.3 L226.0,119.9 L227.7,116.5 L229.3,113.0 L231.0,109.5 L232.6,106.1 L234.3,102.6 L236.0,99.1 L237.6,95.6 L239.3,92.1 L241.0,88.7 L242.6,85.3 L244.3,82.0 L245.9,78.7 L247.6,75.5 L249.3,72.4 L250.9,69.3 L252.6,66.4 L254.2,63.6 L255.9,60.9 L257.6,58.3 L259.2,55.9 L260.9,53.6 L262.6,51.5 L264.2,49.5 L265.9,47.8 L267.5,46.2 L269.2,44.8 L270.9,43.5 L272.5,42.5 L274.2,41.7 L275.8,41.1 L277.5,40.7 L279.2,40.4 L280.8,40.4 L282.5,40.7 L284.2,41.1 L285.8,41.7 L287.5,42.5 L289.1,43.5 L290.8,44.8 L292.5,46.2 L294.1,47.8 L295.8,49.5 L297.4,51.5 L299.1,53.6 L300.8,55.9 L302.4,58.3 L304.1,60.9 L305.8,63.6 L307.4,66.4 L309.1,69.3 L310.7,72.4 L312.4,75.5 L314.1,78.7 L315.7,82.0 L317.4,85.3 L319.0,88.7 L320.7,92.1 L322.4,95.6 L324.0,99.1 L325.7,102.6 L327.4,106.1 L329.0,109.5 L330.7,113.0 L332.3,116.5 L334.0,119.9 L335.7,123.3 L337.3,126.6 L339.0,129.9 L340.6,133.1 L342.3,136.2 L344.0,139.3 L345.6,142.3 L347.3,145.3 L349.0,148.1 L350.6,150.9 L352.3,153.6 L353.9,156.2 L355.6,158.7 L357.3,161.1 L358.9,163.4 L360.6,165.6 L362.2,167.7 L363.9,169.8 L365.6,171.7 L367.2,173.6 L368.9,175.3 L370.6,177.0 L372.2,178.6 L373.9,180.1 L375.5,181.5 L377.2,182.9 L378.9,184.2 L380.5,185.3 L382.2,186.5 L383.8,187.5 L385.5,188.5 L387.2,189.4 L388.8,190.3 L390.5,191.1 L392.2,191.8 L393.8,192.5 L395.5,193.2 L397.1,193.8 L398.8,194.3 L400.5,194.8 L402.1,195.3 L403.8,195.7 L405.4,196.1 L407.1,196.5 L408.8,196.8 L410.4,197.1 L412.1,197.4 L413.8,197.7 L415.4,197.9 L417.1,198.1 L418.7,198.3 L420.4,198.5 L422.1,198.6 L423.7,198.8 L425.4,198.9 L427.0,199.0 L428.7,199.1 L430.4,199.2 L432.0,199.3 L433.7,199.4 L435.4,199.5 L437.0,199.5 L438.7,199.6 L440.3,199.6 L442.0,199.7 L443.7,199.7 L445.3,199.7 L447.0,199.8 L448.6,199.8 L450.3,199.8 L452.0,199.9 L453.6,199.9 L455.3,199.9 L457.0,199.9 L458.6,199.9 L460.3,199.9 L461.9,199.9 L463.6,199.9 L465.3,200.0 L466.9,200.0 L468.6,200.0 L470.2,200.0 L471.9,200.0 L473.6,200.0 L475.2,200.0 L476.9,200.0 L478.6,200.0 L480.2,200.0 L481.9,200.0 L483.5,200.0 L485.2,200.0 L486.9,200.0 L488.5,200.0 L490.2,200.0 L491.8,200.0 L493.5,200.0 L495.2,200.0 L496.8,200.0 L498.5,200.0 L500.2,200.0 L501.8,200.0 L503.5,200.0 L505.1,200.0 L506.8,200.0 L508.5,200.0 L510.1,200.0 L511.8,200.0 L513.4,200.0 L515.1,200.0 L516.8,200.0 L518.4,200.0 L520.1,200.0 L521.8,200.0 L523.4,200.0 L525.1,200.0 L526.7,200.0 L528.4,200.0" fill="none" stroke="var(--pop)" stroke-width="3"/><text x="305.3" y="38.0" font-size="15" fill="var(--pop)" text-anchor="start">Y = 1</text><line x1="303.9" y1="34.0" x2="288.3" y2="44.0" stroke="var(--pop)" stroke-width="1.4"/><polygon points="288.3,44.0 293.4,36.6 297.2,42.5" fill="var(--pop)"/><text x="385.8" y="126.0" font-size="15" fill="var(--est)" text-anchor="start">Y = 2</text><line x1="217.4" y1="200" x2="342.6" y2="200" stroke="var(--accent)" stroke-width="6" stroke-linecap="round"/><line x1="217.4" y1="191" x2="217.4" y2="209" stroke="var(--accent)" stroke-width="2.5"/><line x1="342.6" y1="191" x2="342.6" y2="209" stroke="var(--accent)" stroke-width="2.5"/><line x1="280.0" y1="194" x2="280.0" y2="206" stroke="currentColor" stroke-width="2"/><text x="217.4" y="228.0" font-size="15" fill="var(--accent)" text-anchor="middle">−1.36</text><text x="280.0" y="228.0" font-size="15" fill="currentColor" text-anchor="middle">0</text><text x="342.6" y="228.0" font-size="15" fill="var(--accent)" text-anchor="middle">1.36</text>
+</svg>
+<figcaption>Figure 1. The two class densities. We predict <math alttext="Y equals 1"><mrow><mi>Y</mi><mo>=</mo><mn>1</mn></mrow></math> on the marked interval from <math alttext="minus 1.36"><mrow><mo>−</mo><mn>1.36</mn></mrow></math> to <math alttext="1.36"><mn>1.36</mn></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 1</summary>
+  <p>A horizontal <math alttext="x"><mi>x</mi></math> axis with 0 marked in the middle. Two bell curves are both centred at 0. The curve for <math alttext="Y equals 1"><mrow><mi>Y</mi><mo>=</mo><mn>1</mn></mrow></math> (variance 1) is tall and narrow; the curve for <math alttext="Y equals 2"><mrow><mi>Y</mi><mo>=</mo><mn>2</mn></mrow></math> (variance 4) is low and wide, and lies above the narrow one in both tails. The curves cross at about <math alttext="minus 1.36"><mrow><mo>−</mo><mn>1.36</mn></mrow></math> and <math alttext="1.36"><mn>1.36</mn></math>; the interval between the crossings is marked with a bracket on the axis.</p>
+</details>
+
+<p><strong>What values of <math alttext="x"><mi>x</mi></math> will we predict <math alttext="Y equals 1"><mrow><mi>Y</mi><mo>=</mo><mn>1</mn></mrow></math>?</strong></p>
+
+<div class="eq">
+<math display="block" alttext="delta sub 1 of x equals log of, one half times 1 over the square root of 2 pi times exp of minus x squared over 2, which equals log of one half, minus one half log 2 pi, minus x squared over 2">
+  <mrow>
+    <msub><mi>δ</mi><mn>1</mn></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mi>log</mi>
+    <mrow><mo>(</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>×</mo><mfrac><mn>1</mn><msqrt><mn>2</mn><mi>π</mi></msqrt></mfrac><mi>exp</mi><mrow><mo>(</mo><mo>−</mo><mfrac><msup><mi>x</mi><mn>2</mn></msup><mn>2</mn></mfrac><mo>)</mo></mrow><mo>)</mo></mrow>
+    <mo>=</mo><mi>log</mi><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mi>log</mi><mn>2</mn><mi>π</mi><mo>−</mo><mfrac><msup><mi>x</mi><mn>2</mn></msup><mn>2</mn></mfrac>
+  </mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="delta sub 2 of x equals log of, one half times 1 over the square root of 2 pi times 2, times exp of minus x squared over 8, which equals log of one half, minus one half log 2 pi, minus log 2, minus x squared over 8">
+  <mrow>
+    <msub><mi>δ</mi><mn>2</mn></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mi>log</mi>
+    <mrow><mo>(</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>×</mo><mfrac><mn>1</mn><mrow><msqrt><mn>2</mn><mi>π</mi></msqrt><mspace width="0.2em"></mspace><mn>2</mn></mrow></mfrac><mi>exp</mi><mrow><mo>(</mo><mo>−</mo><mfrac><msup><mi>x</mi><mn>2</mn></msup><mn>8</mn></mfrac><mo>)</mo></mrow><mo>)</mo></mrow>
+    <mo>=</mo><mi>log</mi><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mi>log</mi><mn>2</mn><mi>π</mi><mo>−</mo><mi>log</mi><mn>2</mn><mo>−</mo><mfrac><msup><mi>x</mi><mn>2</mn></msup><mn>8</mn></mfrac>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> In both lines, the terms <math alttext="log of one half"><mrow><mi>log</mi><mfrac><mn>1</mn><mn>2</mn></mfrac></mrow></math> and <math alttext="minus one half log 2 pi"><mrow><mo>−</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mi>log</mi><mn>2</mn><mi>π</mi></mrow></math> are crossed out: they are the same for both classes, so they cancel when we compare <math alttext="delta sub 1"><msub><mi>δ</mi><mn>1</mn></msub></math> and <math alttext="delta sub 2"><msub><mi>δ</mi><mn>2</mn></msub></math>.</p>
+  <p>Written beside the comparison: <math alttext="pi sub k f sub k of x"><mrow><msub><mi>π</mi><mi>k</mi></msub><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math>, the quantity whose log is <math alttext="delta sub k of x"><mrow><msub><mi>δ</mi><mi>k</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math>.</p>
+</div>
+
+<div class="eq">
+<math display="block" alttext="delta sub 1 of x is greater than delta sub 2 of x; minus x squared over 2 is greater than minus log 2 minus x squared over 8; dot dot dot; implies the absolute value of x is less than 1.36">
+  <mtable columnalign="left">
+    <mtr><mtd><mrow><msub><mi>δ</mi><mn>1</mn></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>&gt;</mo><msub><mi>δ</mi><mn>2</mn></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mo>−</mo><mfrac><msup><mi>x</mi><mn>2</mn></msup><mn>2</mn></mfrac><mo>&gt;</mo><mo>−</mo><mi>log</mi><mn>2</mn><mo>−</mo><mfrac><msup><mi>x</mi><mn>2</mn></msup><mn>8</mn></mfrac></mrow></mtd></mtr>
+    <mtr><mtd><mo>⋮</mo></mtd></mtr>
+    <mtr><mtd><mrow><mo>⇒</mo><mrow><mo>|</mo><mi>x</mi><mo>|</mo></mrow><mo>&lt;</mo><mn>1.36</mn></mrow></mtd></mtr>
+  </mtable>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> The classes have the same mean, so LDA, with its shared variance, can’t separate them. QDA can, because the variances differ: the boundary is the pair of points <math alttext="x equals plus or minus 1.36"><mrow><mi>x</mi><mo>=</mo><mo>±</mo><mn>1.36</mn></mrow></math> where the curves in Figure 1 cross. The skipped step is <math alttext="three eighths x squared is less than log 2, so x squared is less than 1.85"><mrow><mfrac><mn>3</mn><mn>8</mn></mfrac><msup><mi>x</mi><mn>2</mn></msup><mo>&lt;</mo><mi>log</mi><mn>2</mn><mo>,</mo><mspace width="0.5em"></mspace><msup><mi>x</mi><mn>2</mn></msup><mo>&lt;</mo><mn>1.85</mn></mrow></math>.</p>
+</div>
+
+<h2 id="poly">1. Polynomial regression</h2>
+
+<h3 id="model">1.1 Model</h3>
+
+<div class="eq">
+<math display="block" alttext="y sub i equals beta sub 0 plus beta sub 1 x sub i plus beta sub 2 x sub i squared plus dot dot dot plus beta sub d x sub i to the d plus epsilon sub i; d.f. equals d plus 1, the number of coefficients">
+  <mrow><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>x</mi><mi>i</mi></msub><mo>+</mo><msub><mi>β</mi><mn>2</mn></msub><msubsup><mi>x</mi><mi>i</mi><mn>2</mn></msubsup><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi>β</mi><mi>d</mi></msub><msubsup><mi>x</mi><mi>i</mi><mi>d</mi></msubsup><mo>+</mo><msub><mi>ε</mi><mi>i</mi></msub>
+  <mspace width="2em"></mspace><mtext>d.f.</mtext><mo>=</mo><mi>d</mi><mo>+</mo><mn>1</mn><mspace width="0.5em"></mspace><mtext>(# of coefficients)</mtext></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> <strong>d.f.:</strong> # of knobs the fit can turn to specify the curve. Higher means more flexible.</p>
+</div>
+
+<h3 id="dist">1.2 Distribution of <math alttext="bold y hat"><mover><mi mathvariant="bold">y</mi><mo>^</mo></mover></math></h3>
+
+<div class="eq">
+<math display="block" alttext="bold y hat is distributed normal with mean bold B beta and variance sigma squared bold H; bold H equals bold B times the inverse of bold B transpose bold B, times bold B transpose">
+  <mrow>
+    <mover><mi mathvariant="bold">y</mi><mo>^</mo></mover><mo>∼</mo><mi>N</mi><mo>(</mo><mi mathvariant="bold">B</mi><mi>β</mi><mo>,</mo><msup><mi>σ</mi><mn>2</mn></msup><mi mathvariant="bold">H</mi><mo>)</mo>
+    <mspace width="2em"></mspace>
+    <mi mathvariant="bold">H</mi><mo>=</mo><mi mathvariant="bold">B</mi><msup><mrow><mo>(</mo><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mi mathvariant="bold">B</mi><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup>
+  </mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="Var of f hat of x sub i equals sigma squared h sub i i">
+  <mrow><mi>Var</mi><mo>(</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>)</mo><mo>=</mo><msup><mi>σ</mi><mn>2</mn></msup><msub><mi>h</mi><mrow><mi>i</mi><mi>i</mi></mrow></msub></mrow>
+</math>
+</div>
+
+<p>Sum this over the entire training set:</p>
+
+<div class="eq">
+<math display="block" alttext="the sum from i equals 1 to n of Var of f hat of x sub i equals sigma squared trace of bold H, which equals sigma squared times d plus 1, which equals sigma squared d.f.">
+  <mrow><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><mi>Var</mi><mo>(</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>)</mo><mo>=</mo><msup><mi>σ</mi><mn>2</mn></msup><mi>tr</mi><mo>(</mo><mi mathvariant="bold">H</mi><mo>)</mo><mo>=</mo><msup><mi>σ</mi><mn>2</mn></msup><mo>(</mo><mi>d</mi><mo>+</mo><mn>1</mn><mo>)</mo><mo>=</mo><msup><mi>σ</mi><mn>2</mn></msup><mspace width="0.2em"></mspace><mtext>d.f.</mtext></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> <strong>Every choice of basis gives the same total variance for a fixed d.f., but changes where the variance is.</strong></p>
+</div>
+
+<figure>
+<svg viewBox="0 0 540 310" role="img" aria-labelledby="fig2-t fig2-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig2-t">A polynomial fit with a 95 percent confidence band that is narrow in the middle of the data and wide at the edges</title>
+  <desc id="fig2-d">Axes y and x. Data points rise from lower left to upper right. A solid curve, the polynomial fit, runs through them. Two dotted curves, one above and one below the fit, mark a 95 percent confidence interval for f hat, labelled f hat plus or minus 2 times the estimated standard error. The band is narrow where the data are dense and flares out sharply beyond both ends of the data.</desc>
+  <clipPath id="fig2-clip"><rect x="50" y="20" width="330" height="290"/></clipPath><line x1="50" y1="270" x2="380" y2="270" stroke="currentColor" stroke-width="2"/><polygon points="380,270 372,266 372,274" fill="currentColor"/><text x="386.0" y="275.0" font-size="15" fill="currentColor" text-anchor="start">x</text><line x1="50" y1="270" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="34.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><g clip-path="url(#fig2-clip)"><g fill="currentColor"><circle cx="90.1" cy="220.5" r="2.4"/><circle cx="102.1" cy="199.4" r="2.4"/><circle cx="109.5" cy="171.1" r="2.4"/><circle cx="116.4" cy="175.3" r="2.4"/><circle cx="125.1" cy="156.6" r="2.4"/><circle cx="150.3" cy="125.3" r="2.4"/><circle cx="163.6" cy="144.8" r="2.4"/><circle cx="179.4" cy="137.3" r="2.4"/><circle cx="179.8" cy="131.2" r="2.4"/><circle cx="180.2" cy="115.3" r="2.4"/><circle cx="183.7" cy="125.5" r="2.4"/><circle cx="188.0" cy="127.7" r="2.4"/><circle cx="193.5" cy="128.2" r="2.4"/><circle cx="195.2" cy="121.7" r="2.4"/><circle cx="221.7" cy="99.3" r="2.4"/><circle cx="225.7" cy="98.4" r="2.4"/><circle cx="228.1" cy="80.9" r="2.4"/><circle cx="231.3" cy="90.9" r="2.4"/><circle cx="232.2" cy="97.8" r="2.4"/><circle cx="233.0" cy="86.6" r="2.4"/><circle cx="242.7" cy="92.4" r="2.4"/><circle cx="250.6" cy="81.5" r="2.4"/><circle cx="252.7" cy="86.6" r="2.4"/><circle cx="274.0" cy="64.7" r="2.4"/><circle cx="274.3" cy="69.2" r="2.4"/><circle cx="274.8" cy="70.3" r="2.4"/><circle cx="278.7" cy="76.1" r="2.4"/><circle cx="280.2" cy="63.1" r="2.4"/></g><path d="M30.2,334.9 L31.6,331.3 L32.9,327.6 L34.3,324.1 L35.6,320.5 L37.0,317.1 L38.3,313.6 L39.7,310.2 L41.0,306.9 L42.4,303.5 L43.7,300.3 L45.1,297.0 L46.4,293.8 L47.8,290.7 L49.1,287.6 L50.5,284.5 L51.9,281.5 L53.2,278.5 L54.6,275.5 L55.9,272.6 L57.3,269.7 L58.6,266.9 L60.0,264.1 L61.3,261.3 L62.7,258.6 L64.0,255.9 L65.4,253.2 L66.7,250.6 L68.1,248.0 L69.4,245.4 L70.8,242.9 L72.1,240.4 L73.5,238.0 L74.9,235.6 L76.2,233.2 L77.6,230.8 L78.9,228.5 L80.3,226.2 L81.6,224.0 L83.0,221.7 L84.3,219.6 L85.7,217.4 L87.0,215.3 L88.4,213.2 L89.7,211.1 L91.1,209.1 L92.4,207.0 L93.8,205.1 L95.2,203.1 L96.5,201.2 L97.9,199.3 L99.2,197.4 L100.6,195.6 L101.9,193.8 L103.3,192.0 L104.6,190.2 L106.0,188.5 L107.3,186.8 L108.7,185.1 L110.0,183.4 L111.4,181.8 L112.7,180.2 L114.1,178.6 L115.4,177.1 L116.8,175.5 L118.2,174.0 L119.5,172.5 L120.9,171.0 L122.2,169.6 L123.6,168.2 L124.9,166.8 L126.3,165.4 L127.6,164.0 L129.0,162.7 L130.3,161.4 L131.7,160.1 L133.0,158.8 L134.4,157.5 L135.7,156.3 L137.1,155.1 L138.5,153.9 L139.8,152.7 L141.2,151.5 L142.5,150.3 L143.9,149.2 L145.2,148.1 L146.6,147.0 L147.9,145.9 L149.3,144.8 L150.6,143.8 L152.0,142.7 L153.3,141.7 L154.7,140.7 L156.0,139.7 L157.4,138.7 L158.7,137.7 L160.1,136.8 L161.5,135.8 L162.8,134.9 L164.2,134.0 L165.5,133.1 L166.9,132.2 L168.2,131.3 L169.6,130.4 L170.9,129.6 L172.3,128.7 L173.6,127.9 L175.0,127.0 L176.3,126.2 L177.7,125.4 L179.0,124.6 L180.4,123.8 L181.8,123.0 L183.1,122.2 L184.5,121.4 L185.8,120.6 L187.2,119.9 L188.5,119.1 L189.9,118.4 L191.2,117.6 L192.6,116.9 L193.9,116.1 L195.3,115.4 L196.6,114.7 L198.0,113.9 L199.3,113.2 L200.7,112.5 L202.0,111.8 L203.4,111.1 L204.8,110.4 L206.1,109.7 L207.5,108.9 L208.8,108.2 L210.2,107.5 L211.5,106.8 L212.9,106.1 L214.2,105.4 L215.6,104.7 L216.9,104.0 L218.3,103.3 L219.6,102.6 L221.0,101.9 L222.3,101.2 L223.7,100.5 L225.1,99.7 L226.4,99.0 L227.8,98.3 L229.1,97.6 L230.5,96.8 L231.8,96.1 L233.2,95.4 L234.5,94.6 L235.9,93.9 L237.2,93.1 L238.6,92.4 L239.9,91.6 L241.3,90.8 L242.6,90.0 L244.0,89.2 L245.3,88.5 L246.7,87.6 L248.1,86.8 L249.4,86.0 L250.8,85.2 L252.1,84.3 L253.5,83.5 L254.8,82.6 L256.2,81.8 L257.5,80.9 L258.9,80.0 L260.2,79.1 L261.6,78.2 L262.9,77.3 L264.3,76.3 L265.6,75.4 L267.0,74.4 L268.4,73.4 L269.7,72.5 L271.1,71.5 L272.4,70.4 L273.8,69.4 L275.1,68.4 L276.5,67.3 L277.8,66.2 L279.2,65.1 L280.5,64.0 L281.9,62.9 L283.2,61.8 L284.6,60.6 L285.9,59.4 L287.3,58.2 L288.6,57.0 L290.0,55.8 L291.4,54.5 L292.7,53.3 L294.1,52.0 L295.4,50.7 L296.8,49.4 L298.1,48.0 L299.5,46.6 L300.8,45.3 L302.2,43.8 L303.5,42.4 L304.9,41.0 L306.2,39.5 L307.6,38.0 L308.9,36.5 L310.3,34.9 L311.7,33.3 L313.0,31.8 L314.4,30.1 L315.7,28.5 L317.1,26.8 L318.4,25.1 L319.8,23.4 L321.1,21.7 L322.5,19.9 L323.8,18.1 L325.2,16.3 L326.5,14.4 L327.9,12.6 L329.2,10.7 L330.6,8.7 L331.9,6.8 L333.3,4.8 L334.7,2.8 L336.0,0.7 L337.4,-1.4 L338.7,-3.5 L340.1,-5.6 L341.4,-7.8 L342.8,-10.0 L344.1,-12.2 L345.5,-14.5 L346.8,-16.8 L348.2,-19.1 L349.5,-21.5 L350.9,-23.9 L352.2,-26.3 L353.6,-28.8" fill="none" stroke="var(--pop)" stroke-width="3"/><path d="M30.2,256.6 L31.6,255.2 L32.9,253.9 L34.3,252.5 L35.6,251.2 L37.0,249.8 L38.3,248.5 L39.7,247.1 L41.0,245.8 L42.4,244.4 L43.7,243.1 L45.1,241.7 L46.4,240.4 L47.8,239.0 L49.1,237.7 L50.5,236.4 L51.9,235.0 L53.2,233.7 L54.6,232.3 L55.9,231.0 L57.3,229.7 L58.6,228.3 L60.0,227.0 L61.3,225.7 L62.7,224.3 L64.0,223.0 L65.4,221.7 L66.7,220.3 L68.1,219.0 L69.4,217.7 L70.8,216.4 L72.1,215.0 L73.5,213.7 L74.9,212.4 L76.2,211.0 L77.6,209.7 L78.9,208.3 L80.3,207.0 L81.6,205.7 L83.0,204.3 L84.3,203.0 L85.7,201.6 L87.0,200.3 L88.4,198.9 L89.7,197.5 L91.1,196.2 L92.4,194.8 L93.8,193.4 L95.2,192.0 L96.5,190.6 L97.9,189.2 L99.2,187.7 L100.6,186.3 L101.9,184.9 L103.3,183.4 L104.6,181.9 L106.0,180.4 L107.3,178.9 L108.7,177.4 L110.0,175.9 L111.4,174.4 L112.7,172.9 L114.1,171.4 L115.4,169.9 L116.8,168.4 L118.2,166.9 L119.5,165.4 L120.9,163.9 L122.2,162.4 L123.6,161.0 L124.9,159.6 L126.3,158.1 L127.6,156.7 L129.0,155.4 L130.3,154.0 L131.7,152.7 L133.0,151.4 L134.4,150.1 L135.7,148.8 L137.1,147.6 L138.5,146.3 L139.8,145.2 L141.2,144.0 L142.5,142.8 L143.9,141.7 L145.2,140.6 L146.6,139.5 L147.9,138.5 L149.3,137.4 L150.6,136.4 L152.0,135.4 L153.3,134.5 L154.7,133.5 L156.0,132.6 L157.4,131.7 L158.7,130.8 L160.1,129.9 L161.5,129.0 L162.8,128.2 L164.2,127.3 L165.5,126.5 L166.9,125.7 L168.2,124.9 L169.6,124.1 L170.9,123.4 L172.3,122.6 L173.6,121.8 L175.0,121.1 L176.3,120.4 L177.7,119.6 L179.0,118.9 L180.4,118.2 L181.8,117.5 L183.1,116.8 L184.5,116.0 L185.8,115.3 L187.2,114.6 L188.5,113.9 L189.9,113.2 L191.2,112.5 L192.6,111.8 L193.9,111.1 L195.3,110.4 L196.6,109.7 L198.0,108.9 L199.3,108.2 L200.7,107.5 L202.0,106.8 L203.4,106.0 L204.8,105.3 L206.1,104.5 L207.5,103.8 L208.8,103.1 L210.2,102.3 L211.5,101.6 L212.9,100.8 L214.2,100.1 L215.6,99.3 L216.9,98.6 L218.3,97.8 L219.6,97.1 L221.0,96.3 L222.3,95.6 L223.7,94.8 L225.1,94.1 L226.4,93.3 L227.8,92.6 L229.1,91.8 L230.5,91.1 L231.8,90.3 L233.2,89.6 L234.5,88.8 L235.9,88.1 L237.2,87.3 L238.6,86.6 L239.9,85.8 L241.3,85.1 L242.6,84.3 L244.0,83.5 L245.3,82.8 L246.7,82.0 L248.1,81.2 L249.4,80.4 L250.8,79.6 L252.1,78.8 L253.5,78.0 L254.8,77.2 L256.2,76.3 L257.5,75.4 L258.9,74.6 L260.2,73.6 L261.6,72.7 L262.9,71.7 L264.3,70.7 L265.6,69.6 L267.0,68.5 L268.4,67.3 L269.7,66.1 L271.1,64.9 L272.4,63.6 L273.8,62.3 L275.1,60.9 L276.5,59.4 L277.8,57.9 L279.2,56.4 L280.5,54.8 L281.9,53.1 L283.2,51.5 L284.6,49.7 L285.9,47.9 L287.3,46.1 L288.6,44.2 L290.0,42.2 L291.4,40.2 L292.7,38.2 L294.1,36.1 L295.4,33.9 L296.8,31.7 L298.1,29.4 L299.5,27.1 L300.8,24.8 L302.2,22.3 L303.5,19.9 L304.9,17.4 L306.2,14.8 L307.6,12.1 L308.9,9.4 L310.3,6.7 L311.7,3.9 L313.0,1.0 L314.4,-1.9 L315.7,-4.9 L317.1,-7.9 L318.4,-11.0 L319.8,-14.2 L321.1,-17.4 L322.5,-20.7 L323.8,-24.0 L325.2,-27.4 L326.5,-30.9 L327.9,-34.4 L329.2,-38.0 L330.6,-41.7 L331.9,-45.5 L333.3,-49.3 L334.7,-53.1 L336.0,-57.1 L337.4,-61.1 L338.7,-65.1 L340.1,-69.3 L341.4,-73.5 L342.8,-77.8 L344.1,-82.2 L345.5,-86.6 L346.8,-91.1 L348.2,-95.7 L349.5,-100.4 L350.9,-105.1 L352.2,-109.9 L353.6,-114.8" fill="none" stroke="var(--pop)" stroke-width="2" stroke-dasharray="3 4"/><path d="M30.2,413.2 L31.6,407.3 L32.9,401.4 L34.3,395.6 L35.6,389.9 L37.0,384.3 L38.3,378.8 L39.7,373.3 L41.0,368.0 L42.4,362.7 L43.7,357.5 L45.1,352.4 L46.4,347.3 L47.8,342.3 L49.1,337.5 L50.5,332.7 L51.9,327.9 L53.2,323.3 L54.6,318.7 L55.9,314.2 L57.3,309.8 L58.6,305.4 L60.0,301.1 L61.3,296.9 L62.7,292.8 L64.0,288.7 L65.4,284.7 L66.7,280.8 L68.1,277.0 L69.4,273.2 L70.8,269.5 L72.1,265.9 L73.5,262.3 L74.9,258.8 L76.2,255.3 L77.6,252.0 L78.9,248.7 L80.3,245.4 L81.6,242.3 L83.0,239.2 L84.3,236.1 L85.7,233.2 L87.0,230.3 L88.4,227.4 L89.7,224.7 L91.1,222.0 L92.4,219.3 L93.8,216.7 L95.2,214.2 L96.5,211.8 L97.9,209.4 L99.2,207.1 L100.6,204.9 L101.9,202.7 L103.3,200.6 L104.6,198.5 L106.0,196.5 L107.3,194.6 L108.7,192.7 L110.0,190.9 L111.4,189.2 L112.7,187.5 L114.1,185.8 L115.4,184.2 L116.8,182.6 L118.2,181.1 L119.5,179.6 L120.9,178.2 L122.2,176.8 L123.6,175.4 L124.9,174.0 L126.3,172.6 L127.6,171.3 L129.0,170.0 L130.3,168.7 L131.7,167.5 L133.0,166.2 L134.4,165.0 L135.7,163.8 L137.1,162.6 L138.5,161.4 L139.8,160.2 L141.2,159.0 L142.5,157.9 L143.9,156.7 L145.2,155.6 L146.6,154.4 L147.9,153.3 L149.3,152.2 L150.6,151.1 L152.0,150.0 L153.3,149.0 L154.7,147.9 L156.0,146.8 L157.4,145.8 L158.7,144.7 L160.1,143.7 L161.5,142.7 L162.8,141.7 L164.2,140.6 L165.5,139.6 L166.9,138.7 L168.2,137.7 L169.6,136.7 L170.9,135.8 L172.3,134.8 L173.6,133.9 L175.0,132.9 L176.3,132.0 L177.7,131.1 L179.0,130.2 L180.4,129.3 L181.8,128.5 L183.1,127.6 L184.5,126.8 L185.8,125.9 L187.2,125.1 L188.5,124.3 L189.9,123.5 L191.2,122.7 L192.6,121.9 L193.9,121.2 L195.3,120.4 L196.6,119.7 L198.0,118.9 L199.3,118.2 L200.7,117.5 L202.0,116.8 L203.4,116.1 L204.8,115.4 L206.1,114.8 L207.5,114.1 L208.8,113.4 L210.2,112.7 L211.5,112.1 L212.9,111.4 L214.2,110.8 L215.6,110.1 L216.9,109.4 L218.3,108.8 L219.6,108.1 L221.0,107.4 L222.3,106.8 L223.7,106.1 L225.1,105.4 L226.4,104.7 L227.8,104.0 L229.1,103.3 L230.5,102.6 L231.8,101.9 L233.2,101.2 L234.5,100.4 L235.9,99.7 L237.2,98.9 L238.6,98.1 L239.9,97.4 L241.3,96.6 L242.6,95.8 L244.0,95.0 L245.3,94.1 L246.7,93.3 L248.1,92.4 L249.4,91.6 L250.8,90.7 L252.1,89.9 L253.5,89.0 L254.8,88.1 L256.2,87.2 L257.5,86.3 L258.9,85.5 L260.2,84.6 L261.6,83.7 L262.9,82.8 L264.3,82.0 L265.6,81.2 L267.0,80.3 L268.4,79.5 L269.7,78.8 L271.1,78.0 L272.4,77.3 L273.8,76.5 L275.1,75.8 L276.5,75.2 L277.8,74.5 L279.2,73.9 L280.5,73.3 L281.9,72.7 L283.2,72.1 L284.6,71.5 L285.9,70.9 L287.3,70.4 L288.6,69.9 L290.0,69.4 L291.4,68.9 L292.7,68.4 L294.1,67.9 L295.4,67.5 L296.8,67.0 L298.1,66.6 L299.5,66.2 L300.8,65.7 L302.2,65.3 L303.5,64.9 L304.9,64.6 L306.2,64.2 L307.6,63.8 L308.9,63.5 L310.3,63.1 L311.7,62.8 L313.0,62.5 L314.4,62.2 L315.7,61.9 L317.1,61.6 L318.4,61.3 L319.8,61.0 L321.1,60.8 L322.5,60.5 L323.8,60.3 L325.2,60.0 L326.5,59.8 L327.9,59.6 L329.2,59.4 L330.6,59.2 L331.9,59.0 L333.3,58.8 L334.7,58.6 L336.0,58.5 L337.4,58.3 L338.7,58.2 L340.1,58.1 L341.4,57.9 L342.8,57.8 L344.1,57.7 L345.5,57.6 L346.8,57.5 L348.2,57.5 L349.5,57.4 L350.9,57.3 L352.2,57.3 L353.6,57.3" fill="none" stroke="var(--pop)" stroke-width="2" stroke-dasharray="3 4"/></g><text x="400.0" y="92.0" font-size="15" fill="var(--pop)" text-anchor="start">95% C.I. for f̂</text><text x="400.0" y="116.0" font-size="15" fill="var(--pop)" text-anchor="start">f̂ ± 2 × SÊ</text><line x1="396.0" y1="100.0" x2="321.3" y2="59.5" stroke="var(--pop)" stroke-width="1.4"/><polygon points="321.3,59.5 330.3,60.4 326.9,66.6" fill="var(--pop)"/>
+</svg>
+<figcaption>Figure 2. A polynomial fit with a 95% confidence band, <math alttext="f hat plus or minus 2 times SE hat"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>±</mo><mn>2</mn><mo>×</mo><mover><mi>SE</mi><mo>^</mo></mover></mrow></math>. The band is narrow in the middle of the data and wide at the edges.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 2</summary>
+  <p>Axes <math alttext="y"><mi>y</mi></math> and <math alttext="x"><mi>x</mi></math>. The data points rise from lower left to upper right, and a solid polynomial curve runs through them. Two dotted curves, one above and one below the fit, mark the 95% confidence interval for <math alttext="f hat"><mover><mi>f</mi><mo>^</mo></mover></math>. They hug the fit where the data are dense and spread apart at both ends: beyond the data the upper curve climbs steeply away from the fit and the lower curve falls away from it.</p>
+</details>
+
+<p>For a new point we have <math alttext="x sub 0"><msub><mi>x</mi><mn>0</mn></msub></math>, and</p>
+
+<div class="eq">
+<math display="block" alttext="b of x sub 0 equals the column vector 1, x sub 0, x sub 0 squared, dot dot dot, x sub 0 to the d">
+  <mrow><mi>b</mi><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>=</mo>
+  <mrow><mo>(</mo><mtable><mtr><mtd><mn>1</mn></mtd></mtr><mtr><mtd><msub><mi>x</mi><mn>0</mn></msub></mtd></mtr><mtr><mtd><msubsup><mi>x</mi><mn>0</mn><mn>2</mn></msubsup></mtd></mtr><mtr><mtd><mo>⋮</mo></mtd></mtr><mtr><mtd><msubsup><mi>x</mi><mn>0</mn><mi>d</mi></msubsup></mtd></mtr></mtable><mo>)</mo></mrow></mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="implies f hat of x sub 0 equals b of x sub 0 transpose beta hat">
+  <mrow><mo>⇒</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>=</mo><mi>b</mi><msup><mrow><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow><mi>T</mi></msup><mover><mi>β</mi><mo>^</mo></mover></mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="Var of f hat of x sub 0 equals Var of b of x sub 0 transpose beta hat, which equals b of x sub 0 transpose Var of beta hat b of x sub 0, which equals sigma squared b of x sub 0 transpose times the inverse of bold B transpose bold B, times b of x sub 0">
+  <mtable columnalign="left">
+    <mtr><mtd><mrow><mi>Var</mi><mo>(</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>)</mo><mo>=</mo><mi>Var</mi><mo>(</mo><mi>b</mi><msup><mrow><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow><mi>T</mi></msup><mover><mi>β</mi><mo>^</mo></mover><mo>)</mo><mo>=</mo><mi>b</mi><msup><mrow><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow><mi>T</mi></msup><mi>Var</mi><mo>(</mo><mover><mi>β</mi><mo>^</mo></mover><mo>)</mo><mspace width="0.2em"></mspace><mi>b</mi><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mspace width="6em"></mspace><mo>=</mo><msup><mi>σ</mi><mn>2</mn></msup><mi>b</mi><msup><mrow><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow><mi>T</mi></msup><msup><mrow><mo>(</mo><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mi mathvariant="bold">B</mi><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><mi>b</mi><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow></mtd></mtr>
+  </mtable>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="sigma hat squared equals RSS over n minus d minus 1, implies SE hat of f hat of x sub 0 equals the square root of Var hat of f hat of x sub 0">
+  <mrow>
+    <msup><mover><mi>σ</mi><mo>^</mo></mover><mn>2</mn></msup><mo>=</mo><mfrac><mtext>RSS</mtext><mrow><mi>n</mi><mo>−</mo><mi>d</mi><mo>−</mo><mn>1</mn></mrow></mfrac>
+    <mspace width="1em"></mspace><mo>⇒</mo><mspace width="1em"></mspace>
+    <mover><mi>SE</mi><mo>^</mo></mover><mo>(</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>)</mo><mo>=</mo><msqrt><mrow><mover><mi>Var</mi><mo>^</mo></mover><mo>(</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo><mo>)</mo></mrow></msqrt>
+  </mrow>
+</math>
+</div>
+
+<h3 id="failure">1.3 Failure points</h3>
+<ul>
+  <li>Edge variance is high</li>
+  <li>Tails are uncertain</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 560 320" role="img" aria-labelledby="fig3-t fig3-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig3-t">Original and new polynomial fits: adding three points at the right edge changes the fit across the whole range, including the far left</title>
+  <desc id="fig3-d">Axes y and x. Data points rise steeply on the left, level off through the middle and rise a little on the right. A solid curve labelled original fit follows them and bends upward past the last point. Three square points labelled added these sit beyond the right edge of the data. A dashed curve labelled new fit, refitted with those points, differs from the original not only on the right but also on the left, where it drops far more steeply below the data.</desc>
+  <clipPath id="fig3-clip"><rect x="46" y="20" width="354" height="300"/></clipPath><line x1="50" y1="290" x2="400" y2="290" stroke="currentColor" stroke-width="2"/><polygon points="400,290 392,286 392,294" fill="currentColor"/><text x="406.0" y="295.0" font-size="15" fill="currentColor" text-anchor="start">x</text><line x1="50" y1="290" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="34.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><g clip-path="url(#fig3-clip)"><g fill="currentColor"><circle cx="98.1" cy="217.4" r="2.4"/><circle cx="110.1" cy="196.7" r="2.4"/><circle cx="117.4" cy="177.5" r="2.4"/><circle cx="122.0" cy="154.8" r="2.4"/><circle cx="124.3" cy="161.4" r="2.4"/><circle cx="133.0" cy="149.0" r="2.4"/><circle cx="144.2" cy="130.8" r="2.4"/><circle cx="158.1" cy="99.3" r="2.4"/><circle cx="171.3" cy="86.3" r="2.4"/><circle cx="180.0" cy="84.5" r="2.4"/><circle cx="187.0" cy="68.2" r="2.4"/><circle cx="187.4" cy="78.6" r="2.4"/><circle cx="187.8" cy="85.1" r="2.4"/><circle cx="188.1" cy="75.6" r="2.4"/><circle cx="191.3" cy="85.2" r="2.4"/><circle cx="195.6" cy="79.2" r="2.4"/><circle cx="200.3" cy="84.3" r="2.4"/><circle cx="201.0" cy="78.4" r="2.4"/><circle cx="202.8" cy="82.5" r="2.4"/><circle cx="220.0" cy="84.7" r="2.4"/><circle cx="229.2" cy="94.6" r="2.4"/><circle cx="233.2" cy="85.2" r="2.4"/><circle cx="235.6" cy="78.1" r="2.4"/><circle cx="238.7" cy="83.9" r="2.4"/><circle cx="239.6" cy="100.0" r="2.4"/><circle cx="240.4" cy="105.8" r="2.4"/><circle cx="250.1" cy="100.6" r="2.4"/><circle cx="257.9" cy="97.5" r="2.4"/><circle cx="260.0" cy="101.1" r="2.4"/><circle cx="281.3" cy="107.1" r="2.4"/><circle cx="281.5" cy="90.7" r="2.4"/><circle cx="282.0" cy="92.5" r="2.4"/><circle cx="285.9" cy="93.8" r="2.4"/><circle cx="287.4" cy="94.2" r="2.4"/></g><path d="M50.0,293.6 L51.2,293.2 L52.3,292.7 L53.5,292.0 L54.6,291.3 L55.8,290.5 L56.9,289.6 L58.1,288.6 L59.2,287.5 L60.4,286.3 L61.6,285.1 L62.7,283.8 L63.9,282.4 L65.0,280.9 L66.2,279.4 L67.3,277.8 L68.5,276.2 L69.6,274.4 L70.8,272.7 L71.9,270.8 L73.1,268.9 L74.3,267.0 L75.4,265.0 L76.6,263.0 L77.7,260.9 L78.9,258.7 L80.0,256.6 L81.2,254.4 L82.3,252.1 L83.5,249.8 L84.7,247.5 L85.8,245.2 L87.0,242.8 L88.1,240.4 L89.3,238.0 L90.4,235.5 L91.6,233.1 L92.7,230.6 L93.9,228.1 L95.1,225.5 L96.2,223.0 L97.4,220.4 L98.5,217.9 L99.7,215.3 L100.8,212.7 L102.0,210.1 L103.1,207.5 L104.3,205.0 L105.5,202.4 L106.6,199.8 L107.8,197.2 L108.9,194.6 L110.1,192.0 L111.2,189.4 L112.4,186.9 L113.5,184.3 L114.7,181.7 L115.8,179.2 L117.0,176.7 L118.2,174.2 L119.3,171.7 L120.5,169.2 L121.6,166.7 L122.8,164.3 L123.9,161.9 L125.1,159.4 L126.2,157.1 L127.4,154.7 L128.6,152.4 L129.7,150.1 L130.9,147.8 L132.0,145.5 L133.2,143.3 L134.3,141.1 L135.5,138.9 L136.6,136.8 L137.8,134.7 L139.0,132.6 L140.1,130.5 L141.3,128.5 L142.4,126.6 L143.6,124.6 L144.7,122.7 L145.9,120.8 L147.0,119.0 L148.2,117.2 L149.3,115.4 L150.5,113.7 L151.7,112.0 L152.8,110.4 L154.0,108.8 L155.1,107.2 L156.3,105.7 L157.4,104.2 L158.6,102.8 L159.7,101.4 L160.9,100.0 L162.1,98.7 L163.2,97.4 L164.4,96.2 L165.5,95.0 L166.7,93.8 L167.8,92.7 L169.0,91.7 L170.1,90.7 L171.3,89.7 L172.5,88.7 L173.6,87.8 L174.8,87.0 L175.9,86.2 L177.1,85.4 L178.2,84.7 L179.4,84.0 L180.5,83.4 L181.7,82.8 L182.8,82.2 L184.0,81.7 L185.2,81.2 L186.3,80.8 L187.5,80.4 L188.6,80.0 L189.8,79.7 L190.9,79.4 L192.1,79.2 L193.2,79.0 L194.4,78.8 L195.6,78.7 L196.7,78.6 L197.9,78.6 L199.0,78.5 L200.2,78.6 L201.3,78.6 L202.5,78.7 L203.6,78.8 L204.8,79.0 L206.0,79.1 L207.1,79.3 L208.3,79.6 L209.4,79.8 L210.6,80.1 L211.7,80.5 L212.9,80.8 L214.0,81.2 L215.2,81.6 L216.4,82.0 L217.5,82.4 L218.7,82.9 L219.8,83.3 L221.0,83.8 L222.1,84.4 L223.3,84.9 L224.4,85.4 L225.6,86.0 L226.7,86.6 L227.9,87.1 L229.1,87.7 L230.2,88.3 L231.4,88.9 L232.5,89.5 L233.7,90.2 L234.8,90.8 L236.0,91.4 L237.1,92.0 L238.3,92.6 L239.5,93.2 L240.6,93.8 L241.8,94.4 L242.9,95.0 L244.1,95.6 L245.2,96.2 L246.4,96.8 L247.5,97.3 L248.7,97.8 L249.9,98.3 L251.0,98.8 L252.2,99.3 L253.3,99.7 L254.5,100.2 L255.6,100.5 L256.8,100.9 L257.9,101.2 L259.1,101.5 L260.2,101.8 L261.4,102.0 L262.6,102.2 L263.7,102.3 L264.9,102.4 L266.0,102.4 L267.2,102.4 L268.3,102.4 L269.5,102.3 L270.6,102.1 L271.8,101.9 L273.0,101.6 L274.1,101.3 L275.3,100.9 L276.4,100.4 L277.6,99.9 L278.7,99.2 L279.9,98.6 L281.0,97.8 L282.2,96.9 L283.4,96.0 L284.5,95.0 L285.7,93.9 L286.8,92.7 L288.0,91.4 L289.1,90.0 L290.3,88.6 L291.4,87.0 L292.6,85.3 L293.7,83.5 L294.9,81.6 L296.1,79.6 L297.2,77.5 L298.4,75.2 L299.5,72.9 L300.7,70.4 L301.8,67.8 L303.0,65.0 L304.1,62.1 L305.3,59.1 L306.5,56.0 L307.6,52.7 L308.8,49.2 L309.9,45.7 L311.1,41.9 L312.2,38.0 L313.4,34.0 L314.5,29.7 L315.7,25.4 L316.9,20.8 L318.0,16.1 L319.2,11.2 L320.3,6.1 L321.5,0.9 L322.6,-4.6 L323.8,-10.2 L324.9,-16.0 L326.1,-22.0 L327.3,-28.3 L328.4,-34.7 L329.6,-41.3 L330.7,-48.1 L331.9,-55.2 L333.0,-62.5 L334.2,-70.0 L335.3,-77.7 L336.5,-85.6 L337.6,-93.8 L338.8,-102.2 L340.0,-110.9 L341.1,-119.8 L342.3,-128.9 L343.4,-138.3 L344.6,-148.0 L345.7,-157.9 L346.9,-168.1 L348.0,-178.5 L349.2,-189.3" fill="none" stroke="var(--est)" stroke-width="3"/><path d="M50.0,482.7 L51.2,474.7 L52.3,466.7 L53.5,458.9 L54.6,451.1 L55.8,443.5 L56.9,436.0 L58.1,428.6 L59.2,421.2 L60.4,414.0 L61.6,406.9 L62.7,399.9 L63.9,393.0 L65.0,386.2 L66.2,379.6 L67.3,373.0 L68.5,366.5 L69.6,360.1 L70.8,353.8 L71.9,347.6 L73.1,341.5 L74.3,335.4 L75.4,329.5 L76.6,323.7 L77.7,318.0 L78.9,312.3 L80.0,306.8 L81.2,301.3 L82.3,295.9 L83.5,290.7 L84.7,285.5 L85.8,280.4 L87.0,275.3 L88.1,270.4 L89.3,265.5 L90.4,260.8 L91.6,256.1 L92.7,251.5 L93.9,247.0 L95.1,242.5 L96.2,238.2 L97.4,233.9 L98.5,229.7 L99.7,225.6 L100.8,221.5 L102.0,217.5 L103.1,213.6 L104.3,209.8 L105.5,206.1 L106.6,202.4 L107.8,198.8 L108.9,195.3 L110.1,191.8 L111.2,188.4 L112.4,185.1 L113.5,181.9 L114.7,178.7 L115.8,175.6 L117.0,172.5 L118.2,169.5 L119.3,166.6 L120.5,163.7 L121.6,161.0 L122.8,158.2 L123.9,155.6 L125.1,152.9 L126.2,150.4 L127.4,147.9 L128.6,145.5 L129.7,143.1 L130.9,140.8 L132.0,138.6 L133.2,136.4 L134.3,134.2 L135.5,132.2 L136.6,130.1 L137.8,128.1 L139.0,126.2 L140.1,124.4 L141.3,122.5 L142.4,120.8 L143.6,119.0 L144.7,117.4 L145.9,115.8 L147.0,114.2 L148.2,112.7 L149.3,111.2 L150.5,109.8 L151.7,108.4 L152.8,107.0 L154.0,105.7 L155.1,104.5 L156.3,103.3 L157.4,102.1 L158.6,101.0 L159.7,99.9 L160.9,98.9 L162.1,97.9 L163.2,96.9 L164.4,96.0 L165.5,95.1 L166.7,94.2 L167.8,93.4 L169.0,92.6 L170.1,91.9 L171.3,91.2 L172.5,90.5 L173.6,89.9 L174.8,89.3 L175.9,88.7 L177.1,88.1 L178.2,87.6 L179.4,87.1 L180.5,86.7 L181.7,86.2 L182.8,85.9 L184.0,85.5 L185.2,85.1 L186.3,84.8 L187.5,84.5 L188.6,84.3 L189.8,84.0 L190.9,83.8 L192.1,83.6 L193.2,83.5 L194.4,83.3 L195.6,83.2 L196.7,83.1 L197.9,83.0 L199.0,82.9 L200.2,82.9 L201.3,82.9 L202.5,82.9 L203.6,82.9 L204.8,82.9 L206.0,83.0 L207.1,83.0 L208.3,83.1 L209.4,83.2 L210.6,83.3 L211.7,83.4 L212.9,83.6 L214.0,83.7 L215.2,83.9 L216.4,84.1 L217.5,84.3 L218.7,84.5 L219.8,84.7 L221.0,84.9 L222.1,85.1 L223.3,85.3 L224.4,85.6 L225.6,85.8 L226.7,86.1 L227.9,86.4 L229.1,86.6 L230.2,86.9 L231.4,87.2 L232.5,87.5 L233.7,87.8 L234.8,88.0 L236.0,88.3 L237.1,88.6 L238.3,88.9 L239.5,89.2 L240.6,89.5 L241.8,89.8 L242.9,90.2 L244.1,90.5 L245.2,90.8 L246.4,91.1 L247.5,91.4 L248.7,91.7 L249.9,91.9 L251.0,92.2 L252.2,92.5 L253.3,92.8 L254.5,93.1 L255.6,93.3 L256.8,93.6 L257.9,93.9 L259.1,94.1 L260.2,94.4 L261.4,94.6 L262.6,94.8 L263.7,95.1 L264.9,95.3 L266.0,95.5 L267.2,95.7 L268.3,95.8 L269.5,96.0 L270.6,96.2 L271.8,96.3 L273.0,96.5 L274.1,96.6 L275.3,96.7 L276.4,96.8 L277.6,96.9 L278.7,97.0 L279.9,97.0 L281.0,97.1 L282.2,97.1 L283.4,97.1 L284.5,97.1 L285.7,97.1 L286.8,97.0 L288.0,97.0 L289.1,96.9 L290.3,96.8 L291.4,96.7 L292.6,96.5 L293.7,96.4 L294.9,96.2 L296.1,96.0 L297.2,95.8 L298.4,95.6 L299.5,95.3 L300.7,95.1 L301.8,94.8 L303.0,94.4 L304.1,94.1 L305.3,93.7 L306.5,93.3 L307.6,92.9 L308.8,92.5 L309.9,92.0 L311.1,91.5 L312.2,91.0 L313.4,90.5 L314.5,89.9 L315.7,89.3 L316.9,88.7 L318.0,88.0 L319.2,87.4 L320.3,86.7 L321.5,85.9 L322.6,85.2 L323.8,84.4 L324.9,83.6 L326.1,82.7 L327.3,81.8 L328.4,80.9 L329.6,80.0 L330.7,79.0 L331.9,78.0 L333.0,77.0 L334.2,75.9 L335.3,74.8 L336.5,73.7 L337.6,72.5 L338.8,71.3 L340.0,70.1 L341.1,68.8 L342.3,67.5 L343.4,66.2 L344.6,64.8 L345.7,63.4 L346.9,62.0 L348.0,60.5 L349.2,59.0" fill="none" stroke="var(--pop)" stroke-width="3" stroke-dasharray="10 5"/></g><g fill="var(--accent)"><rect x="335.5" y="49.0" width="7" height="7"/><rect x="349.1" y="56.5" width="7" height="7"/><rect x="359.3" y="41.5" width="7" height="7"/></g><text x="436.0" y="40.0" font-size="15" fill="var(--est)" text-anchor="start">original fit</text><line x1="432.0" y1="36.0" x2="351.8" y2="24.0" stroke="var(--est)" stroke-width="1.4"/><polygon points="351.8,24.0 360.5,21.8 359.5,28.7" fill="var(--est)"/><text x="436.0" y="56.5" font-size="15" fill="var(--accent)" text-anchor="start">added these</text><line x1="432.0" y1="52.5" x2="372.2" y2="52.5" stroke="var(--accent)" stroke-width="1.4"/><polygon points="372.2,52.5 380.4,49.0 380.4,56.0" fill="var(--accent)"/><text x="436.0" y="200.0" font-size="15" fill="var(--pop)" text-anchor="start">new fit</text><line x1="432.0" y1="194.0" x2="332.8" y2="86.6" stroke="var(--pop)" stroke-width="1.4"/><polygon points="332.8,86.6 341.0,90.3 335.9,95.1" fill="var(--pop)"/>
+</svg>
+<figcaption>Figure 3. Adding a few points beyond the right edge of the data changes the polynomial fit everywhere, including at the far left.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 3</summary>
+  <p>Axes <math alttext="y"><mi>y</mi></math> and <math alttext="x"><mi>x</mi></math>. The data points rise steeply on the left, level off through the middle, and rise gently on the right. A solid curve labelled “original fit” follows them and turns sharply upward past the last point. Three points labelled “added these” sit beyond the right edge of the data, below where the original fit is heading. A dashed curve labelled “new fit” is refitted with those points included. On the right it bends down to meet them; on the far left, away from the new points, it also changes, dropping much more steeply below the data than the original fit.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> <strong>Why?</strong> The curve uses ALL of the data. It’s fit “globally”!</p>
+</div>
+
+<h3 id="choose-d">1.4 Choosing <math alttext="d"><mi>d</mi></math></h3>
+<ul>
+  <li>Use cross-validation</li>
+  <li><math alttext="F"><mi>F</mi></math>-tests</li>
+</ul>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> The <math alttext="F"><mi>F</mi></math>-test compares degree <math alttext="d"><mi>d</mi></math> with degree <math alttext="d plus 1"><mrow><mi>d</mi><mo>+</mo><mn>1</mn></mrow></math> as nested models, as in DSAI 601.</p>
+</div>
+
+<p><strong>Works on logistic regression too!</strong></p>
+
+<div class="eq">
+<math display="block" alttext="P of y sub i equals 1 given x sub i equals 1 over 1 plus exp of minus, beta sub 0 plus beta sub 1 x sub i plus dot dot dot plus beta sub d x sub i to the d">
+  <mrow><mi>P</mi><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><mn>1</mn><mo>|</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>=</mo>
+  <mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><mi>exp</mi><mrow><mo>(</mo><mo>−</mo><mo>(</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>x</mi><mi>i</mi></msub><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi>β</mi><mi>d</mi></msub><msubsup><mi>x</mi><mi>i</mi><mi>d</mi></msubsup><mo>)</mo><mo>)</mo></mrow></mrow></mfrac></mrow>
+</math>
+</div>
+
+<h2 id="piecewise">2. Piecewise polynomials and regression splines</h2>
+
+<h3 id="knots">2.1 Knots</h3>
+
+<p>A knot <math alttext="xi"><mi>ξ</mi></math> splits the range of <math alttext="x"><mi>x</mi></math>, and a separate cubic is fitted on each side.</p>
+
+<figure>
+<svg viewBox="0 0 560 310" role="img" aria-labelledby="fig4-t fig4-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig4-t">A piecewise cubic with one knot: two separate cubic pieces that do not meet at the knot xi</title>
+  <desc id="fig4-d">Axes y and x, with a dashed vertical line at the knot xi. Data points rise, level off into a gentle hump and dip, then climb steeply and flatten at the top right. A cubic is fitted separately on each side of the knot. The left piece ends at the knot at a different height from where the right piece starts, leaving a visible gap, labelled discontinuity.</desc>
+  <clipPath id="fig4-clip"><rect x="51" y="20" width="350" height="239"/></clipPath><line x1="50" y1="260" x2="400" y2="260" stroke="currentColor" stroke-width="2"/><polygon points="400,260 392,256 392,264" fill="currentColor"/><text x="406.0" y="265.0" font-size="15" fill="currentColor" text-anchor="start">x</text><line x1="50" y1="260" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="34.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><line x1="234.8" y1="20" x2="234.8" y2="282" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 4"/><text x="234.8" y="300.0" font-size="17" fill="var(--accent)" text-anchor="middle">ξ</text><g fill="currentColor"><circle cx="81.6" cy="175.1" r="2.4"/><circle cx="82.7" cy="167.3" r="2.4"/><circle cx="94.4" cy="147.1" r="2.4"/><circle cx="95.5" cy="153.2" r="2.4"/><circle cx="97.9" cy="146.8" r="2.4"/><circle cx="99.6" cy="137.9" r="2.4"/><circle cx="107.4" cy="153.8" r="2.4"/><circle cx="111.9" cy="134.3" r="2.4"/><circle cx="116.5" cy="153.6" r="2.4"/><circle cx="116.7" cy="134.2" r="2.4"/><circle cx="121.7" cy="133.8" r="2.4"/><circle cx="125.0" cy="138.7" r="2.4"/><circle cx="135.7" cy="139.9" r="2.4"/><circle cx="142.0" cy="130.1" r="2.4"/><circle cx="151.4" cy="131.8" r="2.4"/><circle cx="155.3" cy="127.3" r="2.4"/><circle cx="162.0" cy="135.7" r="2.4"/><circle cx="162.5" cy="123.6" r="2.4"/><circle cx="173.2" cy="138.3" r="2.4"/><circle cx="175.4" cy="132.8" r="2.4"/><circle cx="178.6" cy="134.7" r="2.4"/><circle cx="182.6" cy="122.6" r="2.4"/><circle cx="188.1" cy="148.7" r="2.4"/><circle cx="190.3" cy="141.1" r="2.4"/><circle cx="191.9" cy="128.9" r="2.4"/><circle cx="204.9" cy="153.5" r="2.4"/><circle cx="209.2" cy="160.8" r="2.4"/><circle cx="210.5" cy="148.8" r="2.4"/><circle cx="211.4" cy="153.9" r="2.4"/><circle cx="215.0" cy="145.8" r="2.4"/><circle cx="215.7" cy="160.6" r="2.4"/><circle cx="228.6" cy="149.6" r="2.4"/><circle cx="240.8" cy="136.9" r="2.4"/><circle cx="241.1" cy="133.5" r="2.4"/><circle cx="241.3" cy="151.2" r="2.4"/><circle cx="255.4" cy="117.4" r="2.4"/><circle cx="267.5" cy="126.3" r="2.4"/><circle cx="269.1" cy="130.0" r="2.4"/><circle cx="281.5" cy="113.7" r="2.4"/><circle cx="283.2" cy="102.7" r="2.4"/><circle cx="287.0" cy="102.3" r="2.4"/><circle cx="306.9" cy="70.6" r="2.4"/><circle cx="311.6" cy="64.6" r="2.4"/><circle cx="314.6" cy="62.8" r="2.4"/><circle cx="319.0" cy="63.2" r="2.4"/><circle cx="327.1" cy="39.6" r="2.4"/><circle cx="327.3" cy="72.9" r="2.4"/><circle cx="331.4" cy="66.5" r="2.4"/><circle cx="333.9" cy="54.9" r="2.4"/><circle cx="334.0" cy="61.1" r="2.4"/><circle cx="338.8" cy="69.9" r="2.4"/><circle cx="339.0" cy="55.2" r="2.4"/><circle cx="343.3" cy="53.3" r="2.4"/><circle cx="345.0" cy="67.0" r="2.4"/><circle cx="347.3" cy="38.9" r="2.4"/><circle cx="347.4" cy="35.2" r="2.4"/><circle cx="370.0" cy="32.7" r="2.4"/><circle cx="370.9" cy="47.2" r="2.4"/><circle cx="372.5" cy="41.6" r="2.4"/><circle cx="375.0" cy="52.1" r="2.4"/></g><g clip-path="url(#fig4-clip)"><path d="M62.0,198.4 L63.5,195.8 L64.9,193.3 L66.4,190.8 L67.8,188.4 L69.3,186.1 L70.7,183.8 L72.2,181.6 L73.6,179.4 L75.1,177.3 L76.5,175.2 L78.0,173.2 L79.4,171.3 L80.9,169.4 L82.3,167.5 L83.8,165.7 L85.2,164.0 L86.7,162.3 L88.1,160.7 L89.6,159.1 L91.0,157.5 L92.5,156.0 L93.9,154.6 L95.4,153.2 L96.9,151.9 L98.3,150.6 L99.8,149.3 L101.2,148.1 L102.7,147.0 L104.1,145.9 L105.6,144.8 L107.0,143.8 L108.5,142.8 L109.9,141.8 L111.4,140.9 L112.8,140.1 L114.3,139.3 L115.7,138.5 L117.2,137.8 L118.6,137.1 L120.1,136.4 L121.5,135.8 L123.0,135.2 L124.4,134.7 L125.9,134.2 L127.3,133.7 L128.8,133.3 L130.2,132.9 L131.7,132.5 L133.2,132.2 L134.6,131.9 L136.1,131.6 L137.5,131.4 L139.0,131.2 L140.4,131.1 L141.9,130.9 L143.3,130.8 L144.8,130.7 L146.2,130.7 L147.7,130.7 L149.1,130.7 L150.6,130.7 L152.0,130.8 L153.5,130.9 L154.9,131.0 L156.4,131.2 L157.8,131.3 L159.3,131.5 L160.7,131.7 L162.2,132.0 L163.6,132.2 L165.1,132.5 L166.6,132.8 L168.0,133.2 L169.5,133.5 L170.9,133.9 L172.4,134.3 L173.8,134.7 L175.3,135.1 L176.7,135.5 L178.2,136.0 L179.6,136.5 L181.1,137.0 L182.5,137.5 L184.0,138.0 L185.4,138.5 L186.9,139.1 L188.3,139.7 L189.8,140.2 L191.2,140.8 L192.7,141.4 L194.1,142.0 L195.6,142.7 L197.0,143.3 L198.5,143.9 L199.9,144.6 L201.4,145.3 L202.9,145.9 L204.3,146.6 L205.8,147.3 L207.2,148.0 L208.7,148.7 L210.1,149.4 L211.6,150.1 L213.0,150.8 L214.5,151.5 L215.9,152.2 L217.4,153.0 L218.8,153.7 L220.3,154.4 L221.7,155.1 L223.2,155.9 L224.6,156.6 L226.1,157.3 L227.5,158.0 L229.0,158.8 L230.4,159.5 L231.9,160.2 L233.3,160.9 L234.8,161.6" fill="none" stroke="var(--pop)" stroke-width="3"/><path d="M234.8,143.4 L235.9,142.9 L237.1,142.4 L238.2,141.8 L239.4,141.2 L240.5,140.6 L241.6,140.0 L242.8,139.3 L243.9,138.7 L245.1,138.0 L246.2,137.2 L247.3,136.5 L248.5,135.7 L249.6,134.9 L250.8,134.1 L251.9,133.2 L253.0,132.4 L254.2,131.5 L255.3,130.6 L256.5,129.7 L257.6,128.7 L258.7,127.8 L259.9,126.8 L261.0,125.8 L262.1,124.8 L263.3,123.8 L264.4,122.8 L265.6,121.7 L266.7,120.7 L267.8,119.6 L269.0,118.5 L270.1,117.4 L271.3,116.3 L272.4,115.2 L273.5,114.1 L274.7,112.9 L275.8,111.8 L277.0,110.6 L278.1,109.5 L279.2,108.3 L280.4,107.1 L281.5,106.0 L282.7,104.8 L283.8,103.6 L284.9,102.4 L286.1,101.2 L287.2,100.0 L288.4,98.8 L289.5,97.6 L290.6,96.4 L291.8,95.2 L292.9,94.0 L294.1,92.8 L295.2,91.6 L296.3,90.4 L297.5,89.2 L298.6,88.0 L299.8,86.8 L300.9,85.6 L302.0,84.4 L303.2,83.3 L304.3,82.1 L305.5,80.9 L306.6,79.8 L307.7,78.6 L308.9,77.5 L310.0,76.3 L311.2,75.2 L312.3,74.1 L313.4,73.0 L314.6,71.9 L315.7,70.8 L316.8,69.8 L318.0,68.7 L319.1,67.7 L320.3,66.6 L321.4,65.6 L322.5,64.6 L323.7,63.7 L324.8,62.7 L326.0,61.7 L327.1,60.8 L328.2,59.9 L329.4,59.0 L330.5,58.1 L331.7,57.3 L332.8,56.5 L333.9,55.7 L335.1,54.9 L336.2,54.1 L337.4,53.4 L338.5,52.6 L339.6,51.9 L340.8,51.3 L341.9,50.6 L343.1,50.0 L344.2,49.4 L345.3,48.8 L346.5,48.3 L347.6,47.8 L348.8,47.3 L349.9,46.9 L351.0,46.4 L352.2,46.0 L353.3,45.7 L354.5,45.4 L355.6,45.1 L356.7,44.8 L357.9,44.6 L359.0,44.4 L360.2,44.2 L361.3,44.1 L362.4,44.0 L363.6,43.9 L364.7,43.9 L365.9,43.9 L367.0,44.0 L368.1,44.1 L369.3,44.2 L370.4,44.4 L371.5,44.6 L372.7,44.9 L373.8,45.2 L375.0,45.5 L376.1,45.9 L377.2,46.3 L378.4,46.8 L379.5,47.3 L380.7,47.9 L381.8,48.5 L382.9,49.1 L384.1,49.8 L385.2,50.6 L386.4,51.4 L387.5,52.2 L388.6,53.1 L389.8,54.1 L390.9,55.1 L392.1,56.1 L393.2,57.2" fill="none" stroke="var(--pop)" stroke-width="3"/></g><text x="448.0" y="182.4" font-size="16" fill="var(--pop)" text-anchor="start">discontinuity</text><line x1="444.0" y1="177.4" x2="242.8" y2="149.4" stroke="var(--pop)" stroke-width="1.5"/><polygon points="242.8,149.4 251.5,147.1 250.5,154.0" fill="var(--pop)"/>
+</svg>
+<figcaption>Figure 4. A piecewise cubic with one knot <math alttext="xi"><mi>ξ</mi></math> and no constraints: 8 d.f. The two pieces don’t meet at the knot.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 4</summary>
+  <p>Axes <math alttext="y"><mi>y</mi></math> and <math alttext="x"><mi>x</mi></math>, with a dashed vertical line at the knot <math alttext="xi"><mi>ξ</mi></math>. The data points rise, level off into a gentle hump and dip, then climb steeply and flatten at the top right. A cubic is fitted to the points left of the knot and another to the points right of it. The left piece ends at the knot lower than the right piece begins, leaving a jump, labelled “discontinuity”.</p>
+</details>
+
+<div class="eq">
+<math display="block" alttext="y sub i equals: beta sub 0 1 plus beta sub 1 1 x sub i plus beta sub 2 1 x sub i squared plus beta sub 3 1 x sub i cubed plus epsilon sub i, if x sub i is less than xi; beta sub 0 2 plus beta sub 1 2 x sub i plus beta sub 2 2 x sub i squared plus beta sub 3 2 x sub i cubed plus epsilon sub i, if x sub i is greater than or equal to xi">
+  <mrow><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo>
+  <mrow><mo>{</mo><mtable columnalign="left left">
+    <mtr><mtd><mrow><msub><mi>β</mi><mn>01</mn></msub><mo>+</mo><msub><mi>β</mi><mn>11</mn></msub><msub><mi>x</mi><mi>i</mi></msub><mo>+</mo><msub><mi>β</mi><mn>21</mn></msub><msubsup><mi>x</mi><mi>i</mi><mn>2</mn></msubsup><mo>+</mo><msub><mi>β</mi><mn>31</mn></msub><msubsup><mi>x</mi><mi>i</mi><mn>3</mn></msubsup><mo>+</mo><msub><mi>ε</mi><mi>i</mi></msub></mrow></mtd><mtd><mrow><mspace width="1.5em"></mspace><msub><mi>x</mi><mi>i</mi></msub><mo>&lt;</mo><mi>ξ</mi></mrow></mtd></mtr>
+    <mtr><mtd><mrow><msub><mi>β</mi><mn>02</mn></msub><mo>+</mo><msub><mi>β</mi><mn>12</mn></msub><msub><mi>x</mi><mi>i</mi></msub><mo>+</mo><msub><mi>β</mi><mn>22</mn></msub><msubsup><mi>x</mi><mi>i</mi><mn>2</mn></msubsup><mo>+</mo><msub><mi>β</mi><mn>32</mn></msub><msubsup><mi>x</mi><mi>i</mi><mn>3</mn></msubsup><mo>+</mo><msub><mi>ε</mi><mi>i</mi></msub></mrow></mtd><mtd><mrow><mspace width="1.5em"></mspace><msub><mi>x</mi><mi>i</mi></msub><mo>≥</mo><mi>ξ</mi></mrow></mtd></mtr>
+  </mtable></mrow></mrow>
+</math>
+</div>
+
+<p><strong>8 parameters (8 d.f.)</strong></p>
+
+<p>Adding constraints at the knot removes parameters:</p>
+
+<figure>
+<svg viewBox="0 0 560 310" role="img" aria-labelledby="fig5-t fig5-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig5-t">A continuous piecewise cubic with one knot: the pieces meet at the knot but form a corner there</title>
+  <desc id="fig5-d">The same axes, data and dashed knot line at xi. The fitted curve is now one unbroken line, but at the knot its direction changes abruptly, leaving a visible corner, labelled kink.</desc>
+  <clipPath id="fig5-clip"><rect x="51" y="20" width="350" height="239"/></clipPath><line x1="50" y1="260" x2="400" y2="260" stroke="currentColor" stroke-width="2"/><polygon points="400,260 392,256 392,264" fill="currentColor"/><text x="406.0" y="265.0" font-size="15" fill="currentColor" text-anchor="start">x</text><line x1="50" y1="260" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="34.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><line x1="234.8" y1="20" x2="234.8" y2="282" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 4"/><text x="234.8" y="300.0" font-size="17" fill="var(--accent)" text-anchor="middle">ξ</text><g fill="currentColor"><circle cx="81.6" cy="175.1" r="2.4"/><circle cx="82.7" cy="167.3" r="2.4"/><circle cx="94.4" cy="147.1" r="2.4"/><circle cx="95.5" cy="153.2" r="2.4"/><circle cx="97.9" cy="146.8" r="2.4"/><circle cx="99.6" cy="137.9" r="2.4"/><circle cx="107.4" cy="153.8" r="2.4"/><circle cx="111.9" cy="134.3" r="2.4"/><circle cx="116.5" cy="153.6" r="2.4"/><circle cx="116.7" cy="134.2" r="2.4"/><circle cx="121.7" cy="133.8" r="2.4"/><circle cx="125.0" cy="138.7" r="2.4"/><circle cx="135.7" cy="139.9" r="2.4"/><circle cx="142.0" cy="130.1" r="2.4"/><circle cx="151.4" cy="131.8" r="2.4"/><circle cx="155.3" cy="127.3" r="2.4"/><circle cx="162.0" cy="135.7" r="2.4"/><circle cx="162.5" cy="123.6" r="2.4"/><circle cx="173.2" cy="138.3" r="2.4"/><circle cx="175.4" cy="132.8" r="2.4"/><circle cx="178.6" cy="134.7" r="2.4"/><circle cx="182.6" cy="122.6" r="2.4"/><circle cx="188.1" cy="148.7" r="2.4"/><circle cx="190.3" cy="141.1" r="2.4"/><circle cx="191.9" cy="128.9" r="2.4"/><circle cx="204.9" cy="153.5" r="2.4"/><circle cx="209.2" cy="160.8" r="2.4"/><circle cx="210.5" cy="148.8" r="2.4"/><circle cx="211.4" cy="153.9" r="2.4"/><circle cx="215.0" cy="145.8" r="2.4"/><circle cx="215.7" cy="160.6" r="2.4"/><circle cx="228.6" cy="149.6" r="2.4"/><circle cx="240.8" cy="136.9" r="2.4"/><circle cx="241.1" cy="133.5" r="2.4"/><circle cx="241.3" cy="151.2" r="2.4"/><circle cx="255.4" cy="117.4" r="2.4"/><circle cx="267.5" cy="126.3" r="2.4"/><circle cx="269.1" cy="130.0" r="2.4"/><circle cx="281.5" cy="113.7" r="2.4"/><circle cx="283.2" cy="102.7" r="2.4"/><circle cx="287.0" cy="102.3" r="2.4"/><circle cx="306.9" cy="70.6" r="2.4"/><circle cx="311.6" cy="64.6" r="2.4"/><circle cx="314.6" cy="62.8" r="2.4"/><circle cx="319.0" cy="63.2" r="2.4"/><circle cx="327.1" cy="39.6" r="2.4"/><circle cx="327.3" cy="72.9" r="2.4"/><circle cx="331.4" cy="66.5" r="2.4"/><circle cx="333.9" cy="54.9" r="2.4"/><circle cx="334.0" cy="61.1" r="2.4"/><circle cx="338.8" cy="69.9" r="2.4"/><circle cx="339.0" cy="55.2" r="2.4"/><circle cx="343.3" cy="53.3" r="2.4"/><circle cx="345.0" cy="67.0" r="2.4"/><circle cx="347.3" cy="38.9" r="2.4"/><circle cx="347.4" cy="35.2" r="2.4"/><circle cx="370.0" cy="32.7" r="2.4"/><circle cx="370.9" cy="47.2" r="2.4"/><circle cx="372.5" cy="41.6" r="2.4"/><circle cx="375.0" cy="52.1" r="2.4"/></g><g clip-path="url(#fig5-clip)"><path d="M62.0,206.5 L63.5,203.3 L64.9,200.2 L66.4,197.2 L67.8,194.3 L69.3,191.4 L70.7,188.6 L72.2,186.0 L73.6,183.3 L75.1,180.8 L76.5,178.3 L78.0,176.0 L79.4,173.7 L80.9,171.4 L82.3,169.3 L83.8,167.2 L85.2,165.1 L86.7,163.2 L88.1,161.3 L89.6,159.5 L91.0,157.8 L92.5,156.1 L93.9,154.5 L95.4,152.9 L96.9,151.4 L98.3,150.0 L99.8,148.6 L101.2,147.3 L102.7,146.1 L104.1,144.9 L105.6,143.7 L107.0,142.7 L108.5,141.6 L109.9,140.7 L111.4,139.8 L112.8,138.9 L114.3,138.1 L115.7,137.3 L117.2,136.6 L118.6,135.9 L120.1,135.3 L121.5,134.7 L123.0,134.2 L124.4,133.7 L125.9,133.3 L127.3,132.9 L128.8,132.5 L130.2,132.2 L131.7,131.9 L133.2,131.7 L134.6,131.5 L136.1,131.3 L137.5,131.2 L139.0,131.1 L140.4,131.0 L141.9,131.0 L143.3,131.0 L144.8,131.0 L146.2,131.1 L147.7,131.1 L149.1,131.3 L150.6,131.4 L152.0,131.6 L153.5,131.7 L154.9,132.0 L156.4,132.2 L157.8,132.4 L159.3,132.7 L160.7,133.0 L162.2,133.3 L163.6,133.7 L165.1,134.0 L166.6,134.4 L168.0,134.7 L169.5,135.1 L170.9,135.5 L172.4,135.9 L173.8,136.4 L175.3,136.8 L176.7,137.2 L178.2,137.7 L179.6,138.1 L181.1,138.6 L182.5,139.1 L184.0,139.5 L185.4,140.0 L186.9,140.5 L188.3,141.0 L189.8,141.4 L191.2,141.9 L192.7,142.4 L194.1,142.8 L195.6,143.3 L197.0,143.8 L198.5,144.2 L199.9,144.6 L201.4,145.1 L202.9,145.5 L204.3,145.9 L205.8,146.3 L207.2,146.7 L208.7,147.1 L210.1,147.4 L211.6,147.8 L213.0,148.1 L214.5,148.4 L215.9,148.7 L217.4,149.0 L218.8,149.3 L220.3,149.5 L221.7,149.7 L223.2,149.9 L224.6,150.1 L226.1,150.2 L227.5,150.3 L229.0,150.4 L230.4,150.5 L231.9,150.5 L233.3,150.5 L234.8,150.5" fill="none" stroke="var(--err)" stroke-width="3"/><path d="M234.8,150.5 L235.9,149.6 L237.1,148.6 L238.2,147.7 L239.4,146.7 L240.5,145.8 L241.6,144.8 L242.8,143.8 L243.9,142.8 L245.1,141.8 L246.2,140.7 L247.3,139.7 L248.5,138.6 L249.6,137.6 L250.8,136.5 L251.9,135.4 L253.0,134.3 L254.2,133.2 L255.3,132.1 L256.5,130.9 L257.6,129.8 L258.7,128.7 L259.9,127.5 L261.0,126.3 L262.1,125.2 L263.3,124.0 L264.4,122.8 L265.6,121.6 L266.7,120.5 L267.8,119.3 L269.0,118.1 L270.1,116.9 L271.3,115.7 L272.4,114.4 L273.5,113.2 L274.7,112.0 L275.8,110.8 L277.0,109.6 L278.1,108.4 L279.2,107.2 L280.4,105.9 L281.5,104.7 L282.7,103.5 L283.8,102.3 L284.9,101.1 L286.1,99.9 L287.2,98.6 L288.4,97.4 L289.5,96.2 L290.6,95.0 L291.8,93.8 L292.9,92.6 L294.1,91.4 L295.2,90.3 L296.3,89.1 L297.5,87.9 L298.6,86.7 L299.8,85.6 L300.9,84.4 L302.0,83.3 L303.2,82.1 L304.3,81.0 L305.5,79.9 L306.6,78.8 L307.7,77.7 L308.9,76.6 L310.0,75.5 L311.2,74.5 L312.3,73.4 L313.4,72.4 L314.6,71.3 L315.7,70.3 L316.8,69.3 L318.0,68.3 L319.1,67.3 L320.3,66.3 L321.4,65.4 L322.5,64.5 L323.7,63.5 L324.8,62.6 L326.0,61.7 L327.1,60.9 L328.2,60.0 L329.4,59.2 L330.5,58.4 L331.7,57.6 L332.8,56.8 L333.9,56.0 L335.1,55.3 L336.2,54.5 L337.4,53.8 L338.5,53.2 L339.6,52.5 L340.8,51.9 L341.9,51.2 L343.1,50.6 L344.2,50.1 L345.3,49.5 L346.5,49.0 L347.6,48.5 L348.8,48.0 L349.9,47.6 L351.0,47.1 L352.2,46.7 L353.3,46.4 L354.5,46.0 L355.6,45.7 L356.7,45.4 L357.9,45.1 L359.0,44.9 L360.2,44.7 L361.3,44.5 L362.4,44.4 L363.6,44.3 L364.7,44.2 L365.9,44.1 L367.0,44.1 L368.1,44.1 L369.3,44.1 L370.4,44.2 L371.5,44.3 L372.7,44.4 L373.8,44.6 L375.0,44.8 L376.1,45.0 L377.2,45.3 L378.4,45.6 L379.5,45.9 L380.7,46.3 L381.8,46.7 L382.9,47.2 L384.1,47.7 L385.2,48.2 L386.4,48.8 L387.5,49.4 L388.6,50.0 L389.8,50.7 L390.9,51.4 L392.1,52.2 L393.2,53.0" fill="none" stroke="var(--err)" stroke-width="3"/></g><text x="448.0" y="189.5" font-size="16" fill="var(--err)" text-anchor="start">kink</text><line x1="444.0" y1="184.5" x2="242.8" y2="156.5" stroke="var(--err)" stroke-width="1.5"/><polygon points="242.8,156.5 251.5,154.1 250.5,161.1" fill="var(--err)"/><text x="470.0" y="50.0" font-size="17" fill="var(--err)" text-anchor="start" font-weight="700">7 d.f.</text>
+</svg>
+<figcaption>Figure 5. Requiring <math alttext="f"><mi>f</mi></math> to be continuous at the knot: 7 d.f. The pieces meet, but with a kink.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 5</summary>
+  <p>The same axes, data and dashed knot line at <math alttext="xi"><mi>ξ</mi></math>. The fitted curve is now unbroken, but its direction changes abruptly at the knot: nearly flat coming in from the left, then rising steeply. The corner is labelled “kink”.</p>
+</details>
+
+<figure>
+<svg viewBox="0 0 560 310" role="img" aria-labelledby="fig6-t fig6-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig6-t">A piecewise cubic with one knot whose value and slope are both continuous: the curve passes smoothly through the knot</title>
+  <desc id="fig6-d">The same axes, data and dashed knot line at xi. The fitted curve passes through the knot with no gap and no corner, labelled smooth.</desc>
+  <clipPath id="fig6-clip"><rect x="51" y="20" width="350" height="239"/></clipPath><line x1="50" y1="260" x2="400" y2="260" stroke="currentColor" stroke-width="2"/><polygon points="400,260 392,256 392,264" fill="currentColor"/><text x="406.0" y="265.0" font-size="15" fill="currentColor" text-anchor="start">x</text><line x1="50" y1="260" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="34.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><line x1="234.8" y1="20" x2="234.8" y2="282" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 4"/><text x="234.8" y="300.0" font-size="17" fill="var(--accent)" text-anchor="middle">ξ</text><g fill="currentColor"><circle cx="81.6" cy="175.1" r="2.4"/><circle cx="82.7" cy="167.3" r="2.4"/><circle cx="94.4" cy="147.1" r="2.4"/><circle cx="95.5" cy="153.2" r="2.4"/><circle cx="97.9" cy="146.8" r="2.4"/><circle cx="99.6" cy="137.9" r="2.4"/><circle cx="107.4" cy="153.8" r="2.4"/><circle cx="111.9" cy="134.3" r="2.4"/><circle cx="116.5" cy="153.6" r="2.4"/><circle cx="116.7" cy="134.2" r="2.4"/><circle cx="121.7" cy="133.8" r="2.4"/><circle cx="125.0" cy="138.7" r="2.4"/><circle cx="135.7" cy="139.9" r="2.4"/><circle cx="142.0" cy="130.1" r="2.4"/><circle cx="151.4" cy="131.8" r="2.4"/><circle cx="155.3" cy="127.3" r="2.4"/><circle cx="162.0" cy="135.7" r="2.4"/><circle cx="162.5" cy="123.6" r="2.4"/><circle cx="173.2" cy="138.3" r="2.4"/><circle cx="175.4" cy="132.8" r="2.4"/><circle cx="178.6" cy="134.7" r="2.4"/><circle cx="182.6" cy="122.6" r="2.4"/><circle cx="188.1" cy="148.7" r="2.4"/><circle cx="190.3" cy="141.1" r="2.4"/><circle cx="191.9" cy="128.9" r="2.4"/><circle cx="204.9" cy="153.5" r="2.4"/><circle cx="209.2" cy="160.8" r="2.4"/><circle cx="210.5" cy="148.8" r="2.4"/><circle cx="211.4" cy="153.9" r="2.4"/><circle cx="215.0" cy="145.8" r="2.4"/><circle cx="215.7" cy="160.6" r="2.4"/><circle cx="228.6" cy="149.6" r="2.4"/><circle cx="240.8" cy="136.9" r="2.4"/><circle cx="241.1" cy="133.5" r="2.4"/><circle cx="241.3" cy="151.2" r="2.4"/><circle cx="255.4" cy="117.4" r="2.4"/><circle cx="267.5" cy="126.3" r="2.4"/><circle cx="269.1" cy="130.0" r="2.4"/><circle cx="281.5" cy="113.7" r="2.4"/><circle cx="283.2" cy="102.7" r="2.4"/><circle cx="287.0" cy="102.3" r="2.4"/><circle cx="306.9" cy="70.6" r="2.4"/><circle cx="311.6" cy="64.6" r="2.4"/><circle cx="314.6" cy="62.8" r="2.4"/><circle cx="319.0" cy="63.2" r="2.4"/><circle cx="327.1" cy="39.6" r="2.4"/><circle cx="327.3" cy="72.9" r="2.4"/><circle cx="331.4" cy="66.5" r="2.4"/><circle cx="333.9" cy="54.9" r="2.4"/><circle cx="334.0" cy="61.1" r="2.4"/><circle cx="338.8" cy="69.9" r="2.4"/><circle cx="339.0" cy="55.2" r="2.4"/><circle cx="343.3" cy="53.3" r="2.4"/><circle cx="345.0" cy="67.0" r="2.4"/><circle cx="347.3" cy="38.9" r="2.4"/><circle cx="347.4" cy="35.2" r="2.4"/><circle cx="370.0" cy="32.7" r="2.4"/><circle cx="370.9" cy="47.2" r="2.4"/><circle cx="372.5" cy="41.6" r="2.4"/><circle cx="375.0" cy="52.1" r="2.4"/></g><g clip-path="url(#fig6-clip)"><path d="M62.0,213.5 L63.5,209.8 L64.9,206.3 L66.4,202.8 L67.8,199.4 L69.3,196.1 L70.7,192.9 L72.2,189.9 L73.6,186.9 L75.1,184.0 L76.5,181.2 L78.0,178.5 L79.4,175.9 L80.9,173.3 L82.3,170.9 L83.8,168.5 L85.2,166.3 L86.7,164.1 L88.1,162.0 L89.6,160.0 L91.0,158.1 L92.5,156.2 L93.9,154.4 L95.4,152.7 L96.9,151.1 L98.3,149.5 L99.8,148.1 L101.2,146.6 L102.7,145.3 L104.1,144.0 L105.6,142.8 L107.0,141.7 L108.5,140.6 L109.9,139.6 L111.4,138.7 L112.8,137.8 L114.3,137.0 L115.7,136.2 L117.2,135.5 L118.6,134.8 L120.1,134.2 L121.5,133.7 L123.0,133.2 L124.4,132.7 L125.9,132.3 L127.3,132.0 L128.8,131.6 L130.2,131.4 L131.7,131.2 L133.2,131.0 L134.6,130.9 L136.1,130.8 L137.5,130.7 L139.0,130.7 L140.4,130.7 L141.9,130.7 L143.3,130.8 L144.8,130.9 L146.2,131.1 L147.7,131.2 L149.1,131.4 L150.6,131.7 L152.0,131.9 L153.5,132.2 L154.9,132.5 L156.4,132.8 L157.8,133.1 L159.3,133.5 L160.7,133.9 L162.2,134.3 L163.6,134.7 L165.1,135.1 L166.6,135.5 L168.0,135.9 L169.5,136.4 L170.9,136.8 L172.4,137.3 L173.8,137.8 L175.3,138.2 L176.7,138.7 L178.2,139.2 L179.6,139.7 L181.1,140.1 L182.5,140.6 L184.0,141.1 L185.4,141.5 L186.9,142.0 L188.3,142.4 L189.8,142.9 L191.2,143.3 L192.7,143.7 L194.1,144.1 L195.6,144.5 L197.0,144.9 L198.5,145.2 L199.9,145.5 L201.4,145.9 L202.9,146.1 L204.3,146.4 L205.8,146.7 L207.2,146.9 L208.7,147.1 L210.1,147.2 L211.6,147.4 L213.0,147.5 L214.5,147.6 L215.9,147.6 L217.4,147.6 L218.8,147.6 L220.3,147.5 L221.7,147.4 L223.2,147.3 L224.6,147.1 L226.1,146.9 L227.5,146.6 L229.0,146.3 L230.4,145.9 L231.9,145.5 L233.3,145.0 L234.8,144.5" fill="none" stroke="var(--est)" stroke-width="3"/><path d="M234.8,144.5 L235.9,144.1 L237.1,143.6 L238.2,143.1 L239.4,142.6 L240.5,142.0 L241.6,141.4 L242.8,140.8 L243.9,140.2 L245.1,139.5 L246.2,138.8 L247.3,138.1 L248.5,137.3 L249.6,136.5 L250.8,135.7 L251.9,134.9 L253.0,134.1 L254.2,133.2 L255.3,132.3 L256.5,131.4 L257.6,130.4 L258.7,129.5 L259.9,128.5 L261.0,127.5 L262.1,126.5 L263.3,125.5 L264.4,124.5 L265.6,123.4 L266.7,122.3 L267.8,121.2 L269.0,120.1 L270.1,119.0 L271.3,117.9 L272.4,116.7 L273.5,115.6 L274.7,114.4 L275.8,113.3 L277.0,112.1 L278.1,110.9 L279.2,109.7 L280.4,108.5 L281.5,107.3 L282.7,106.1 L283.8,104.8 L284.9,103.6 L286.1,102.4 L287.2,101.1 L288.4,99.9 L289.5,98.6 L290.6,97.4 L291.8,96.2 L292.9,94.9 L294.1,93.7 L295.2,92.4 L296.3,91.2 L297.5,89.9 L298.6,88.7 L299.8,87.5 L300.9,86.2 L302.0,85.0 L303.2,83.8 L304.3,82.6 L305.5,81.4 L306.6,80.2 L307.7,79.0 L308.9,77.8 L310.0,76.6 L311.2,75.5 L312.3,74.3 L313.4,73.2 L314.6,72.0 L315.7,70.9 L316.8,69.8 L318.0,68.7 L319.1,67.7 L320.3,66.6 L321.4,65.5 L322.5,64.5 L323.7,63.5 L324.8,62.5 L326.0,61.5 L327.1,60.6 L328.2,59.6 L329.4,58.7 L330.5,57.8 L331.7,57.0 L332.8,56.1 L333.9,55.3 L335.1,54.5 L336.2,53.7 L337.4,52.9 L338.5,52.2 L339.6,51.5 L340.8,50.8 L341.9,50.2 L343.1,49.5 L344.2,48.9 L345.3,48.4 L346.5,47.8 L347.6,47.3 L348.8,46.9 L349.9,46.4 L351.0,46.0 L352.2,45.6 L353.3,45.3 L354.5,45.0 L355.6,44.7 L356.7,44.5 L357.9,44.3 L359.0,44.1 L360.2,44.0 L361.3,43.9 L362.4,43.9 L363.6,43.9 L364.7,43.9 L365.9,44.0 L367.0,44.1 L368.1,44.2 L369.3,44.4 L370.4,44.7 L371.5,45.0 L372.7,45.3 L373.8,45.7 L375.0,46.1 L376.1,46.6 L377.2,47.1 L378.4,47.6 L379.5,48.3 L380.7,48.9 L381.8,49.6 L382.9,50.4 L384.1,51.2 L385.2,52.1 L386.4,53.0 L387.5,54.0 L388.6,55.0 L389.8,56.1 L390.9,57.2 L392.1,58.4 L393.2,59.7" fill="none" stroke="var(--est)" stroke-width="3"/></g><text x="448.0" y="183.5" font-size="16" fill="var(--est)" text-anchor="start">smooth</text><line x1="444.0" y1="178.5" x2="242.8" y2="150.5" stroke="var(--est)" stroke-width="1.5"/><polygon points="242.8,150.5 251.5,148.2 250.5,155.1" fill="var(--est)"/><text x="470.0" y="50.0" font-size="17" fill="var(--est)" text-anchor="start" font-weight="700">6 d.f.</text>
+</svg>
+<figcaption>Figure 6. Also requiring the slope to be continuous at the knot: 6 d.f. The curve passes smoothly through the knot.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 6</summary>
+  <p>The same axes, data and dashed knot line at <math alttext="xi"><mi>ξ</mi></math>. The fitted curve passes through the knot with no jump and no corner, labelled “smooth”.</p>
+</details>
+
+<table>
+  <caption>Constraints at one knot, for a piecewise cubic</caption>
+  <thead><tr><th scope="col">Knot constraints</th><th scope="col">d.f.</th><th scope="col">Name</th></tr></thead>
+  <tbody>
+    <tr><td>none</td><td>8</td><td>piecewise cubic</td></tr>
+    <tr><td><math alttext="f"><mi>f</mi></math> continuous</td><td>7</td><td>continuous piecewise</td></tr>
+    <tr><td><math alttext="f, f prime"><mrow><mi>f</mi><mo>,</mo><msup><mi>f</mi><mo>′</mo></msup></mrow></math> continuous</td><td>6</td><td>— (no name given)</td></tr>
+    <tr><td><math alttext="f, f prime, f double prime"><mrow><mi>f</mi><mo>,</mo><msup><mi>f</mi><mo>′</mo></msup><mo>,</mo><msup><mi>f</mi><mo>″</mo></msup></mrow></math> continuous</td><td>5</td><td>cubic spline</td></tr>
+    <tr><td><math alttext="f, f prime, f double prime, f triple prime"><mrow><mi>f</mi><mo>,</mo><msup><mi>f</mi><mo>′</mo></msup><mo>,</mo><msup><mi>f</mi><mo>″</mo></msup><mo>,</mo><msup><mi>f</mi><mo>‴</mo></msup></mrow></math> continuous</td><td>4</td><td>no knot</td></tr>
+  </tbody>
+</table>
+
+<p>In general, a degree-<math alttext="d"><mi>d</mi></math> spline with knots <math alttext="xi sub 1 through xi sub K"><mrow><msub><mi>ξ</mi><mn>1</mn></msub><mo>,</mo><mo>…</mo><mo>,</mo><msub><mi>ξ</mi><mi>K</mi></msub></mrow></math> has</p>
+
+<div class="eq">
+<math display="block" alttext="d.f. equals K plus 1 times d plus 1, minus K d, which equals K plus d plus 1">
+  <mrow><mtext>d.f.</mtext><mo>=</mo><mo>(</mo><mi>K</mi><mo>+</mo><mn>1</mn><mo>)</mo><mo>(</mo><mi>d</mi><mo>+</mo><mn>1</mn><mo>)</mo><mo>−</mo><mi>K</mi><mi>d</mi><mo>=</mo><mi>K</mi><mo>+</mo><mi>d</mi><mo>+</mo><mn>1</mn></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Arrows label the parts of this formula:</p>
+  <ul>
+    <li><math alttext="K plus 1 times d plus 1"><mrow><mo>(</mo><mi>K</mi><mo>+</mo><mn>1</mn><mo>)</mo><mo>(</mo><mi>d</mi><mo>+</mo><mn>1</mn><mo>)</mo></mrow></math>: # of coefficients, i.e. the total d.f. without constraints, from <math alttext="K plus 1"><mrow><mi>K</mi><mo>+</mo><mn>1</mn></mrow></math> polynomials (Figure 7).</li>
+    <li><math alttext="K d"><mrow><mi>K</mi><mi>d</mi></mrow></math>: <math alttext="d"><mi>d</mi></math> constraints per knot.</li>
+    <li>Cubic: <math alttext="d equals 3"><mrow><mi>d</mi><mo>=</mo><mn>3</mn></mrow></math>, d.f. <math alttext="equals K plus 4"><mrow><mo>=</mo><mi>K</mi><mo>+</mo><mn>4</mn></mrow></math>.</li>
+  </ul>
+</div>
+
+<figure>
+<svg viewBox="0 0 520 250" role="img" aria-labelledby="fig7-t fig7-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig7-t">Three knots divide the x axis into four regions, each with its own polynomial</title>
+  <desc id="fig7-d">Axes y and x. Three dashed vertical lines, the knots, cut the plane into four shaded regions. Arrows from a label reading K plus 1 polynomials point up at each of the four regions.</desc>
+  <rect x="44" y="35" width="112" height="145" rx="14" fill="var(--accent)" fill-opacity="0.16"/><rect x="164" y="35" width="87" height="145" rx="14" fill="var(--accent)" fill-opacity="0.3"/><rect x="259" y="35" width="87" height="145" rx="14" fill="var(--accent)" fill-opacity="0.16"/><rect x="354" y="35" width="112" height="145" rx="14" fill="var(--accent)" fill-opacity="0.3"/><line x1="120" y1="150" x2="470" y2="150" stroke="currentColor" stroke-width="2"/><polygon points="470,150 462,146 462,154" fill="currentColor"/><text x="476.0" y="155.0" font-size="15" fill="currentColor" text-anchor="start">x</text><line x1="120" y1="150" x2="120" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="120,20 116,28 124,28" fill="currentColor"/><text x="104.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><line x1="160" y1="30" x2="160" y2="180" stroke="var(--accent)" stroke-width="2.2" stroke-dasharray="4 4"/><line x1="255" y1="30" x2="255" y2="180" stroke="var(--accent)" stroke-width="2.2" stroke-dasharray="4 4"/><line x1="350" y1="30" x2="350" y2="180" stroke="var(--accent)" stroke-width="2.2" stroke-dasharray="4 4"/><text x="270.0" y="236.0" font-size="17" fill="currentColor" text-anchor="middle">K + 1 polynomials</text><line x1="232.8" y1="216.0" x2="100.0" y2="182.0" stroke="currentColor" stroke-width="1.4"/><polygon points="100.0,182.0 108.9,180.7 107.2,187.5" fill="currentColor"/><line x1="258.6" y1="216.0" x2="207.5" y2="182.0" stroke="currentColor" stroke-width="1.4"/><polygon points="207.5,182.0 216.3,183.7 212.5,189.5" fill="currentColor"/><line x1="281.4" y1="216.0" x2="302.5" y2="182.0" stroke="currentColor" stroke-width="1.4"/><polygon points="302.5,182.0 301.1,190.9 295.2,187.2" fill="currentColor"/><line x1="307.2" y1="216.0" x2="410.0" y2="182.0" stroke="currentColor" stroke-width="1.4"/><polygon points="410.0,182.0 403.2,187.9 401.0,181.3" fill="currentColor"/>
+</svg>
+<figcaption>Figure 7. <math alttext="K"><mi>K</mi></math> knots split the line into <math alttext="K plus 1"><mrow><mi>K</mi><mo>+</mo><mn>1</mn></mrow></math> regions, each with its own polynomial (here <math alttext="K equals 3"><mrow><mi>K</mi><mo>=</mo><mn>3</mn></mrow></math>).</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 7</summary>
+  <p>Axes <math alttext="y"><mi>y</mi></math> and <math alttext="x"><mi>x</mi></math>. Three dashed vertical lines, the knots, cut the plane into four regions, each shaded. Arrows from the label “<math alttext="K plus 1"><mrow><mi>K</mi><mo>+</mo><mn>1</mn></mrow></math> polynomials” point at each of the four regions.</p>
+</details>
+
+<h3 id="cubic">2.2 Cubic splines (d.f. <math alttext="K plus 4"><mrow><mi>K</mi><mo>+</mo><mn>4</mn></mrow></math>)</h3>
+
+<div class="eq">
+<math display="block" alttext="y sub i equals beta sub 0 plus beta sub 1 b sub 1 of x sub i plus beta sub 2 b sub 2 of x sub i plus beta sub 3 b sub 3 of x sub i plus dot dot dot plus beta sub K plus 3 b sub K plus 3 of x sub i plus epsilon sub i">
+  <mrow><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>b</mi><mn>1</mn></msub><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>+</mo><msub><mi>β</mi><mn>2</mn></msub><msub><mi>b</mi><mn>2</mn></msub><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>+</mo><msub><mi>β</mi><mn>3</mn></msub><msub><mi>b</mi><mn>3</mn></msub><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi>β</mi><mrow><mi>K</mi><mo>+</mo><mn>3</mn></mrow></msub><msub><mi>b</mi><mrow><mi>K</mi><mo>+</mo><mn>3</mn></mrow></msub><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>+</mo><msub><mi>ε</mi><mi>i</mi></msub></mrow>
+</math>
+</div>
+
+<p><strong>Example.</strong> 3 knots gives us <math alttext="beta sub 4, beta sub 5, beta sub 6"><mrow><msub><mi>β</mi><mn>4</mn></msub><mo>,</mo><msub><mi>β</mi><mn>5</mn></msub><mo>,</mo><msub><mi>β</mi><mn>6</mn></msub></mrow></math>. What are <math alttext="b sub 4, b sub 5, b sub 6"><mrow><msub><mi>b</mi><mn>4</mn></msub><mo>,</mo><msub><mi>b</mi><mn>5</mn></msub><mo>,</mo><msub><mi>b</mi><mn>6</mn></msub></mrow></math>?</p>
+
+<p><strong>Use the truncated power basis!</strong></p>
+
+<div class="eq">
+<math display="block" alttext="h of x and xi equals x minus xi, positive part, cubed, which equals x minus xi cubed if x is greater than xi, and 0 otherwise">
+  <mrow><mi>h</mi><mo>(</mo><mi>x</mi><mo>,</mo><mi>ξ</mi><mo>)</mo><mo>=</mo><msubsup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><mi>ξ</mi><mo>)</mo></mrow><mo>+</mo><mn>3</mn></msubsup><mo>=</mo>
+  <mrow><mo>{</mo><mtable columnalign="left left">
+    <mtr><mtd><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><mi>ξ</mi><mo>)</mo></mrow><mn>3</mn></msup></mtd><mtd><mrow><mspace width="1.5em"></mspace><mi>x</mi><mo>&gt;</mo><mi>ξ</mi></mrow></mtd></mtr>
+    <mtr><mtd><mn>0</mn></mtd><mtd><mrow><mspace width="1.5em"></mspace><mtext>else</mtext></mrow></mtd></mtr>
+  </mtable></mrow></mrow>
+</math>
+</div>
+
+<figure>
+<svg viewBox="0 0 540 200" role="img" aria-labelledby="fig8-t fig8-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig8-t">The truncated power basis function h of x and 3: zero to the left of the knot at 3, and x minus 3 cubed to the right</title>
+  <desc id="fig8-d">Axes y and x, with knots at x equals 3 (dashed line) and x equals 6 (solid line). The x axis is highlighted in two parts. The part left of 3 is labelled h of x comma 3 equals 0. The part right of 3 is labelled h of x comma 3 equals x minus 3, cubed.</desc>
+  <rect x="20" y="111" width="196.0" height="18" rx="9" fill="var(--est)" fill-opacity="0.28"/><rect x="216.0" y="111" width="294.0" height="18" rx="9" fill="var(--pop)" fill-opacity="0.28" stroke="var(--pop)" stroke-dasharray="5 3"/><line x1="60" y1="120" x2="500" y2="120" stroke="currentColor" stroke-width="2"/><polygon points="500,120 492,116 492,124" fill="currentColor"/><text x="506.0" y="125.0" font-size="15" fill="currentColor" text-anchor="start">x</text><line x1="60" y1="120" x2="60" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="60,15 56,23 64,23" fill="currentColor"/><text x="44.0" y="21.0" font-size="15" fill="currentColor" text-anchor="start">y</text><line x1="216.0" y1="25" x2="216.0" y2="132" stroke="var(--accent)" stroke-width="2.2" stroke-dasharray="4 4"/><line x1="372.0" y1="20" x2="372.0" y2="132" stroke="var(--accent)" stroke-width="2.2"/><text x="216.0" y="152.0" font-size="16" fill="var(--accent)" text-anchor="middle">3</text><text x="372.0" y="152.0" font-size="16" fill="var(--accent)" text-anchor="middle">6</text><text x="123.0" y="182.0" font-size="16" fill="var(--est)" text-anchor="middle">h(x, 3) = 0</text><text x="378.0" y="182.0" font-size="16" fill="var(--pop)" text-anchor="middle">h(x, 3) = (x − 3)³</text>
+</svg>
+<figcaption>Figure 8. Knots at 3 and 6. The basis function <math alttext="h of x and 3"><mrow><mi>h</mi><mo>(</mo><mi>x</mi><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math> is 0 left of 3 and <math alttext="x minus 3 cubed"><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><mn>3</mn><mo>)</mo></mrow><mn>3</mn></msup></math> right of 3.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 8</summary>
+  <p>Axes <math alttext="y"><mi>y</mi></math> and <math alttext="x"><mi>x</mi></math>, with knots marked at <math alttext="x equals 3"><mrow><mi>x</mi><mo>=</mo><mn>3</mn></mrow></math> (dashed line) and <math alttext="x equals 6"><mrow><mi>x</mi><mo>=</mo><mn>6</mn></mrow></math> (solid line). The <math alttext="x"><mi>x</mi></math> axis is highlighted in two parts. The part left of 3 is labelled <math alttext="h of x and 3 equals 0"><mrow><mi>h</mi><mo>(</mo><mi>x</mi><mo>,</mo><mn>3</mn><mo>)</mo><mo>=</mo><mn>0</mn></mrow></math>. The part right of 3 is labelled <math alttext="h of x and 3 equals x minus 3 cubed"><mrow><mi>h</mi><mo>(</mo><mi>x</mi><mo>,</mo><mn>3</mn><mo>)</mo><mo>=</mo><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><mn>3</mn><mo>)</mo></mrow><mn>3</mn></msup></mrow></math>.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> In the original, the highlight right of 3 is drawn in two shades, one from 3 to about 6 and one from about 6 onward. The labels only distinguish left of 3 from right of 3.</p>
+</div>
+
+<p>And for the knot at 6:</p>
+
+<div class="eq">
+<math display="block" alttext="h of x and 6 equals x minus 6 cubed if x is greater than or equal to 6, and 0 if x is less than 6">
+  <mrow><mi>h</mi><mo>(</mo><mi>x</mi><mo>,</mo><mn>6</mn><mo>)</mo><mo>=</mo>
+  <mrow><mo>{</mo><mtable columnalign="left left">
+    <mtr><mtd><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><mn>6</mn><mo>)</mo></mrow><mn>3</mn></msup></mtd><mtd><mrow><mspace width="1.5em"></mspace><mi>x</mi><mo>≥</mo><mn>6</mn></mrow></mtd></mtr>
+    <mtr><mtd><mn>0</mn></mtd><mtd><mrow><mspace width="1.5em"></mspace><mi>x</mi><mo>&lt;</mo><mn>6</mn></mrow></mtd></mtr>
+  </mtable></mrow></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> So <math alttext="b sub 1, b sub 2, b sub 3"><mrow><msub><mi>b</mi><mn>1</mn></msub><mo>,</mo><msub><mi>b</mi><mn>2</mn></msub><mo>,</mo><msub><mi>b</mi><mn>3</mn></msub></mrow></math> are <math alttext="x, x squared, x cubed"><mrow><mi>x</mi><mo>,</mo><msup><mi>x</mi><mn>2</mn></msup><mo>,</mo><msup><mi>x</mi><mn>3</mn></msup></mrow></math>, and each knot adds one more: <math alttext="b sub 3 plus k of x equals h of x and xi sub k"><mrow><msub><mi>b</mi><mrow><mn>3</mn><mo>+</mo><mi>k</mi></mrow></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mi>h</mi><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ξ</mi><mi>k</mi></msub><mo>)</mo></mrow></math> (ISL 7.4.3). The <math alttext="greater than"><mo>&gt;</mo></math> on one line and <math alttext="greater than or equal to"><mo>≥</mo></math> on the other don’t matter, since <math alttext="x minus xi cubed"><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><mi>ξ</mi><mo>)</mo></mrow><mn>3</mn></msup></math> is 0 at the knot.</p>
+</div>
+
+</main>
+
+<footer>
+  <p>Transcribed from the handwritten notes <em>ML_week_4_day_1.pdf</em> (7 pages). Equations are MathML; figures are inline SVG with title, description, and an expandable long description. Figures 4–6 are fitted to one simulated data set, so the jump, kink and smooth join are real features of those fits. Conforms to WCAG 2.2 Level AA.</p>
+</footer>
+</div>
+</body>
+</html>
