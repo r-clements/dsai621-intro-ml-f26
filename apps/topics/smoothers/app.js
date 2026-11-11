@@ -10,10 +10,15 @@
 // spline through f̂ with second derivatives γ = R⁻¹Qᵀf̂, linear outside [x_1, x_n].
 //
 // LOOCV uses the shortcut mean((y_i − f̂_i)/(1 − S_ii))², exact for the smoothing spline (notes
-// §4.1); GCV replaces S_ii by df/n.
+// §4.1). SE band: Var f̂(t) = σ² Σ_k ρ_k² g_k(t)², where g_k is the natural spline interpolating u_k
+// (so f̂(t) = Σ ρ_k (u_kᵀy) g_k(t)), with σ² estimated by RSS/(n − df).
+// Bias–variance panel (fixed x, at the training x_i): bias² = (1/n)‖(S − I)f‖² = (1/n)Σ(1 − ρ_k)²(u_kᵀf)²,
+// variance = (σ²/n) tr(S²) = (σ²/n)Σρ_k², expected test error = σ² + bias² + variance.
+// Natural cubic spline overlay: OLS on ESL's basis (5.4–5.5) with knots 0, the K = df − 2 interior
+// quantiles of x, and 1, solved by QR.
 
 const N_MAX = 300;
-const GRID_N = 401;           // grid on [0, 1] for curves and the ISE integral
+const GRID_N = 401;           // grid on [0, 1] for curves and the SE band
 // Reference λ for the eigendecomposition. Error in d_k is about ε/λ0 for small d_k and relative
 // ε(1 + λ0 d_k) for large ones; 1e-6 keeps both below ~1e-8 for the λ the df slider reaches.
 const LAMBDA0 = 1e-6;
@@ -291,15 +296,6 @@ function splineFit(pre, y, lam) {
   for (let c = 0; c < m; c++) gam[c + 1] = g[c];
   return { lam, rho, coef, fhat, Sii, gam, df: d3.sum(rho) };
 }
-function splineRow(pre, rho, i) {   // row i of S_λ = weights ℓ(x_i)
-  const n = pre.n, row = new Float64Array(n);
-  for (let k = 0; k < n; k++) {
-    if (rho[k] < 1e-14) continue;
-    const w = rho[k] * pre.U[k][i], u = pre.U[k];
-    for (let r = 0; r < n; r++) row[r] += w * u[r];
-  }
-  return row;
-}
 function splineEval(pre, fhat, gam, t) {
   const x = pre.x, h = pre.h, n = pre.n;
   if (t <= x[0]) {
@@ -315,8 +311,89 @@ function splineEval(pre, fhat, gam, t) {
   return (a * fhat[i + 1] + b * fhat[i]) / hi - a * b / 6 * ((1 + a / hi) * gam[i + 1] + (1 + b / hi) * gam[i]);
 }
 
+// Second derivatives of the natural spline through values f at the x_i: γ = R⁻¹Qᵀf, zero at the ends.
+function splineGamma(pre, f) {
+  const n = pre.n, m = n - 2, qtf = new Float64Array(m);
+  for (let c = 0; c < m; c++) qtf[c] = pre.q0[c] * f[c] + pre.q1[c] * f[c + 1] + pre.q2[c] * f[c + 2];
+  const g = solveTridiag(pre.rd, pre.ro, qtf), gam = new Float64Array(n);
+  for (let c = 0; c < m; c++) gam[c + 1] = g[c];
+  return gam;
+}
+// g_k(t) on the grid for every eigenvector u_k; depends on x only.
+function eigenCurves(pre, grid) {
+  return pre.U.map(u => {
+    const gam = splineGamma(pre, u);
+    return Float64Array.from(grid, t => splineEval(pre, u, gam, t));
+  });
+}
+
+// ---------- natural cubic spline (regression spline) ----------
+function nsKnots(x, M) {          // M knots: 0, M − 2 interior quantiles of x, 1
+  return [0, ...d3.range(1, M - 1).map(j => d3.quantileSorted(x, j / (M - 1))), 1];
+}
+function nsRow(xi, t) {           // ESL 5.4–5.5: 1, t, d_k(t) − d_{M−2}(t), k = 0..M−3
+  const M = xi.length, o = new Float64Array(M), last = xi[M - 1];
+  const cube = v => (v > 0 ? v * v * v : 0);
+  const dk = k => (cube(t - xi[k]) - cube(t - last)) / (last - xi[k]);
+  o[0] = 1;
+  if (M > 1) o[1] = t;
+  if (M > 2) { const dEnd = dk(M - 2); for (let k = 0; k < M - 2; k++) o[k + 2] = dk(k) - dEnd; }
+  return o;
+}
+// Least squares by modified Gram–Schmidt with one reorthogonalization pass.
+function lsQR(rows) {
+  const n = rows.length, M = rows[0].length;
+  const Q = Array.from({ length: M }, (_, j) => Float64Array.from(rows, r => r[j]));
+  const R = Array.from({ length: M }, () => new Float64Array(M));
+  for (let j = 0; j < M; j++) {
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < j; i++) {
+        let d = 0;
+        for (let r = 0; r < n; r++) d += Q[i][r] * Q[j][r];
+        R[i][j] += d;
+        for (let r = 0; r < n; r++) Q[j][r] -= d * Q[i][r];
+      }
+    }
+    let nrm = 0;
+    for (let r = 0; r < n; r++) nrm += Q[j][r] ** 2;
+    nrm = Math.sqrt(nrm);
+    R[j][j] = nrm;
+    for (let r = 0; r < n; r++) Q[j][r] /= nrm;
+  }
+  return { Q, R, n, M };
+}
+function projectQ(Q, v) {        // Q Qᵀ v
+  const n = v.length, out = new Float64Array(n);
+  for (const q of Q) {
+    let d = 0;
+    for (let r = 0; r < n; r++) d += q[r] * v[r];
+    for (let r = 0; r < n; r++) out[r] += d * q[r];
+  }
+  return out;
+}
+function nsFit(x, y, fx, M, sigma) {
+  const knots = nsKnots(x, M), rows = Array.from(x, t => nsRow(knots, t));
+  const { Q, R, n } = lsQR(rows);
+  const fhat = projectQ(Q, y), hii = new Float64Array(n);
+  for (const q of Q) for (let r = 0; r < n; r++) hii[r] += q[r] * q[r];
+  // Coefficients: R β = Qᵀy.
+  const qty = Q.map(q => q.reduce((s, v, r) => s + v * y[r], 0)), beta = new Float64Array(M);
+  for (let j = M - 1; j >= 0; j--) {
+    let s = qty[j];
+    for (let k = j + 1; k < M; k++) s -= R[j][k] * beta[k];
+    beta[j] = s / R[j][j];
+  }
+  const Hf = projectQ(Q, fx);
+  let bias2 = 0;
+  for (let r = 0; r < n; r++) bias2 += (Hf[r] - fx[r]) ** 2;
+  bias2 /= n;
+  const variance = sigma * sigma * M / n;
+  return { M, knots, fhat, hii, beta, df: M, bias2, variance, testErr: sigma * sigma + bias2 + variance,
+    curve: t => nsRow(knots, t).reduce((s, v, j) => s + v * beta[j], 0) };
+}
+
 // ---------- criteria ----------
-function cvStats(y, fhat, Sii, df) {
+function cvStats(y, fhat, Sii) {
   const n = y.length;
   let loo = 0, rss = 0;
   for (let i = 0; i < n; i++) {
@@ -324,22 +401,23 @@ function cvStats(y, fhat, Sii, df) {
     rss += e * e;
     loo += (e / (1 - Sii[i])) ** 2;
   }
-  return { loocv: loo / n, gcv: rss / n / (1 - df / n) ** 2, trainMSE: rss / n };
+  return { loocv: loo / n, trainMSE: rss / n, rss };
 }
-function ise(fGrid, curve) {   // trapezoid rule for ∫_0^1 (f̂ − f)²
-  let s = 0;
-  for (let g = 0; g < GRID_N; g++) {
-    const v = (curve[g] - fGrid[g]) ** 2;
-    s += (g === 0 || g === GRID_N - 1 ? 0.5 : 1) * v;
-  }
-  return s / (GRID_N - 1);
+// Exact bias², variance and expected test error at the training x_i for a smoothing spline with these ρ.
+function biasVar(rho, fcoef, sigma, n) {
+  let b = 0, v = 0;
+  for (let k = 0; k < rho.length; k++) { b += (1 - rho[k]) ** 2 * fcoef[k] ** 2; v += rho[k] ** 2; }
+  const bias2 = b / n, variance = sigma * sigma * v / n;
+  return { bias2, variance, testErr: sigma * sigma + bias2 + variance };
 }
 
 // ---------- state ----------
-const DEFAULTS = { df: 10, preset: "esl", n: 100, seed: 1, i0: 0 };
+const DF_MIN = 2.5, DF_STEP = 0.5;
+const DEFAULTS = { df: 10, preset: "esl", n: 100, seed: 1, showNS: false };
 const S = { ...DEFAULTS };
 let D = draws(S.seed);
-let data, pre, sp, grid, fGrid, curves;
+let data, pre, sp, ns, grid, fGrid, G, fcoef, sweep, curves;
+grid = d3.range(GRID_N).map(g => g / (GRID_N - 1));
 
 function makeData() {
   const idx = Array.from({ length: S.n }, (_, i) => i).sort((a, b) => D.x[a] - D.x[b]);
@@ -347,28 +425,49 @@ function makeData() {
   const x = Float64Array.from(idx, i => D.x[i]);
   const y = Float64Array.from(idx, i => P.f(D.x[i]) + P.sigma * D.z[i]);
   data = { x, y, fx: Float64Array.from(x, P.f) };
+  fGrid = grid.map(P.f);
 }
 function precomputeX() {         // after x changes (new seed or n)
   pre = splinePrecompute(data.x);
+  G = eigenCurves(pre, grid);
+}
+const dfMax = () => Math.min(30, S.n / 2);
+// Everything in the error-vs-df panel; recomputed when x or y changes, not when df moves.
+function computeSweep() {
+  const { y, fx } = data, n = S.n, sigma = PRESETS[S.preset].sigma;
+  fcoef = pre.U.map(u => u.reduce((s, v, r) => s + v * fx[r], 0));
+  sweep = d3.range(DF_MIN, dfMax() + 1e-9, DF_STEP / 2).map(df => {
+    const fit = splineFit(pre, y, lambdaForDf(pre, df));
+    return { df, ...cvStats(y, fit.fhat, fit.Sii), ...biasVar(fit.rho, fcoef, sigma, n) };
+  });
 }
 function refit() {
-  const { y } = data;
-  const lam = lambdaForDf(pre, S.df);
-  sp = splineFit(pre, y, lam);
-  Object.assign(sp, cvStats(y, sp.fhat, sp.Sii, sp.df));
-  const P = PRESETS[S.preset];
-  grid = d3.range(GRID_N).map(g => g / (GRID_N - 1));
-  fGrid = grid.map(P.f);
-  curves = {
-    spline: grid.map(t => splineEval(pre, sp.fhat, sp.gam, t)),
-  };
-  sp.ise = ise(fGrid, curves.spline);
+  const { x, y, fx } = data, n = S.n, P = PRESETS[S.preset];
+  sp = splineFit(pre, y, lambdaForDf(pre, S.df));
+  Object.assign(sp, cvStats(y, sp.fhat, sp.Sii), biasVar(sp.rho, fcoef, P.sigma, n));
+  sp.sigmaHat = Math.sqrt(sp.rss / (n - sp.df));
+  const curve = new Float64Array(GRID_N), se = new Float64Array(GRID_N);
+  for (let k = 0; k < n; k++) {
+    const r = sp.rho[k];
+    if (r < 1e-10) continue;
+    const gk = G[k], w = r * sp.coef[k], r2 = r * r;
+    for (let g = 0; g < GRID_N; g++) { curve[g] += w * gk[g]; se[g] += r2 * gk[g] * gk[g]; }
+  }
+  for (let g = 0; g < GRID_N; g++) se[g] = sp.sigmaHat * Math.sqrt(se[g]);
+  curves = { spline: curve, se };
+  ns = null;
+  if (S.showNS) {
+    const M = Math.max(2, Math.round(S.df));
+    ns = nsFit(x, y, fx, M, P.sigma);
+    Object.assign(ns, cvStats(y, ns.fhat, ns.hii));
+    curves.ns = grid.map(ns.curve);
+  }
 }
 
 // ---------- drawing ----------
 const W = 740;
 const MG = { top: 14, right: 16, bottom: 40, left: 54 };
-const BLUE = "#1a5fb4";
+const BLUE = "#1a5fb4", ORANGE = "#c64600", RED = "#c01c28", GREEN = "#26a269", PURPLE = "#813d9c";
 
 function makeChart(id, height, label) {
   const svg = d3.select(`#${id}`).append("svg")
@@ -390,12 +489,13 @@ function axisLabels(c, xl, yl) {
     .attr("text-anchor", "middle").text(yl);
 }
 const fmt3 = v => (Number.isFinite(v) ? v.toFixed(3) : v === Infinity ? "∞" : "–");
+const SUP = { "-": "⁻", 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
+const supNum = s => [...String(s)].map(ch => SUP[ch]).join("");
 const fmtLam = v => {
   const e = Math.floor(Math.log10(v)), m = v / 10 ** e;
   return `${m.toFixed(2)} × 10${supNum(e)}`;
 };
-const SUP = { "-": "⁻", 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
-const supNum = s => [...String(s)].map(ch => SUP[ch]).join("");
+const fmtDf = v => (Number.isInteger(v * 2) ? String(v) : v.toFixed(2));
 const xS = d3.scaleLinear().domain([0, 1]).range([MG.left, W - MG.right]);
 
 // Fit chart
@@ -403,185 +503,163 @@ const fitC = makeChart("fit", 350, "");
 axisLabels(fitC, "x", "y");
 fitC.gx.call(d3.axisBottom(xS).ticks(10));
 const fitY = d3.scaleLinear().range([fitC.height - MG.bottom, MG.top]);
-const x0Line = fitC.plot.append("line").attr("stroke", "#555").attr("stroke-dasharray", "1 3");
+const bandPath = fitC.plot.append("path").attr("fill", BLUE).attr("fill-opacity", 0.15);
+const bandUp = fitC.plot.append("path").attr("fill", "none").attr("stroke", BLUE).attr("stroke-dasharray", "2 2");
+const bandLo = fitC.plot.append("path").attr("fill", "none").attr("stroke", BLUE).attr("stroke-dasharray", "2 2");
 const pointsG = fitC.plot.append("g");
+const knotsG = fitC.plot.append("g");
 const truePath = fitC.plot.append("path").attr("fill", "none").attr("stroke", "#111")
   .attr("stroke-width", 2).attr("stroke-dasharray", "2 3");
+const nsPath = fitC.plot.append("path").attr("fill", "none").attr("stroke", ORANGE)
+  .attr("stroke-width", 2.5).attr("stroke-dasharray", "9 4");
 const splinePath = fitC.plot.append("path").attr("fill", "none").attr("stroke", BLUE).attr("stroke-width", 3);
-const selPoint = fitC.plot.append("circle").attr("r", 6).attr("fill", "none").attr("stroke", "#111").attr("stroke-width", 2);
-fitC.svg.attr("tabindex", 0).attr("aria-describedby", "x0-text");
 
-// Kernel chart: the weights in row i0 of S_λ.
-const kerC = makeChart("kernel", 220, "");
-axisLabels(kerC, "x", "");
-kerC.gx.call(d3.axisBottom(xS).ticks(10));
-const stripH = kerC.height - MG.top - MG.bottom;
-const strips = [0].map(() => {
-  const top = MG.top;
-  const yS = d3.scaleLinear().range([top + stripH, top + 16]);
-  const g = kerC.svg.append("g");
-  const gy = kerC.svg.append("g").attr("class", "axis").attr("transform", `translate(${MG.left},0)`);
-  const title = kerC.svg.append("text").attr("class", "sub-title").attr("x", MG.left + 6).attr("y", top + 10);
-  const zero = g.append("line").attr("stroke", "#888").attr("x1", MG.left).attr("x2", W - MG.right);
-  const x0 = g.append("line").attr("stroke", "#555").attr("stroke-dasharray", "1 3");
-  const stems = g.append("g");
-  return { top, yS, g, gy, title, zero, x0, stems };
-});
-kerC.svg.append("text").attr("class", "axis-label")
-  .attr("transform", `translate(14,${(kerC.height - MG.bottom + MG.top) / 2}) rotate(-90)`)
-  .attr("text-anchor", "middle").text("weight ℓᵢ(x₀)");
+// Error-vs-df chart
+const errC = makeChart("errors", 300, "");
+axisLabels(errC, "df = tr(S)", "mean squared error");
+const errX = d3.scaleLinear().range([MG.left, W - MG.right]);
+const errY = d3.scaleLinear().range([errC.height - MG.bottom, MG.top]);
+const errSigma = errC.plot.append("line").attr("stroke", "#999").attr("stroke-width", 1.5);
+const errSigmaText = errC.svg.append("text").attr("class", "axis-label").attr("text-anchor", "end");
+const errCurrent = errC.plot.append("line").attr("stroke", "#111").attr("stroke-dasharray", "1 3");
+const errG = errC.plot.append("g");
+const errMarks = errC.plot.append("g");
+errC.svg.style("cursor", "pointer");
+
+const SERIES = [
+  { key: "testErr", label: "expected test error", colour: RED, width: 3, dash: null },
+  { key: "bias2", label: "bias²", colour: PURPLE, width: 2, dash: "8 4" },
+  { key: "variance", label: "variance", colour: GREEN, width: 2, dash: "8 3 2 3" },
+  { key: "trainMSE", label: "training MSE", colour: "#555", width: 2, dash: "2 3" },
+  { key: "loocv", label: "LOOCV", colour: BLUE, width: 2, dash: "5 3", dots: true },
+];
 
 function drawFit() {
   const { x, y } = data, P = PRESETS[S.preset];
-  const ext = d3.extent([...y, ...curves.spline]);
-  fitY.domain([Math.min(P.y[0], ext[0]), Math.max(P.y[1], ext[1])]).nice();
+  const lo = curves.spline.map((v, g) => v - 2 * curves.se[g]), hi = curves.spline.map((v, g) => v + 2 * curves.se[g]);
+  const ext = d3.extent([...y, ...lo, ...hi, ...(curves.ns || [])]);
+  fitY.domain([Math.max(Math.min(P.y[0], ext[0]), P.y[0] - 3 * P.sigma),
+               Math.min(Math.max(P.y[1], ext[1]), P.y[1] + 3 * P.sigma)]).nice();
   fitC.gy.call(d3.axisLeft(fitY).ticks(6));
   const line = arr => d3.line().x((_, g) => xS(grid[g])).y(v => fitY(v))(arr);
+  bandPath.attr("d", d3.area().x((_, g) => xS(grid[g])).y0((_, g) => fitY(lo[g])).y1(v => fitY(v))(hi));
+  bandUp.attr("d", line(hi));
+  bandLo.attr("d", line(lo));
   truePath.attr("d", line(fGrid));
   splinePath.attr("d", line(curves.spline));
+  nsPath.attr("d", curves.ns ? line(curves.ns) : null);
+  const [y0, y1] = fitY.range();
+  knotsG.selectAll("line").data(ns ? ns.knots.slice(1, -1) : []).join("line")
+    .attr("x1", k => xS(k)).attr("x2", k => xS(k)).attr("y1", y0).attr("y2", y0 - 10)
+    .attr("stroke", ORANGE).attr("stroke-width", 2);
   pointsG.selectAll("circle").data(d3.range(S.n)).join("circle")
     .attr("r", 3).attr("fill", "none").attr("stroke", "#777")
     .attr("cx", i => xS(x[i])).attr("cy", i => fitY(y[i]));
-  drawX0OnFit();
+  const seAt = t => curves.se[Math.round(t * (GRID_N - 1))];
   fitC.svg.attr("aria-label",
     `Scatterplot of ${S.n} points with the true function (dotted) and the smoothing spline (solid) with ` +
-    `${S.df} degrees of freedom. The selected target point is circled. Use the arrow keys to move the target point.`);
-}
-function drawX0OnFit() {
-  const { x, y } = data, i = S.i0, t = x[i];
-  const [y0, y1] = fitY.range();
-  x0Line.attr("x1", xS(t)).attr("x2", xS(t)).attr("y1", y1).attr("y2", y0);
-  selPoint.attr("cx", xS(t)).attr("cy", fitY(y[i]));
+    `${fmtDf(S.df)} degrees of freedom and a shaded ±2 standard-error band. The standard error is ` +
+    `${seAt(0).toFixed(2)} at x = 0, ${seAt(0.5).toFixed(2)} at x = 0.5 and ${seAt(1).toFixed(2)} at x = 1.` +
+    (ns ? ` A natural cubic spline with ${ns.M} degrees of freedom is overlaid (long dashes), with its ${ns.M - 2} interior knots marked by ticks on the x axis.` : ""));
 }
 
-function kernelRows() {
-  return { sRow: splineRow(pre, sp.rho, S.i0) };
-}
-function drawKernel(rows) {
-  const { x } = data, t = x[S.i0];
-  const series = [
-    { row: rows.sRow, colour: BLUE, title: `Row ${S.i0 + 1} of S(λ), λ = ${fmtLam(sp.lam)}` },
-  ];
-  let mx = 0, mn = 0;
-  for (const s of series) for (const v of s.row) { mx = Math.max(mx, v); mn = Math.min(mn, v); }
-  const lo_ = Math.min(mn * 1.15, -0.1 * mx);
-  series.forEach((s, k) => {
-    const st = strips[k];
-    st.yS.domain([lo_, mx * 1.1]);
-    st.gy.call(d3.axisLeft(st.yS).ticks(4));
-    st.title.text(s.title);
-    st.zero.attr("y1", st.yS(0)).attr("y2", st.yS(0));
-    st.x0.attr("x1", xS(t)).attr("x2", xS(t)).attr("y1", st.top + 14).attr("y2", st.top + stripH);
-    const idx = d3.range(S.n).filter(j => Math.abs(s.row[j]) > 1e-4 * mx);
-    const g = st.stems.selectAll("g.stem").data(idx, j => j).join(enter => {
-      const e = enter.append("g").attr("class", "stem");
-      e.append("line"); e.append("circle"); e.append("rect");
-      return e;
-    });
-    g.select("line").attr("x1", j => xS(x[j])).attr("x2", j => xS(x[j]))
-      .attr("y1", st.yS(0)).attr("y2", j => st.yS(s.row[j]))
-      .attr("stroke", s.colour).attr("stroke-width", 1.5)
-      .attr("stroke-dasharray", j => (s.row[j] < 0 ? "2 2" : null));
-    g.select("circle").attr("cx", j => xS(x[j])).attr("cy", j => st.yS(s.row[j])).attr("r", 2.6)
-      .attr("fill", s.colour).attr("display", j => (s.row[j] < 0 ? "none" : null));
-    g.select("rect").attr("x", j => xS(x[j]) - 3).attr("y", j => st.yS(s.row[j]) - 3)
-      .attr("width", 6).attr("height", 6).attr("fill", "#fff").attr("stroke", s.colour).attr("stroke-width", 1.5)
-      .attr("display", j => (s.row[j] < 0 ? null : "none"));
+function drawErrors() {
+  const sigma2 = PRESETS[S.preset].sigma ** 2;
+  errX.domain([DF_MIN, dfMax()]);
+  // Cap the y axis so the U-shape is visible; very large values at small df are clipped.
+  const yMax = Math.max(sigma2 * 2.2, d3.max(sweep, d => Math.min(d.testErr, sigma2 * 3)));
+  errY.domain([0, yMax]).nice();
+  errC.gx.call(d3.axisBottom(errX).ticks(10));
+  errC.gy.call(d3.axisLeft(errY).ticks(6));
+  errSigma.attr("x1", MG.left).attr("x2", W - MG.right).attr("y1", errY(sigma2)).attr("y2", errY(sigma2));
+  errSigmaText.attr("x", W - MG.right - 4).attr("y", errY(sigma2) + 14).text("σ² (irreducible)");
+  const g = errG.selectAll("g.series").data(SERIES).join(enter => {
+    const e = enter.append("g").attr("class", "series");
+    e.append("path"); e.append("g").attr("class", "dots");
+    return e;
   });
+  g.select("path").attr("fill", "none").attr("stroke", s => s.colour).attr("stroke-width", s => s.width)
+    .attr("stroke-dasharray", s => s.dash)
+    .attr("d", s => d3.line().x(d => errX(d.df)).y(d => errY(Math.min(d[s.key], yMax * 1.5)))(sweep));
+  g.select("g.dots").selectAll("circle").data(s => (s.dots ? sweep.filter((_, i) => i % 4 === 0).map(d => ({ d, s })) : []))
+    .join("circle").attr("r", 3).attr("fill", "#fff").attr("stroke", o => o.s.colour)
+    .attr("cx", o => errX(o.d.df)).attr("cy", o => errY(Math.min(o.d[o.s.key], yMax * 1.5)));
+  drawErrorMarker();
+  const best = d3.least(sweep, d => d.testErr), bestCV = d3.least(sweep, d => d.loocv);
+  errC.svg.attr("aria-label",
+    `Line chart of error against df from ${DF_MIN} to ${fmtDf(dfMax())}. Bias squared falls and variance rises as df grows; ` +
+    `expected test error is smallest at df ≈ ${fmtDf(best.df)} (${best.testErr.toFixed(3)}), and this sample's LOOCV ` +
+    `is smallest at df ≈ ${fmtDf(bestCV.df)}. Training MSE keeps falling. The current df, ${fmtDf(S.df)}, is marked.`);
 }
-const NEG_TOL = 1e-3;   // the spline's far-away weights oscillate around zero at the 1e-6 level
-function kernelSummary(row) {
-  const { x, fx } = data, t = x[S.i0], P = PRESETS[S.preset];
-  let fh = 0, ef = 0, mom = 0, ss = 0, mn = Infinity;
-  for (let j = 0; j < S.n; j++) {
-    fh += row[j] * data.y[j]; ef += row[j] * fx[j]; mom += row[j] * (x[j] - t); ss += row[j] ** 2;
-    if (row[j] !== 0) mn = Math.min(mn, row[j]);
-  }
-  return { fh, sii: row[S.i0], mn, mom, bias: ef - P.f(t), sd: P.sigma * Math.sqrt(ss), neg: row.filter(v => v < -NEG_TOL).length };
-}
-function drawX0Readout(rows) {
-  const { x } = data, t = x[S.i0], P = PRESETS[S.preset];
-  const a = kernelSummary(rows.sRow);
-  document.getElementById("x0-text").textContent =
-    `x₀ = ${t.toFixed(3)}, point ${S.i0 + 1} of ${S.n} (sorted by x); f(x₀) = ${P.f(t).toFixed(3)}. ` +
-    `Weights below −0.001: ${a.neg}.`;
-  const r = v => (Math.abs(v) < 5e-13 ? "0.000" : fmt3(v));
-  const cell = (s) => `<td>${r(s.fh)}</td><td>${r(s.sii)}</td><td>${r(s.mn)}</td><td>${r(s.mom)}</td><td>${r(s.bias)}</td><td>${r(s.sd)}</td>`;
-  document.getElementById("x0-table").innerHTML =
-    `<table class="stats"><caption>Weights at x₀</caption><thead><tr><th scope="col">Smoother</th>` +
-    `<th scope="col">f̂(x₀)</th><th scope="col">own weight Sᵢᵢ</th><th scope="col">smallest weight</th>` +
-    `<th scope="col">Σℓᵢ(xᵢ − x₀)</th><th scope="col">bias</th><th scope="col">SD</th></tr></thead><tbody>` +
-    `<tr><th scope="row">Smoothing spline</th>${cell(a)}</tr></tbody></table>`;
-  document.getElementById("x0-out").textContent = `x₀ = ${t.toFixed(3)} (point ${S.i0 + 1})`;
-  const sl = document.getElementById("x0-slider");
-  sl.setAttribute("aria-valuetext", `x0 = ${t.toFixed(3)}, point ${S.i0 + 1} of ${S.n}`);
-  kerC.svg.attr("aria-label",
-    `Equivalent kernel of the smoothing spline at x0 = ${t.toFixed(3)}: ${a.neg} weights below −0.001, smallest ${r(a.mn)}. ` +
-    `Positive weights are filled dots above the zero line; negative weights are open squares on dashed stems below it.`);
-}
-function drawX0() {
-  const rows = kernelRows();
-  drawX0OnFit(); drawKernel(rows); drawX0Readout(rows);
+function drawErrorMarker() {
+  const [y0, y1] = errY.range();
+  errCurrent.attr("x1", errX(S.df)).attr("x2", errX(S.df)).attr("y1", y0).attr("y2", y1);
+  const yMax = errY.domain()[1];
+  errMarks.selectAll("path").data(SERIES.filter(s => s.key !== "trainMSE")).join("path")
+    .attr("d", s => {
+      const cx = errX(S.df), cy = errY(Math.min(sp[s.key], yMax * 1.5));
+      return `M${cx},${cy - 6} l6,6 l-6,6 l-6,-6 z`;
+    })
+    .attr("fill", s => s.colour).attr("stroke", "#fff");
 }
 
 let lastStats = "";
 function drawStats() {
-  const r = (o, tuning) => `<td>${tuning}</td><td>${o.df.toFixed(2)}</td><td>${fmt3(o.trainMSE)}</td>` +
-    `<td>${fmt3(o.loocv)}</td><td>${fmt3(o.gcv)}</td><td>${fmt3(o.ise)}</td>`;
-  const html = `<table class="stats"><caption>Fit statistics (target df = ${S.df.toFixed(S.df % 1 ? 2 : 0)})</caption>` +
-    `<thead><tr><th scope="col">Smoother</th><th scope="col">tuning</th><th scope="col">df</th>` +
-    `<th scope="col">training MSE</th><th scope="col">LOOCV</th><th scope="col">GCV</th>` +
-    `<th scope="col">ISE ∫(f̂ − f)²</th></tr></thead><tbody>` +
-    `<tr><th scope="row">Smoothing spline</th>${r(sp, `λ = ${fmtLam(sp.lam)}`)}</tr>` +
+  const row = (name, o, tuning, df) => `<tr><th scope="row">${name}</th><td>${tuning}</td><td>${df}</td>` +
+    `<td>${fmt3(o.trainMSE)}</td><td>${fmt3(o.loocv)}</td><td>${fmt3(o.bias2)}</td><td>${fmt3(o.variance)}</td>` +
+    `<td>${fmt3(o.testErr)}</td></tr>`;
+  const html = `<table class="stats"><caption>Fit statistics (σ² = ${(PRESETS[S.preset].sigma ** 2).toFixed(2)})</caption>` +
+    `<thead><tr><th scope="col">Fit</th><th scope="col">tuning</th><th scope="col">df</th>` +
+    `<th scope="col">training MSE</th><th scope="col">LOOCV</th><th scope="col">bias²</th>` +
+    `<th scope="col">variance</th><th scope="col">expected test error</th></tr></thead><tbody>` +
+    row("Smoothing spline", sp, `λ = ${fmtLam(sp.lam)}`, sp.df.toFixed(2)) +
+    (ns ? row("Natural cubic spline", ns, `${ns.M - 2} interior knots`, ns.M) : "") +
     `</tbody></table>`;
   const el = document.getElementById("stats");
   if (html !== lastStats) { el.innerHTML = html; lastStats = html; }
+  document.getElementById("ns-note").textContent = ns && ns.M !== S.df
+    ? `The natural spline needs a whole number of df, so it uses df = ${ns.M}.` : "";
 }
 
-function drawAll() {
-  drawFit(); drawX0(); drawStats();
+function drawAll(full) {
+  drawFit();
+  if (full) drawErrors(); else drawErrorMarker();
+  drawStats();
 }
 
 // ---------- controls ----------
 const dfSlider = document.getElementById("df-slider"), dfOut = document.getElementById("df-out");
 const nSlider = document.getElementById("n-slider"), nOut = document.getElementById("n-out");
-const x0Slider = document.getElementById("x0-slider");
 const presetSel = document.getElementById("preset");
+const nsBox = document.getElementById("show-ns");
 
 function syncControls() {
-  dfSlider.max = Math.min(30, S.n / 2);
+  dfSlider.max = dfMax();
   dfSlider.value = S.df;
-  dfOut.textContent = `df = ${Number.isInteger(S.df * 2) ? S.df : S.df.toFixed(2)}`;
+  dfOut.textContent = `df = ${fmtDf(S.df)}`;
   dfSlider.setAttribute("aria-valuetext", dfOut.textContent);
   nSlider.value = S.n; nOut.textContent = `n = ${S.n}`;
-  x0Slider.max = S.n; x0Slider.value = S.i0 + 1;
   presetSel.value = S.preset;
+  nsBox.checked = S.showNS;
 }
 function update(newX) {
   makeData();
   if (newX) precomputeX();
-  S.i0 = Math.min(S.i0, S.n - 1);
+  S.df = Math.min(S.df, dfMax());
+  computeSweep();
   refit();
   syncControls();
-  drawAll();
+  drawAll(true);
 }
-function setX0(i) {
-  S.i0 = Math.max(0, Math.min(S.n - 1, i));
-  x0Slider.value = S.i0 + 1;
-  drawX0();
+function setDf(df) {
+  S.df = Math.max(DF_MIN, Math.min(dfMax(), Math.round(df / DF_STEP) * DF_STEP));
+  refit(); syncControls(); drawAll(false);
 }
 
-dfSlider.addEventListener("input", () => {
-  S.df = +dfSlider.value;
-  refit(); syncControls(); drawAll();
-});
+dfSlider.addEventListener("input", () => setDf(+dfSlider.value));
 presetSel.addEventListener("change", () => { S.preset = presetSel.value; update(false); });
-nSlider.addEventListener("input", () => {
-  S.n = +nSlider.value; nOut.textContent = `n = ${S.n}`;
-  S.df = Math.min(S.df, S.n / 2);
-  update(true);
-});
-x0Slider.addEventListener("input", () => setX0(+x0Slider.value - 1));
+nSlider.addEventListener("input", () => { S.n = +nSlider.value; nOut.textContent = `n = ${S.n}`; update(true); });
+nsBox.addEventListener("change", () => { S.showNS = nsBox.checked; refit(); drawAll(false); });
 document.getElementById("resample").addEventListener("click", () => {
   S.seed += 1; D = draws(S.seed); update(true);
 });
@@ -589,39 +667,10 @@ document.getElementById("reset").addEventListener("click", () => {
   Object.assign(S, DEFAULTS);
   D = draws(S.seed); update(true);
 });
-document.getElementById("gcv").addEventListener("click", () => {
-  // Minimize the spline's GCV over λ, using ‖y − f̂‖² = Σ(1 − ρ_k)² (u_kᵀy)².
-  const c2 = sp.coef.map(c => c * c), n = S.n;
-  let best = null;
-  for (let e = -12; e <= 2; e += 0.01) {
-    const lam = 10 ** e;
-    let rss = 0, df = 0;
-    for (let k = 0; k < n; k++) { const r = 1 / (1 + lam * pre.d[k]); df += r; rss += (1 - r) ** 2 * c2[k]; }
-    const g = rss / n / (1 - df / n) ** 2;
-    if (!best || g < best.g) best = { g, df };
-  }
-  S.df = Math.max(+dfSlider.min, Math.min(+dfSlider.max, best.df));
-  refit(); syncControls(); drawAll();
-});
-
-// Click the fit chart: target = the data point nearest in x.
-fitC.svg.on("click", event => {
-  const [px] = d3.pointer(event, fitC.svg.node());
-  const t = xS.invert(px);
-  const r = d3.bisectLeft(data.x, t);
-  let i = Math.min(S.n - 1, r);
-  if (r > 0 && (r >= S.n || t - data.x[r - 1] < data.x[r] - t)) i = r - 1;
-  setX0(i);
-});
-fitC.svg.on("keydown", event => {
-  const step = event.shiftKey ? 10 : 1;
-  const moves = { ArrowRight: step, ArrowUp: step, ArrowLeft: -step, ArrowDown: -step };
-  if (event.key in moves) setX0(S.i0 + moves[event.key]);
-  else if (event.key === "Home") setX0(0);
-  else if (event.key === "End") setX0(S.n - 1);
-  else return;
-  event.preventDefault();
-  // Keyboard users get the x0 summary announced through its live region.
+// Clicking the error chart sets df (the df slider does the same from the keyboard).
+errC.svg.on("click", event => {
+  const [px] = d3.pointer(event, errC.svg.node());
+  setDf(errX.invert(px));
 });
 // Shift+arrow moves a slider by 5 steps.
 document.querySelectorAll("input[type=range]").forEach(sl => sl.addEventListener("keydown", event => {
@@ -634,10 +683,10 @@ document.querySelectorAll("input[type=range]").forEach(sl => sl.addEventListener
   sl.dispatchEvent(new Event("input"));
 }));
 
-// Exposed for checking against SciPy.
+// Exposed for checking against SciPy and numpy.
 window.__smoothers = {
-  S, data: () => data, pre: () => pre, sp: () => sp, curves: () => curves, grid: () => grid,
-  splineFit, lambdaForDf, splineRow, splineEval,
+  S, data: () => data, pre: () => pre, sp: () => sp, ns: () => ns, curves: () => curves, grid: () => grid,
+  sweep: () => sweep, splineFit, lambdaForDf, splineEval, nsFit, setDf,
 };
 
 update(true);
