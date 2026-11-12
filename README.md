@@ -11,7 +11,7 @@
 **Work on (for Quiz 3):**
 - [Quiz 3 practice problems](problem_sets/Quiz3_practice_problems.pdf) ([solutions](problem_sets/Quiz3_practice_problems_sol.pdf)). These aren't turned in, but the quiz draws on them, so try each problem before you look at the solutions.
 - Finish [`notebooks/lda_vs_logistic.ipynb`](notebooks/lda_vs_logistic.ipynb) and [`notebooks/qda_vs_naive_bayes.ipynb`](notebooks/qda_vs_naive_bayes.ipynb). Run `git pull` and then `uv sync` first.
-- A splines notebook is coming later this week.
+- Work through [`notebooks/polynomials_splines.ipynb`](notebooks/polynomials_splines.ipynb). You can skip the smoothing spline sections (4 and 5) for now: they are for Quiz 4, not Quiz 3.
 
 **Interactive demos:**
 - [Basis Expansions: Polynomials and Splines](https://robertclements.org/dsai621-intro-ml-f26/topics/basis-expansions/)
