@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Natural Cubic Splines and Smoothing Splines — Week 4, Day 2 | DSAI 621</title>
+<meta name="description" content="Accessible class notes reviewing cubic splines, then natural cubic splines and their degrees of freedom, numerical notes on spline bases, and smoothing splines: the penalized criterion, its natural-spline solution, the penalty matrix and the linear smoother matrix.">
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #4a4a4a;
+    --rule: #c9c9c9;
+    --accent: #0b4f8a;
+    --accent-bg: #eef4fa;
+    --focus: #0b4f8a;
+    --pop: #a4262c;   /* population / true  — 5.9:1 on white */
+    --est: #5b2d8e;   /* estimate / fitted  — 8.5:1 on white */
+    --err: #8a5000;   /* errors / residuals — 5.1:1 on white */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f2; --muted: #cfcfcf; --rule: #555;
+      --accent: #8ab8e0; --accent-bg: #182430; --focus: #8ab8e0;
+      --pop: #ff9f99; --est: #cbb0ff; --err: #f0b458;
+    }
+    body { background: #131313; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--ink);
+    background: #fff;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #131313; } }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 5rem; }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible, :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--accent); color: #fff;
+    padding: .75rem 1rem; z-index: 10; text-decoration: none;
+  }
+  .skip:focus { left: .5rem; top: .5rem; }
+  h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; line-height: 1.3; margin: 2.5rem 0 .5rem;
+       padding-top: .75rem; border-top: 2px solid var(--rule); }
+  h3 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  p, li { max-width: 42rem; }
+  .lede { color: var(--muted); margin-top: 0; }
+  nav.toc {
+    background: var(--accent-bg); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 1rem 1.25rem; margin: 2rem 0;
+  }
+  nav.toc h2 { font-size: 1.05rem; margin: 0 0 .5rem; border: 0; padding: 0; }
+  nav.toc ol { margin: 0; padding-left: 1.25rem; }
+  nav.toc li { margin: .3rem 0; }
+  nav.toc a { display: inline-block; min-height: 24px; padding: 2px 0; }
+  table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+  caption { text-align: left; font-weight: 600; padding-bottom: .5rem; }
+  th, td { border: 1px solid var(--rule); padding: .5rem .7rem; text-align: left; }
+  thead th { background: var(--accent-bg); }
+  figure { margin: 1.5rem 0; }
+  figcaption { font-size: .95rem; color: var(--muted); margin-top: .5rem; }
+  svg { max-width: 100%; height: auto; display: block; }
+  details {
+    border: 1px solid var(--rule); border-radius: 6px;
+    padding: .5rem .85rem; margin: .75rem 0; background: var(--accent-bg);
+  }
+  summary { cursor: pointer; font-weight: 600; min-height: 24px; padding: .25rem 0; }
+  details[open] summary { margin-bottom: .5rem; }
+  math { font-size: 1.15em; }
+  math[display="block"] { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }
+  .eq { margin: 1.25rem 0; }
+  .note {
+    border-left: 4px solid var(--accent); background: var(--accent-bg);
+    padding: .75rem 1rem; margin: 1.25rem 0; border-radius: 0 6px 6px 0;
+  }
+  .note > :first-child { margin-top: 0; }
+  .note > :last-child { margin-bottom: 0; }
+  .tag {
+    display: inline-block; font-size: .8rem; font-weight: 700;
+    letter-spacing: .02em; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 4px;
+    padding: 0 .4em; white-space: nowrap;
+  }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 2px solid var(--rule);
+           color: var(--muted); font-size: .95rem; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps > li { margin: .75rem 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<div class="wrap">
+<header>
+  <p class="lede"><strong>DSAI 621 — Intro to Machine Learning</strong> · Fall 2026 · Week 4, Day 2</p>
+  <h1>Natural Cubic Splines and Smoothing Splines</h1>
+  <p class="lede">Accessible transcription of the handwritten class notes. All equations are marked up in MathML so they can be read by a screen reader, magnified, or rendered in braille. All figures have text descriptions. Annotations written in a second pen colour in the original are reproduced here as labelled callouts, so none of their meaning depends on colour. A few short callouts marked <strong>Commentary</strong> were added in this transcription; they are not in the handwritten notes.</p>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+  <h2 id="toc-h">On this page</h2>
+  <ol>
+    <li><a href="#announcements">Announcements</a></li>
+    <li><a href="#agenda">Agenda</a></li>
+    <li><a href="#cubic">1. Cubic splines</a></li>
+    <li><a href="#review">1.1 Review</a></li>
+    <li><a href="#natural">1.3 Natural cubic spline</a></li>
+    <li><a href="#quick">1.4 Quick notes</a></li>
+    <li><a href="#smoothing">2. Smoothing splines</a></li>
+    <li><a href="#criterion">2.1 The criterion</a></li>
+    <li><a href="#solution">2.2 Solution</a></li>
+    <li><a href="#fitting">3.1 Fitting</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+
+<h2 id="announcements">Announcements</h2>
+<ul>
+  <li><strong>Quiz 3:</strong> Monday, regular quiz</li>
+  <li><strong>Quiz 4:</strong> Thursday, partner activity, no laptops but open notes</li>
+</ul>
+
+<h2 id="agenda">Agenda</h2>
+<ul>
+  <li>Cubic splines</li>
+  <li>Smoothing splines</li>
+</ul>
+
+<h2 id="cubic">1. Cubic splines</h2>
+
+<h3 id="review">1.1 Review</h3>
+
+<div class="eq">
+<math display="block" alttext="y sub i equals beta sub 0 plus the sum from j equals 1 to K plus 3 of beta sub j b sub j of x sub i, plus epsilon sub i">
+  <mrow><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi>K</mi><mo>+</mo><mn>3</mn></mrow></munderover><msub><mi>β</mi><mi>j</mi></msub><msub><mi>b</mi><mi>j</mi></msub><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>+</mo><msub><mi>ε</mi><mi>i</mi></msub></mrow>
+</math>
+</div>
+
+<p>If <math alttext="K equals 2"><mrow><mi>K</mi><mo>=</mo><mn>2</mn></mrow></math>, we have <math alttext="beta sub 0, beta sub 1, through beta sub 5"><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>,</mo><msub><mi>β</mi><mn>1</mn></msub><mo>,</mo><mo>…</mo><mo>,</mo><msub><mi>β</mi><mn>5</mn></msub></mrow></math>.</p>
+
+<figure>
+<svg viewBox="0 0 440 305" role="img" aria-labelledby="fig9-t fig9-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig9-t">A cubic spline with two knots, xi 1 and xi 2, fitted to scattered data</title>
+  <desc id="fig9-d">Axes y and x. Two dashed vertical lines mark the knots xi 1 and xi 2. Data points rise on the left, level off and dip slightly between the knots, then rise again on the right. One smooth curve, the cubic spline, follows them through both knots with no breaks or corners.</desc>
+  <line x1="50" y1="250" x2="400" y2="250" stroke="currentColor" stroke-width="2"/><polygon points="400,250 392,246 392,254" fill="currentColor"/><text x="406.0" y="255.0" font-size="15" fill="currentColor" text-anchor="start">x</text><line x1="50" y1="250" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="34.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><g fill="currentColor"><circle cx="81.4" cy="175.7" r="2.4"/><circle cx="82.8" cy="162.3" r="2.4"/><circle cx="84.2" cy="177.3" r="2.4"/><circle cx="110.3" cy="131.4" r="2.4"/><circle cx="110.6" cy="148.9" r="2.4"/><circle cx="114.1" cy="131.0" r="2.4"/><circle cx="118.3" cy="132.3" r="2.4"/><circle cx="137.5" cy="124.2" r="2.4"/><circle cx="144.3" cy="114.3" r="2.4"/><circle cx="146.6" cy="119.3" r="2.4"/><circle cx="161.5" cy="102.8" r="2.4"/><circle cx="183.7" cy="105.3" r="2.4"/><circle cx="187.7" cy="89.3" r="2.4"/><circle cx="205.1" cy="103.0" r="2.4"/><circle cx="211.1" cy="82.7" r="2.4"/><circle cx="212.2" cy="97.8" r="2.4"/><circle cx="227.0" cy="106.6" r="2.4"/><circle cx="231.9" cy="99.8" r="2.4"/><circle cx="233.7" cy="106.8" r="2.4"/><circle cx="240.0" cy="99.9" r="2.4"/><circle cx="256.6" cy="95.2" r="2.4"/><circle cx="260.6" cy="91.5" r="2.4"/><circle cx="278.9" cy="72.0" r="2.4"/><circle cx="284.5" cy="62.4" r="2.4"/><circle cx="299.3" cy="61.5" r="2.4"/><circle cx="321.7" cy="52.6" r="2.4"/><circle cx="326.0" cy="54.6" r="2.4"/><circle cx="328.4" cy="60.4" r="2.4"/><circle cx="331.8" cy="39.6" r="2.4"/><circle cx="338.5" cy="42.5" r="2.4"/><circle cx="339.8" cy="42.4" r="2.4"/><circle cx="340.4" cy="52.3" r="2.4"/><circle cx="344.8" cy="50.5" r="2.4"/><circle cx="355.7" cy="28.6" r="2.4"/><circle cx="364.6" cy="40.9" r="2.4"/><circle cx="376.2" cy="28.7" r="2.4"/></g><path d="M63.8,207.3 L65.1,204.6 L66.4,201.9 L67.6,199.2 L68.9,196.7 L70.2,194.1 L71.5,191.6 L72.7,189.2 L74.0,186.8 L75.3,184.5 L76.6,182.2 L77.8,180.0 L79.1,177.8 L80.4,175.7 L81.7,173.6 L82.9,171.6 L84.2,169.6 L85.5,167.7 L86.8,165.8 L88.1,163.9 L89.3,162.1 L90.6,160.3 L91.9,158.6 L93.2,156.9 L94.4,155.3 L95.7,153.7 L97.0,152.1 L98.3,150.6 L99.5,149.1 L100.8,147.7 L102.1,146.3 L103.4,144.9 L104.6,143.6 L105.9,142.3 L107.2,141.0 L108.5,139.8 L109.8,138.6 L111.0,137.4 L112.3,136.3 L113.6,135.2 L114.9,134.1 L116.1,133.0 L117.4,132.0 L118.7,131.0 L120.0,130.1 L121.2,129.2 L122.5,128.3 L123.8,127.4 L125.1,126.5 L126.3,125.7 L127.6,124.9 L128.9,124.1 L130.2,123.4 L131.5,122.6 L132.7,121.9 L134.0,121.2 L135.3,120.6 L136.6,119.9 L137.8,119.3 L139.1,118.7 L140.4,118.1 L141.7,117.5 L142.9,116.9 L144.2,116.4 L145.5,115.8 L146.8,115.3 L148.0,114.8 L149.3,114.3 L150.6,113.9 L151.9,113.4 L153.2,112.9 L154.4,112.5 L155.7,112.1 L157.0,111.6 L158.3,111.2 L159.5,110.8 L160.8,110.4 L162.1,110.0 L163.4,109.6 L164.6,109.2 L165.9,108.9 L167.2,108.5 L168.5,108.1 L169.7,107.8 L171.0,107.4 L172.3,107.1 L173.6,106.8 L174.9,106.4 L176.1,106.1 L177.4,105.8 L178.7,105.5 L180.0,105.2 L181.2,104.9 L182.5,104.6 L183.8,104.3 L185.1,104.0 L186.3,103.7 L187.6,103.4 L188.9,103.1 L190.2,102.8 L191.4,102.5 L192.7,102.3 L194.0,102.0 L195.3,101.7 L196.6,101.5 L197.8,101.2 L199.1,100.9 L200.4,100.7 L201.7,100.4 L202.9,100.2 L204.2,99.9 L205.5,99.6 L206.8,99.4 L208.0,99.1 L209.3,98.9 L210.6,98.6 L211.9,98.4 L213.1,98.1 L214.4,97.8 L215.7,97.6 L217.0,97.3 L218.3,97.1 L219.5,96.8 L220.8,96.6 L222.1,96.3 L223.4,96.0 L224.6,95.8 L225.9,95.5 L227.2,95.2 L228.5,94.9 L229.7,94.7 L231.0,94.4 L232.3,94.1 L233.6,93.8 L234.8,93.5 L236.1,93.2 L237.4,92.9 L238.7,92.6 L239.9,92.3 L241.2,92.0 L242.5,91.7 L243.8,91.4 L245.1,91.1 L246.3,90.7 L247.6,90.4 L248.9,90.1 L250.2,89.7 L251.4,89.4 L252.7,89.0 L254.0,88.6 L255.3,88.3 L256.5,87.9 L257.8,87.5 L259.1,87.1 L260.4,86.7 L261.6,86.3 L262.9,85.9 L264.2,85.5 L265.5,85.1 L266.8,84.6 L268.0,84.2 L269.3,83.7 L270.6,83.2 L271.9,82.8 L273.1,82.3 L274.4,81.8 L275.7,81.3 L277.0,80.8 L278.2,80.3 L279.5,79.7 L280.8,79.2 L282.1,78.6 L283.3,78.1 L284.6,77.5 L285.9,76.9 L287.2,76.3 L288.5,75.7 L289.7,75.1 L291.0,74.5 L292.3,73.8 L293.6,73.2 L294.8,72.5 L296.1,71.8 L297.4,71.1 L298.7,70.4 L299.9,69.7 L301.2,69.0 L302.5,68.2 L303.8,67.5 L305.0,66.7 L306.3,65.9 L307.6,65.1 L308.9,64.3 L310.2,63.5 L311.4,62.6 L312.7,61.8 L314.0,61.0 L315.3,60.1 L316.5,59.3 L317.8,58.4 L319.1,57.6 L320.4,56.7 L321.6,55.9 L322.9,55.0 L324.2,54.1 L325.5,53.3 L326.7,52.4 L328.0,51.6 L329.3,50.7 L330.6,49.9 L331.9,49.1 L333.1,48.3 L334.4,47.5 L335.7,46.7 L337.0,45.9 L338.2,45.1 L339.5,44.3 L340.8,43.6 L342.1,42.8 L343.3,42.1 L344.6,41.4 L345.9,40.8 L347.2,40.1 L348.4,39.4 L349.7,38.8 L351.0,38.2 L352.3,37.7 L353.6,37.1 L354.8,36.6 L356.1,36.1 L357.4,35.6 L358.7,35.2 L359.9,34.7 L361.2,34.4 L362.5,34.0 L363.8,33.7 L365.0,33.4 L366.3,33.1 L367.6,32.9 L368.9,32.7 L370.1,32.6 L371.4,32.5 L372.7,32.4 L374.0,32.4 L375.3,32.4 L376.5,32.4 L377.8,32.5 L379.1,32.7 L380.4,32.9 L381.6,33.1 L382.9,33.4 L384.2,33.7 L385.5,34.1 L386.7,34.5 L388.0,35.0 L389.3,35.5 L390.6,36.1 L391.8,36.7 L393.1,37.4 L394.4,38.1" fill="none" stroke="var(--pop)" stroke-width="3"/><line x1="158.8" y1="30" x2="158.8" y2="268" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 4"/><text x="158.8" y="288.0" font-size="17" fill="var(--accent)" text-anchor="middle">ξ<tspan baseline-shift="sub" font-size="11">1</tspan></text><line x1="303.2" y1="30" x2="303.2" y2="268" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 4"/><text x="303.2" y="288.0" font-size="17" fill="var(--accent)" text-anchor="middle">ξ<tspan baseline-shift="sub" font-size="11">2</tspan></text>
+</svg>
+<figcaption>Figure 9. A cubic spline with <math alttext="K equals 2"><mrow><mi>K</mi><mo>=</mo><mn>2</mn></mrow></math> knots, <math alttext="xi sub 1"><msub><mi>ξ</mi><mn>1</mn></msub></math> and <math alttext="xi sub 2"><msub><mi>ξ</mi><mn>2</mn></msub></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 9</summary>
+  <p>Axes <math alttext="y"><mi>y</mi></math> and <math alttext="x"><mi>x</mi></math>, with dashed vertical lines at the knots <math alttext="xi sub 1"><msub><mi>ξ</mi><mn>1</mn></msub></math> and <math alttext="xi sub 2"><msub><mi>ξ</mi><mn>2</mn></msub></math>. The data rise steeply on the left, level off between the knots, and rise again on the right. A single smooth curve follows them through both knots with no breaks or corners.</p>
+</details>
+
+<p>For example, <math alttext="b sub 1 equals x sub i, b sub 2 equals x sub i squared, b sub 3 equals x sub i cubed"><mrow><msub><mi>b</mi><mn>1</mn></msub><mo>=</mo><msub><mi>x</mi><mi>i</mi></msub><mo>,</mo><mspace width="0.5em"></mspace><msub><mi>b</mi><mn>2</mn></msub><mo>=</mo><msubsup><mi>x</mi><mi>i</mi><mn>2</mn></msubsup><mo>,</mo><mspace width="0.5em"></mspace><msub><mi>b</mi><mn>3</mn></msub><mo>=</mo><msubsup><mi>x</mi><mi>i</mi><mn>3</mn></msubsup></mrow></math>, and <math alttext="b sub 4, b sub 5"><mrow><msub><mi>b</mi><mn>4</mn></msub><mo>,</mo><msub><mi>b</mi><mn>5</mn></msub></mrow></math> can be the truncated power basis:</p>
+
+<div class="eq">
+<math display="block" alttext="h of x and xi equals x minus xi, positive part, cubed, which equals x minus xi cubed if x is greater than xi, and 0 otherwise">
+  <mrow><mi>h</mi><mo>(</mo><mi>x</mi><mo>,</mo><mi>ξ</mi><mo>)</mo><mo>=</mo><msubsup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><mi>ξ</mi><mo>)</mo></mrow><mo>+</mo><mn>3</mn></msubsup><mo>=</mo>
+  <mrow><mo>{</mo><mtable columnalign="left left">
+    <mtr><mtd><msup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><mi>ξ</mi><mo>)</mo></mrow><mn>3</mn></msup></mtd><mtd><mrow><mspace width="1.5em"></mspace><mi>x</mi><mo>&gt;</mo><mi>ξ</mi></mrow></mtd></mtr>
+    <mtr><mtd><mn>0</mn></mtd><mtd><mrow><mspace width="1.5em"></mspace><mtext>else</mtext></mrow></mtd></mtr>
+  </mtable></mrow></mrow>
+</math>
+</div>
+
+<h3 id="natural">1.3 Natural cubic spline</h3>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> The original numbers this section 1.3; there is no 1.2.</p>
+</div>
+
+<p><strong>One more constraint:</strong> the curve is linear beyond the boundary knots <math alttext="xi sub 0"><msub><mi>ξ</mi><mn>0</mn></msub></math> and <math alttext="xi sub K plus 1"><msub><mi>ξ</mi><mrow><mi>K</mi><mo>+</mo><mn>1</mn></mrow></msub></math>.</p>
+
+<figure>
+<svg viewBox="0 0 500 330" role="img" aria-labelledby="fig10-t fig10-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig10-t">A natural cubic spline: cubic between the boundary knots xi 0 and xi 3, and a straight line beyond them</title>
+  <desc id="fig10-d">Axes y and x. Four dashed vertical lines mark the knots: thick boundary knots xi 0 and xi 3 at the edges of the data, and thinner interior knots xi 1 and xi 2 between them. The fitted curve wiggles through the data between the boundary knots and continues as a straight line beyond each one. Labels under the axis read, from left to right: linear, cubic, cubic, cubic, linear.</desc>
+  <clipPath id="fig10-clip"><rect x="51" y="20" width="420" height="209"/></clipPath><line x1="50" y1="230" x2="470" y2="230" stroke="currentColor" stroke-width="2"/><polygon points="470,230 462,226 462,234" fill="currentColor"/><text x="476.0" y="235.0" font-size="15" fill="currentColor" text-anchor="start">x</text><line x1="50" y1="230" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="34.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><g fill="currentColor"><circle cx="117.3" cy="122.9" r="2.4"/><circle cx="134.9" cy="117.3" r="2.4"/><circle cx="146.7" cy="106.1" r="2.4"/><circle cx="149.8" cy="102.6" r="2.4"/><circle cx="151.4" cy="108.1" r="2.4"/><circle cx="154.7" cy="108.2" r="2.4"/><circle cx="172.1" cy="96.8" r="2.4"/><circle cx="175.9" cy="94.3" r="2.4"/><circle cx="190.5" cy="96.8" r="2.4"/><circle cx="202.1" cy="94.5" r="2.4"/><circle cx="214.7" cy="88.8" r="2.4"/><circle cx="222.9" cy="98.6" r="2.4"/><circle cx="224.3" cy="102.4" r="2.4"/><circle cx="226.9" cy="94.0" r="2.4"/><circle cx="268.4" cy="112.2" r="2.4"/><circle cx="286.7" cy="107.9" r="2.4"/><circle cx="288.1" cy="103.6" r="2.4"/><circle cx="288.2" cy="116.2" r="2.4"/><circle cx="289.0" cy="112.8" r="2.4"/><circle cx="291.8" cy="117.2" r="2.4"/><circle cx="297.3" cy="116.3" r="2.4"/><circle cx="302.5" cy="106.0" r="2.4"/><circle cx="304.9" cy="108.5" r="2.4"/><circle cx="306.7" cy="108.1" r="2.4"/><circle cx="311.2" cy="115.0" r="2.4"/><circle cx="311.2" cy="108.2" r="2.4"/><circle cx="319.4" cy="95.5" r="2.4"/><circle cx="320.9" cy="106.8" r="2.4"/><circle cx="325.9" cy="91.6" r="2.4"/><circle cx="335.0" cy="90.6" r="2.4"/><circle cx="335.2" cy="93.9" r="2.4"/><circle cx="339.4" cy="87.6" r="2.4"/><circle cx="343.5" cy="79.1" r="2.4"/><circle cx="345.2" cy="81.1" r="2.4"/><circle cx="354.5" cy="66.0" r="2.4"/><circle cx="362.3" cy="68.6" r="2.4"/><circle cx="375.8" cy="55.1" r="2.4"/><circle cx="377.0" cy="51.9" r="2.4"/><circle cx="377.5" cy="65.8" r="2.4"/><circle cx="385.4" cy="52.7" r="2.4"/></g><g clip-path="url(#fig10-clip)"><path d="M53.8,154.0 L55.2,153.3 L56.5,152.7 L57.9,152.0 L59.3,151.3 L60.6,150.6 L62.0,149.9 L63.3,149.2 L64.7,148.6 L66.1,147.9 L67.4,147.2 L68.8,146.5 L70.2,145.8 L71.5,145.2 L72.9,144.5 L74.2,143.8 L75.6,143.1 L77.0,142.4 L78.3,141.8 L79.7,141.1 L81.1,140.4 L82.4,139.7 L83.8,139.0 L85.1,138.3 L86.5,137.7 L87.9,137.0 L89.2,136.3 L90.6,135.6 L92.0,134.9 L93.3,134.3 L94.7,133.6 L96.0,132.9 L97.4,132.2 L98.8,131.5 L100.1,130.9 L101.5,130.2 L102.9,129.5 L104.2,128.8 L105.6,128.1 L106.9,127.4 L108.3,126.8 L109.7,126.1 L111.0,125.4 L112.4,124.7 L113.8,124.0 L115.1,123.4 L116.5,122.7 L117.8,122.0 L119.2,121.3 L120.6,120.6 L121.9,120.0 L123.3,119.3 L124.7,118.6 L126.0,117.9 L127.4,117.3 L128.7,116.6 L130.1,115.9 L131.5,115.3 L132.8,114.6 L134.2,113.9 L135.6,113.3 L136.9,112.7 L138.3,112.0 L139.6,111.4 L141.0,110.8 L142.4,110.1 L143.7,109.5 L145.1,108.9 L146.5,108.3 L147.8,107.7 L149.2,107.1 L150.5,106.6 L151.9,106.0 L153.3,105.4 L154.6,104.9 L156.0,104.4 L157.4,103.8 L158.7,103.3 L160.1,102.8 L161.4,102.3 L162.8,101.8 L164.2,101.4 L165.5,100.9 L166.9,100.5 L168.3,100.0 L169.6,99.6 L171.0,99.2 L172.3,98.8 L173.7,98.4 L175.1,98.1 L176.4,97.7 L177.8,97.4 L179.2,97.1 L180.5,96.8 L181.9,96.5 L183.2,96.3 L184.6,96.0 L186.0,95.8 L187.3,95.6 L188.7,95.4 L190.1,95.2 L191.4,95.1 L192.8,95.0 L194.1,94.8 L195.5,94.8 L196.9,94.7 L198.2,94.6 L199.6,94.6 L201.0,94.6 L202.3,94.6 L203.7,94.7 L205.0,94.7 L206.4,94.8 L207.8,94.9 L209.1,95.0 L210.5,95.2 L211.9,95.3 L213.2,95.5 L214.6,95.7 L215.9,95.9 L217.3,96.1 L218.7,96.3 L220.0,96.6 L221.4,96.8 L222.8,97.1 L224.1,97.4 L225.5,97.6 L226.8,97.9 L228.2,98.3 L229.6,98.6 L230.9,98.9 L232.3,99.2 L233.7,99.6 L235.0,99.9 L236.4,100.2 L237.7,100.6 L239.1,100.9 L240.5,101.3 L241.8,101.7 L243.2,102.0 L244.6,102.4 L245.9,102.7 L247.3,103.1 L248.6,103.5 L250.0,103.8 L251.4,104.2 L252.7,104.5 L254.1,104.9 L255.5,105.2 L256.8,105.5 L258.2,105.9 L259.5,106.2 L260.9,106.5 L262.3,106.8 L263.6,107.1 L265.0,107.4 L266.4,107.6 L267.7,107.9 L269.1,108.1 L270.4,108.4 L271.8,108.6 L273.2,108.8 L274.5,109.0 L275.9,109.2 L277.3,109.4 L278.6,109.5 L280.0,109.6 L281.3,109.7 L282.7,109.8 L284.1,109.9 L285.4,110.0 L286.8,110.0 L288.2,110.0 L289.5,110.0 L290.9,110.0 L292.2,109.9 L293.6,109.8 L295.0,109.7 L296.3,109.6 L297.7,109.4 L299.1,109.2 L300.4,109.0 L301.8,108.7 L303.1,108.5 L304.5,108.2 L305.9,107.8 L307.2,107.5 L308.6,107.1 L310.0,106.6 L311.3,106.2 L312.7,105.7 L314.0,105.1 L315.4,104.6 L316.8,104.0 L318.1,103.3 L319.5,102.7 L320.9,102.0 L322.2,101.3 L323.6,100.5 L324.9,99.8 L326.3,99.0 L327.7,98.1 L329.0,97.3 L330.4,96.4 L331.8,95.5 L333.1,94.6 L334.5,93.6 L335.8,92.6 L337.2,91.6 L338.6,90.6 L339.9,89.5 L341.3,88.5 L342.7,87.4 L344.0,86.3 L345.4,85.1 L346.7,84.0 L348.1,82.8 L349.5,81.6 L350.8,80.4 L352.2,79.2 L353.6,78.0 L354.9,76.7 L356.3,75.4 L357.6,74.2 L359.0,72.9 L360.4,71.5 L361.7,70.2 L363.1,68.9 L364.5,67.5 L365.8,66.1 L367.2,64.8 L368.5,63.4 L369.9,62.0 L371.3,60.6 L372.6,59.2 L374.0,57.7 L375.4,56.3 L376.7,54.9 L378.1,53.4 L379.4,52.0 L380.8,50.5 L382.2,49.0 L383.5,47.6 L384.9,46.1 L386.3,44.6 L387.6,43.1 L389.0,41.7 L390.3,40.2 L391.7,38.7 L393.1,37.2 L394.4,35.7 L395.8,34.2 L397.2,32.7 L398.5,31.2 L399.9,29.8 L401.2,28.3 L402.6,26.8 L404.0,25.3 L405.3,23.8 L406.7,22.3 L408.1,20.8 L409.4,19.3 L410.8,17.9 L412.1,16.4 L413.5,14.9 L414.9,13.4 L416.2,11.9 L417.6,10.4 L419.0,8.9 L420.3,7.4 L421.7,5.9 L423.0,4.5 L424.4,3.0 L425.8,1.5 L427.1,-0.0 L428.5,-1.5 L429.9,-3.0 L431.2,-4.5 L432.6,-6.0 L433.9,-7.4 L435.3,-8.9 L436.7,-10.4 L438.0,-11.9 L439.4,-13.4 L440.8,-14.9 L442.1,-16.4 L443.5,-17.9 L444.8,-19.3 L446.2,-20.8 L447.6,-22.3 L448.9,-23.8 L450.3,-25.3 L451.7,-26.8 L453.0,-28.3 L454.4,-29.8 L455.7,-31.2 L457.1,-32.7 L458.5,-34.2 L459.8,-35.7 L461.2,-37.2" fill="none" stroke="var(--pop)" stroke-width="3"/></g><line x1="116.8" y1="28" x2="116.8" y2="246" stroke="var(--accent)" stroke-width="4" stroke-dasharray="8 4"/><text x="116.8" y="266.0" font-size="17" fill="var(--accent)" text-anchor="middle">ξ<tspan baseline-shift="sub" font-size="11">0</tspan></text><text x="116.8" y="288.0" font-size="14" fill="var(--accent)" text-anchor="middle">boundary</text><line x1="200.8" y1="28" x2="200.8" y2="246" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 4"/><text x="200.8" y="266.0" font-size="17" fill="var(--accent)" text-anchor="middle">ξ<tspan baseline-shift="sub" font-size="11">1</tspan></text><line x1="310.0" y1="28" x2="310.0" y2="246" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 4"/><text x="310.0" y="266.0" font-size="17" fill="var(--accent)" text-anchor="middle">ξ<tspan baseline-shift="sub" font-size="11">2</tspan></text><line x1="394.0" y1="28" x2="394.0" y2="246" stroke="var(--accent)" stroke-width="4" stroke-dasharray="8 4"/><text x="394.0" y="266.0" font-size="17" fill="var(--accent)" text-anchor="middle">ξ<tspan baseline-shift="sub" font-size="11">3</tspan></text><text x="394.0" y="288.0" font-size="14" fill="var(--accent)" text-anchor="middle">boundary</text><text x="84.4" y="314.0" font-size="14" fill="var(--pop)" text-anchor="middle" font-style="italic">linear</text><text x="158.8" y="314.0" font-size="14" fill="var(--pop)" text-anchor="middle">cubic</text><text x="255.4" y="314.0" font-size="14" fill="var(--pop)" text-anchor="middle">cubic</text><text x="352.0" y="314.0" font-size="14" fill="var(--pop)" text-anchor="middle">cubic</text><text x="430.0" y="314.0" font-size="14" fill="var(--pop)" text-anchor="middle" font-style="italic">linear</text>
+</svg>
+<figcaption>Figure 10. A natural cubic spline with boundary knots <math alttext="xi sub 0"><msub><mi>ξ</mi><mn>0</mn></msub></math> and <math alttext="xi sub 3"><msub><mi>ξ</mi><mn>3</mn></msub></math> and interior knots <math alttext="xi sub 1"><msub><mi>ξ</mi><mn>1</mn></msub></math> and <math alttext="xi sub 2"><msub><mi>ξ</mi><mn>2</mn></msub></math>: cubic between the boundary knots, linear beyond them.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 10</summary>
+  <p>Axes <math alttext="y"><mi>y</mi></math> and <math alttext="x"><mi>x</mi></math>. Four dashed vertical lines mark the knots. The outer two, <math alttext="xi sub 0"><msub><mi>ξ</mi><mn>0</mn></msub></math> and <math alttext="xi sub 3"><msub><mi>ξ</mi><mn>3</mn></msub></math>, are drawn thicker and labelled “boundary”; they sit at the left and right edges of the data. Between them the fitted curve rises to a gentle hump, dips, and climbs again. Beyond each boundary knot it continues as a straight line. Labels under the axis give the shape in each of the five regions, left to right: linear, cubic, cubic, cubic, linear.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Annotation</span> <strong>Why?</strong> Less extreme tails.</p>
+</div>
+
+<table>
+  <caption>Counting degrees of freedom for the natural cubic spline in Figure 10, left to right (5 regions, 4 knots)</caption>
+  <thead><tr><th scope="col">Piece</th><th scope="col">Uncon&shy;strained d.f.</th><th scope="col">Knot constraints</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">linear region</th><td>2</td><td></td></tr>
+    <tr><th scope="row">knot <math alttext="xi sub 0"><msub><mi>ξ</mi><mn>0</mn></msub></math> (boundary)</th><td></td><td>3</td></tr>
+    <tr><th scope="row">cubic region</th><td>4</td><td></td></tr>
+    <tr><th scope="row">knot <math alttext="xi sub 1"><msub><mi>ξ</mi><mn>1</mn></msub></math></th><td></td><td>3</td></tr>
+    <tr><th scope="row">cubic region</th><td>4</td><td></td></tr>
+    <tr><th scope="row">knot <math alttext="xi sub 2"><msub><mi>ξ</mi><mn>2</mn></msub></math></th><td></td><td>3</td></tr>
+    <tr><th scope="row">cubic region</th><td>4</td><td></td></tr>
+    <tr><th scope="row">knot <math alttext="xi sub 3"><msub><mi>ξ</mi><mn>3</mn></msub></math> (boundary)</th><td></td><td>3</td></tr>
+    <tr><th scope="row">linear region</th><td>2</td><td></td></tr>
+    <tr><th scope="row">Total</th><td>16</td><td>12</td></tr>
+  </tbody>
+</table>
+
+<div class="eq">
+<math display="block" alttext="d.f. equals 16 minus 12 equals 4">
+  <mrow><mtext>d.f.</mtext><mo>=</mo><mn>16</mn><mo>−</mo><mn>12</mn><mo>=</mo><mn>4</mn></mrow>
+</math>
+</div>
+
+<p>or</p>
+
+<div class="eq">
+<math display="block" alttext="d.f. equals K plus 2, plus 4, minus 2 plus 2">
+  <mrow><mtext>d.f.</mtext><mo>=</mo><mo>(</mo><mi>K</mi><mo>+</mo><mn>2</mn><mo>)</mo><mo>+</mo><mn>4</mn><mo>−</mo><mo>(</mo><mn>2</mn><mo>+</mo><mn>2</mn><mo>)</mo></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> Arrows label the parts: <math alttext="K"><mi>K</mi></math> is the inner knots and the <math alttext="plus 2"><mrow><mo>+</mo><mn>2</mn></mrow></math> beside it the boundary knots; <math alttext="2 plus 2"><mrow><mo>(</mo><mn>2</mn><mo>+</mo><mn>2</mn><mo>)</mo></mrow></math> is the boundary areas, which use <math alttext="1"><mn>1</mn></math> and <math alttext="x"><mi>x</mi></math>, not <math alttext="x squared"><msup><mi>x</mi><mn>2</mn></msup></math> and <math alttext="x cubed"><msup><mi>x</mi><mn>3</mn></msup></math>.</p>
+</div>
+
+<p>or</p>
+
+<div class="eq">
+<math display="block" alttext="d.f. equals K plus 2, where K counts the interior knots only">
+  <mrow><mtext>d.f.</mtext><mo>=</mo><mi>K</mi><mo>+</mo><mn>2</mn><mspace width="1em"></mspace><mtext>(</mtext><mi>K</mi><mtext>: interior knots only)</mtext></mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="bold B equals the n by 4 matrix with columns 1, x, b sub 2, b sub 3">
+  <mrow><mi mathvariant="bold">B</mi><mo>=</mo><msub><mrow><mo>(</mo><mtable><mtr><mtd><mo>|</mo></mtd><mtd><mo>|</mo></mtd><mtd><mo>|</mo></mtd><mtd><mo>|</mo></mtd></mtr><mtr><mtd><mn>1</mn></mtd><mtd><mi>x</mi></mtd><mtd><msub><mi>b</mi><mn>2</mn></msub></mtd><mtd><msub><mi>b</mi><mn>3</mn></msub></mtd></mtr><mtr><mtd><mo>|</mo></mtd><mtd><mo>|</mo></mtd><mtd><mo>|</mo></mtd><mtd><mo>|</mo></mtd></mtr></mtable><mo>)</mo></mrow><mrow><mi>n</mi><mo>×</mo><mn>4</mn></mrow></msub></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> The columns <math alttext="b sub 2"><msub><mi>b</mi><mn>2</mn></msub></math> and <math alttext="b sub 3"><msub><mi>b</mi><mn>3</mn></msub></math> are bracketed and labelled <strong>complex</strong>.</p>
+</div>
+
+<h3 id="quick">1.4 Quick notes</h3>
+<ul>
+  <li><math alttext="x, x squared, x cubed, dot dot dot, x minus xi sub 1, positive part, cubed, dot dot dot"><mrow><mi>x</mi><mo>,</mo><msup><mi>x</mi><mn>2</mn></msup><mo>,</mo><msup><mi>x</mi><mn>3</mn></msup><mo>,</mo><mo>…</mo><mo>,</mo><msubsup><mrow><mo>(</mo><mi>x</mi><mo>−</mo><msub><mi>ξ</mi><mn>1</mn></msub><mo>)</mo></mrow><mo>+</mo><mn>3</mn></msubsup><mo>,</mo><mo>…</mo></mrow></math>: correlated, numerically unstable. Solutions:
+    <ul>
+      <li>standardize <math alttext="x"><mi>x</mi></math></li>
+      <li>use orthonormal columns (QR decomposition)</li>
+      <li>B-spline basis</li>
+    </ul>
+  </li>
+  <li>Choosing <math alttext="K"><mi>K</mi></math>: use C.V.</li>
+  <li>Knot placement: by default, use quantiles</li>
+</ul>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Also on this page, in a second colour and without the questions they answer:</p>
+  <ul>
+    <li>Round 1: 12, 6, 4</li>
+    <li>Round 2: Y, N, N</li>
+    <li>Round 3: C, A, B</li>
+  </ul>
+</div>
+
+<h2 id="smoothing">2. Smoothing splines</h2>
+
+<h3 id="criterion">2.1 The criterion</h3>
+
+<div class="eq">
+<math display="block" alttext="g hat sub lambda equals the argmin over g of the sum from i equals 1 to n of, y sub i minus g of x sub i, squared, plus lambda times the integral of g double prime of t squared d t">
+  <mrow><msub><mover><mi>g</mi><mo>^</mo></mover><mi>λ</mi></msub><mo>=</mo><munder><mrow><mi>arg</mi><mo>⁡</mo><mi>min</mi></mrow><mi>g</mi></munder><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mi>g</mi><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><mi>λ</mi><mo>∫</mo><msup><mrow><mo>(</mo><msup><mi>g</mi><mo>″</mo></msup><mo>(</mo><mi>t</mi><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mspace width="0.2em"></mspace><mi>d</mi><mi>t</mi></mrow>
+</math>
+</div>
+
+<figure>
+<svg viewBox="0 0 520 270" role="img" aria-labelledby="fig11-t fig11-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig11-t">Two curves through the same few points: a wiggly one with a larger integrated squared second derivative, and a smoother one</title>
+  <desc id="fig11-d">Axes y and x, with nine data points trending upward. A solid curve passes through every point, swinging up and down between them; an arrow from the label larger integral of g double prime of t squared d t points at it. A dashed curve rises smoothly through the middle of the points without chasing each one.</desc>
+  <clipPath id="fig11-clip"><rect x="51" y="20" width="340" height="219"/></clipPath><line x1="50" y1="240" x2="390" y2="240" stroke="currentColor" stroke-width="2"/><polygon points="390,240 382,236 382,244" fill="currentColor"/><text x="396.0" y="245.0" font-size="15" fill="currentColor" text-anchor="start">x</text><line x1="50" y1="240" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="34.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><g fill="currentColor"><circle cx="88.8" cy="171.4" r="3.2"/><circle cx="124.8" cy="129.4" r="3.2"/><circle cx="160.8" cy="152.2" r="3.2"/><circle cx="196.8" cy="158.2" r="3.2"/><circle cx="232.8" cy="97.0" r="3.2"/><circle cx="268.8" cy="100.6" r="3.2"/><circle cx="304.8" cy="65.8" r="3.2"/><circle cx="340.8" cy="71.8" r="3.2"/><circle cx="369.6" cy="49.3" r="3.2"/></g><g clip-path="url(#fig11-clip)"><path d="M78.0,188.9 L79.2,187.0 L80.3,185.1 L81.5,183.2 L82.7,181.3 L83.8,179.4 L85.0,177.5 L86.2,175.6 L87.3,173.7 L88.5,171.8 L89.7,169.9 L90.8,168.0 L92.0,166.1 L93.2,164.3 L94.3,162.4 L95.5,160.6 L96.7,158.7 L97.8,156.9 L99.0,155.1 L100.2,153.4 L101.4,151.7 L102.5,150.0 L103.7,148.3 L104.9,146.7 L106.0,145.2 L107.2,143.7 L108.4,142.2 L109.5,140.9 L110.7,139.5 L111.9,138.3 L113.0,137.1 L114.2,136.0 L115.4,134.9 L116.5,133.9 L117.7,133.1 L118.9,132.3 L120.0,131.5 L121.2,130.9 L122.4,130.4 L123.5,130.0 L124.7,129.6 L125.9,129.4 L127.0,129.3 L128.2,129.3 L129.4,129.4 L130.5,129.5 L131.7,129.8 L132.9,130.1 L134.0,130.5 L135.2,131.0 L136.4,131.6 L137.5,132.2 L138.7,132.9 L139.9,133.6 L141.0,134.4 L142.2,135.2 L143.4,136.1 L144.6,137.1 L145.7,138.0 L146.9,139.1 L148.1,140.1 L149.2,141.2 L150.4,142.2 L151.6,143.3 L152.7,144.5 L153.9,145.6 L155.1,146.7 L156.2,147.9 L157.4,149.0 L158.6,150.1 L159.7,151.2 L160.9,152.3 L162.1,153.4 L163.2,154.5 L164.4,155.5 L165.6,156.5 L166.7,157.5 L167.9,158.4 L169.1,159.3 L170.2,160.2 L171.4,161.0 L172.6,161.7 L173.7,162.4 L174.9,163.0 L176.1,163.5 L177.2,164.0 L178.4,164.4 L179.6,164.8 L180.7,165.0 L181.9,165.2 L183.1,165.2 L184.2,165.2 L185.4,165.1 L186.6,164.9 L187.8,164.5 L188.9,164.1 L190.1,163.5 L191.3,162.9 L192.4,162.1 L193.6,161.1 L194.8,160.1 L195.9,158.9 L197.1,157.6 L198.3,156.1 L199.4,154.5 L200.6,152.8 L201.8,151.0 L202.9,149.0 L204.1,147.0 L205.3,144.9 L206.4,142.8 L207.6,140.6 L208.8,138.3 L209.9,136.0 L211.1,133.7 L212.3,131.3 L213.4,128.9 L214.6,126.6 L215.8,124.2 L216.9,121.9 L218.1,119.6 L219.3,117.3 L220.4,115.1 L221.6,113.0 L222.8,110.9 L223.9,108.9 L225.1,107.0 L226.3,105.2 L227.4,103.5 L228.6,102.0 L229.8,100.5 L231.0,99.2 L232.1,98.1 L233.3,97.1 L234.5,96.3 L235.6,95.6 L236.8,95.1 L238.0,94.7 L239.1,94.5 L240.3,94.3 L241.5,94.3 L242.6,94.3 L243.8,94.5 L245.0,94.7 L246.1,95.0 L247.3,95.3 L248.5,95.7 L249.6,96.1 L250.8,96.6 L252.0,97.1 L253.1,97.6 L254.3,98.0 L255.5,98.5 L256.6,99.0 L257.8,99.4 L259.0,99.8 L260.1,100.1 L261.3,100.4 L262.5,100.6 L263.6,100.8 L264.8,100.8 L266.0,100.8 L267.1,100.6 L268.3,100.4 L269.5,100.0 L270.6,99.5 L271.8,98.8 L273.0,98.1 L274.2,97.3 L275.3,96.3 L276.5,95.3 L277.7,94.2 L278.8,93.1 L280.0,91.8 L281.2,90.6 L282.3,89.2 L283.5,87.9 L284.7,86.5 L285.8,85.1 L287.0,83.7 L288.2,82.3 L289.3,80.8 L290.5,79.4 L291.7,78.0 L292.8,76.7 L294.0,75.4 L295.2,74.1 L296.3,72.8 L297.5,71.7 L298.7,70.6 L299.8,69.5 L301.0,68.6 L302.2,67.7 L303.3,67.0 L304.5,66.3 L305.7,65.8 L306.8,65.4 L308.0,65.1 L309.2,64.8 L310.3,64.7 L311.5,64.7 L312.7,64.7 L313.8,64.8 L315.0,65.0 L316.2,65.2 L317.4,65.5 L318.5,65.8 L319.7,66.2 L320.9,66.6 L322.0,67.0 L323.2,67.5 L324.4,67.9 L325.5,68.4 L326.7,68.8 L327.9,69.3 L329.0,69.7 L330.2,70.1 L331.4,70.5 L332.5,70.8 L333.7,71.1 L334.9,71.4 L336.0,71.5 L337.2,71.7 L338.4,71.7 L339.5,71.7 L340.7,71.6 L341.9,71.4 L343.0,71.1 L344.2,70.8 L345.4,70.3 L346.5,69.8 L347.7,69.2 L348.9,68.6 L350.0,67.8 L351.2,67.0 L352.4,66.2 L353.5,65.3 L354.7,64.3 L355.9,63.3 L357.0,62.3 L358.2,61.2 L359.4,60.1 L360.6,59.0 L361.7,57.8 L362.9,56.6 L364.1,55.4 L365.2,54.1 L366.4,52.9 L367.6,51.6 L368.7,50.3 L369.9,49.0 L371.1,47.8 L372.2,46.5 L373.4,45.2 L374.6,44.0 L375.7,42.7 L376.9,41.4 L378.1,40.1 L379.2,38.9 L380.4,37.6" fill="none" stroke="var(--est)" stroke-width="3"/><path d="M78.0,166.9 L79.2,166.5 L80.3,166.1 L81.5,165.6 L82.7,165.2 L83.8,164.8 L85.0,164.3 L86.2,163.9 L87.3,163.5 L88.5,163.0 L89.7,162.6 L90.8,162.2 L92.0,161.7 L93.2,161.3 L94.3,160.9 L95.5,160.5 L96.7,160.0 L97.8,159.6 L99.0,159.2 L100.2,158.8 L101.4,158.4 L102.5,158.0 L103.7,157.6 L104.9,157.2 L106.0,156.8 L107.2,156.4 L108.4,156.0 L109.5,155.6 L110.7,155.3 L111.9,154.9 L113.0,154.5 L114.2,154.2 L115.4,153.8 L116.5,153.5 L117.7,153.2 L118.9,152.9 L120.0,152.6 L121.2,152.3 L122.4,152.0 L123.5,151.7 L124.7,151.4 L125.9,151.2 L127.0,150.9 L128.2,150.7 L129.4,150.5 L130.5,150.3 L131.7,150.1 L132.9,149.9 L134.0,149.7 L135.2,149.5 L136.4,149.3 L137.5,149.1 L138.7,149.0 L139.9,148.8 L141.0,148.6 L142.2,148.5 L143.4,148.3 L144.6,148.2 L145.7,148.0 L146.9,147.9 L148.1,147.7 L149.2,147.6 L150.4,147.4 L151.6,147.3 L152.7,147.1 L153.9,147.0 L155.1,146.8 L156.2,146.6 L157.4,146.5 L158.6,146.3 L159.7,146.1 L160.9,145.9 L162.1,145.7 L163.2,145.6 L164.4,145.3 L165.6,145.1 L166.7,144.9 L167.9,144.7 L169.1,144.5 L170.2,144.2 L171.4,144.0 L172.6,143.7 L173.7,143.4 L174.9,143.1 L176.1,142.8 L177.2,142.5 L178.4,142.2 L179.6,141.9 L180.7,141.6 L181.9,141.2 L183.1,140.8 L184.2,140.5 L185.4,140.1 L186.6,139.7 L187.8,139.3 L188.9,138.9 L190.1,138.4 L191.3,138.0 L192.4,137.5 L193.6,137.0 L194.8,136.5 L195.9,136.0 L197.1,135.5 L198.3,134.9 L199.4,134.4 L200.6,133.8 L201.8,133.2 L202.9,132.6 L204.1,132.0 L205.3,131.4 L206.4,130.7 L207.6,130.1 L208.8,129.4 L209.9,128.7 L211.1,128.1 L212.3,127.4 L213.4,126.7 L214.6,126.0 L215.8,125.3 L216.9,124.6 L218.1,123.9 L219.3,123.2 L220.4,122.4 L221.6,121.7 L222.8,121.0 L223.9,120.3 L225.1,119.5 L226.3,118.8 L227.4,118.1 L228.6,117.4 L229.8,116.6 L231.0,115.9 L232.1,115.2 L233.3,114.5 L234.5,113.8 L235.6,113.1 L236.8,112.4 L238.0,111.7 L239.1,111.0 L240.3,110.3 L241.5,109.6 L242.6,108.9 L243.8,108.2 L245.0,107.6 L246.1,106.9 L247.3,106.2 L248.5,105.6 L249.6,104.9 L250.8,104.2 L252.0,103.6 L253.1,102.9 L254.3,102.3 L255.5,101.6 L256.6,101.0 L257.8,100.4 L259.0,99.7 L260.1,99.1 L261.3,98.4 L262.5,97.8 L263.6,97.2 L264.8,96.5 L266.0,95.9 L267.1,95.3 L268.3,94.7 L269.5,94.0 L270.6,93.4 L271.8,92.8 L273.0,92.2 L274.2,91.5 L275.3,90.9 L276.5,90.3 L277.7,89.7 L278.8,89.1 L280.0,88.5 L281.2,87.9 L282.3,87.3 L283.5,86.7 L284.7,86.1 L285.8,85.5 L287.0,84.9 L288.2,84.3 L289.3,83.8 L290.5,83.2 L291.7,82.6 L292.8,82.1 L294.0,81.5 L295.2,81.0 L296.3,80.4 L297.5,79.9 L298.7,79.3 L299.8,78.8 L301.0,78.3 L302.2,77.7 L303.3,77.2 L304.5,76.7 L305.7,76.2 L306.8,75.7 L308.0,75.2 L309.2,74.8 L310.3,74.3 L311.5,73.8 L312.7,73.3 L313.8,72.9 L315.0,72.4 L316.2,72.0 L317.4,71.5 L318.5,71.1 L319.7,70.6 L320.9,70.2 L322.0,69.7 L323.2,69.3 L324.4,68.9 L325.5,68.4 L326.7,68.0 L327.9,67.6 L329.0,67.1 L330.2,66.7 L331.4,66.3 L332.5,65.9 L333.7,65.4 L334.9,65.0 L336.0,64.6 L337.2,64.1 L338.4,63.7 L339.5,63.3 L340.7,62.8 L341.9,62.4 L343.0,62.0 L344.2,61.5 L345.4,61.1 L346.5,60.6 L347.7,60.2 L348.9,59.7 L350.0,59.3 L351.2,58.8 L352.4,58.4 L353.5,57.9 L354.7,57.4 L355.9,57.0 L357.0,56.5 L358.2,56.1 L359.4,55.6 L360.6,55.1 L361.7,54.7 L362.9,54.2 L364.1,53.7 L365.2,53.3 L366.4,52.8 L367.6,52.3 L368.7,51.9 L369.9,51.4 L371.1,50.9 L372.2,50.5 L373.4,50.0 L374.6,49.5 L375.7,49.1 L376.9,48.6 L378.1,48.1 L379.2,47.7 L380.4,47.2" fill="none" stroke="var(--pop)" stroke-width="3" stroke-dasharray="10 5"/></g><text x="408.0" y="60.0" font-size="15" fill="var(--est)" text-anchor="start">larger</text><text x="408.0" y="82.0" font-size="15" fill="var(--est)" text-anchor="start">∫(g″(t))² dt</text><line x1="404.0" y1="66.0" x2="308.8" y2="60.2" stroke="var(--est)" stroke-width="1.5"/><polygon points="308.8,60.2 317.3,57.2 316.9,64.2" fill="var(--est)"/>
+</svg>
+<figcaption>Figure 11. Two curves through the same points. The wiggly one has the larger penalty <math alttext="the integral of g double prime of t squared d t"><mrow><mo>∫</mo><msup><mrow><mo>(</mo><msup><mi>g</mi><mo>″</mo></msup><mo>(</mo><mi>t</mi><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mi>d</mi><mi>t</mi></mrow></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 11</summary>
+  <p>Axes <math alttext="y"><mi>y</mi></math> and <math alttext="x"><mi>x</mi></math>, with nine data points trending upward. A solid curve passes through every point, swinging up and down between them; an arrow from the label “larger <math alttext="the integral of g double prime of t squared d t"><mrow><mo>∫</mo><msup><mrow><mo>(</mo><msup><mi>g</mi><mo>″</mo></msup><mo>(</mo><mi>t</mi><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mi>d</mi><mi>t</mi></mrow></math>” points at it. A dashed curve rises smoothly through the middle of the points without chasing each one.</p>
+</details>
+
+<ul>
+  <li><math alttext="lambda equals 0"><mrow><mi>λ</mi><mo>=</mo><mn>0</mn></mrow></math> ⇒ as wiggly as we want</li>
+  <li><math alttext="lambda goes to infinity"><mrow><mi>λ</mi><mo>→</mo><mi>∞</mi></mrow></math> ⇒ OLS line</li>
+</ul>
+
+<p>Written beside these: <strong>Bias? Variance?</strong></p>
+
+<h3 id="solution">2.2 Solution</h3>
+
+<p><strong>Given (ESL Ex. 5.7):</strong> For <math alttext="lambda greater than 0"><mrow><mi>λ</mi><mo>&gt;</mo><mn>0</mn></mrow></math> and <math alttext="n greater than or equal to 2"><mrow><mi>n</mi><mo>≥</mo><mn>2</mn></mrow></math> distinct <math alttext="x sub i"><msub><mi>x</mi><mi>i</mi></msub></math>, the <math alttext="g"><mi>g</mi></math> that minimizes the criterion is a <em>natural</em> cubic spline with knots at <strong>all</strong> <math alttext="x sub 1 through x sub n"><mrow><msub><mi>x</mi><mn>1</mn></msub><mo>,</mo><mo>…</mo><mo>,</mo><msub><mi>x</mi><mi>n</mi></msub></mrow></math>.</p>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> In the original, “natural” is underlined in a second colour and “all” is double-underlined.</p>
+</div>
+
+<p><strong>Recall:</strong> For <math alttext="x sub 1 less than x sub 2 less than dot dot dot less than x sub n"><mrow><msub><mi>x</mi><mn>1</mn></msub><mo>&lt;</mo><msub><mi>x</mi><mn>2</mn></msub><mo>&lt;</mo><mo>⋯</mo><mo>&lt;</mo><msub><mi>x</mi><mi>n</mi></msub></mrow></math>, <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> and <math alttext="x sub n"><msub><mi>x</mi><mi>n</mi></msub></math> are the boundary knots.</p>
+
+<h3 id="fitting">3.1 Fitting</h3>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> The original numbers this section 3.1, although it continues Section 2.</p>
+</div>
+
+<div class="eq">
+<math display="block" alttext="g of x equals beta sub 0 plus the sum from j equals 1 to n minus 1 of beta sub j b sub j of x">
+  <mrow><mi>g</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></munderover><msub><mi>β</mi><mi>j</mi></msub><msub><mi>b</mi><mi>j</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="bold B equals the n by n matrix with columns 1, x, dot dot dot, b sub n minus 1">
+  <mrow><mi mathvariant="bold">B</mi><mo>=</mo><msub><mrow><mo>(</mo><mtable><mtr><mtd><mo>|</mo></mtd><mtd><mo>|</mo></mtd><mtd></mtd><mtd><mo>|</mo></mtd></mtr><mtr><mtd><mn>1</mn></mtd><mtd><mi>x</mi></mtd><mtd><mo>⋯</mo></mtd><mtd><msub><mi>b</mi><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></msub></mtd></mtr><mtr><mtd><mo>|</mo></mtd><mtd><mo>|</mo></mtd><mtd></mtd><mtd><mo>|</mo></mtd></mtr></mtable><mo>)</mo></mrow><mrow><mi>n</mi><mo>×</mo><mi>n</mi></mrow></msub></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> <strong>Example</strong> (columns 1, <math alttext="x"><mi>x</mi></math>, <math alttext="b sub 2"><msub><mi>b</mi><mn>2</mn></msub></math>, <math alttext="b sub 3"><msub><mi>b</mi><mn>3</mn></msub></math>):</p>
+  <div class="eq">
+  <math display="block" alttext="bold B equals the 4 by 4 matrix with rows: 1, 0, 0, 0; 1, 1, one third, 0; 1, 2, eight thirds, one half; 1, 3, 8, 3">
+    <mrow><mi mathvariant="bold">B</mi><mo>=</mo><msub><mrow><mo>(</mo><mtable>
+      <mtr><mtd><mn>1</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>0</mn></mtd></mtr>
+      <mtr><mtd><mn>1</mn></mtd><mtd><mn>1</mn></mtd><mtd><mfrac><mn>1</mn><mn>3</mn></mfrac></mtd><mtd><mn>0</mn></mtd></mtr>
+      <mtr><mtd><mn>1</mn></mtd><mtd><mn>2</mn></mtd><mtd><mfrac><mn>8</mn><mn>3</mn></mfrac></mtd><mtd><mfrac><mn>1</mn><mn>2</mn></mfrac></mtd></mtr>
+      <mtr><mtd><mn>1</mn></mtd><mtd><mn>3</mn></mtd><mtd><mn>8</mn></mtd><mtd><mn>3</mn></mtd></mtr>
+    </mtable><mo>)</mo></mrow><mrow><mn>4</mn><mo>×</mo><mn>4</mn></mrow></msub></mrow>
+  </math>
+  </div>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> These <math alttext="b sub 2"><msub><mi>b</mi><mn>2</mn></msub></math> and <math alttext="b sub 3"><msub><mi>b</mi><mn>3</mn></msub></math> are ESL’s natural-spline basis functions <math alttext="N sub 3"><msub><mi>N</mi><mn>3</mn></msub></math> and <math alttext="N sub 4"><msub><mi>N</mi><mn>4</mn></msub></math> (ESL 5.2.1) for knots at <math alttext="x equals 0, 1, 2, 3"><mrow><mi>x</mi><mo>=</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn></mrow></math>; the entries check out.</p>
+</div>
+
+<p><strong>The loss:</strong></p>
+
+<div class="eq">
+<math display="block" alttext="the sum from i equals 1 to n of, y sub i minus g of x sub i, squared, equals the squared 2-norm of bold y minus bold B beta, which equals bold y minus bold B beta, transpose, times bold y minus bold B beta">
+  <mrow><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mi>g</mi><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>=</mo><msubsup><mrow><mo>‖</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">B</mi><mi>β</mi><mo>‖</mo></mrow><mn>2</mn><mn>2</mn></msubsup><mo>=</mo><msup><mrow><mo>(</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">B</mi><mi>β</mi><mo>)</mo></mrow><mi>T</mi></msup><mo>(</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">B</mi><mi>β</mi><mo>)</mo></mrow>
+</math>
+</div>
+
+<p><strong>Penalty:</strong></p>
+
+<div class="eq">
+<math display="block" alttext="the integral of g double prime of t squared d t, equals the integral of, the sum from j equals 1 to n minus 1 of beta sub j b sub j double prime of t, squared, d t; equals the integral of the double sum over j and k of beta sub j beta sub k b sub j double prime of t b sub k double prime of t d t; equals the double sum over j and k of beta sub j beta sub k times the integral of b sub j double prime of t b sub k double prime of t d t; equals beta transpose bold Omega beta">
+  <mtable columnalign="left">
+    <mtr><mtd><mrow><mo>∫</mo><msup><mrow><mo>(</mo><msup><mi>g</mi><mo>″</mo></msup><mo>(</mo><mi>t</mi><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mi>d</mi><mi>t</mi><mo>=</mo><mo>∫</mo><msup><mrow><mo>(</mo><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></munderover><msub><mi>β</mi><mi>j</mi></msub><msubsup><mi>b</mi><mi>j</mi><mo>″</mo></msubsup><mo>(</mo><mi>t</mi><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mi>d</mi><mi>t</mi></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mspace width="6em"></mspace><mo>=</mo><mo>∫</mo><munder><mo>∑</mo><mi>j</mi></munder><munder><mo>∑</mo><mi>k</mi></munder><msub><mi>β</mi><mi>j</mi></msub><msub><mi>β</mi><mi>k</mi></msub><msubsup><mi>b</mi><mi>j</mi><mo>″</mo></msubsup><mo>(</mo><mi>t</mi><mo>)</mo><msubsup><mi>b</mi><mi>k</mi><mo>″</mo></msubsup><mo>(</mo><mi>t</mi><mo>)</mo><mspace width="0.2em"></mspace><mi>d</mi><mi>t</mi></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mspace width="6em"></mspace><mo>=</mo><munder><mo>∑</mo><mi>j</mi></munder><munder><mo>∑</mo><mi>k</mi></munder><msub><mi>β</mi><mi>j</mi></msub><msub><mi>β</mi><mi>k</mi></msub><mo>∫</mo><msubsup><mi>b</mi><mi>j</mi><mo>″</mo></msubsup><mo>(</mo><mi>t</mi><mo>)</mo><msubsup><mi>b</mi><mi>k</mi><mo>″</mo></msubsup><mo>(</mo><mi>t</mi><mo>)</mo><mspace width="0.2em"></mspace><mi>d</mi><mi>t</mi></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mspace width="6em"></mspace><mo>=</mo><msup><mi>β</mi><mi>T</mi></msup><mi mathvariant="bold">Ω</mi><mi>β</mi></mrow></mtd></mtr>
+  </mtable>
+</math>
+</div>
+
+<p><math alttext="bold Omega, n by n"><msub><mi mathvariant="bold">Ω</mi><mrow><mi>n</mi><mo>×</mo><mi>n</mi></mrow></msub></math>: symmetric, positive semi-definite (eigenvalues <math alttext="greater than or equal to 0"><mrow><mo>≥</mo><mn>0</mn></mrow></math>).</p>
+
+<p>Worked beside the penalty:</p>
+
+<div class="eq">
+<math display="block" alttext="beta sub 1 b sub 1 plus beta sub 2 b sub 2, squared, equals beta sub 1 b sub 1 squared, plus 2 beta sub 1 b sub 1 beta sub 2 b sub 2, plus beta sub 2 b sub 2 squared">
+  <mrow><msup><mrow><mo>(</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>b</mi><mn>1</mn></msub><mo>+</mo><msub><mi>β</mi><mn>2</mn></msub><msub><mi>b</mi><mn>2</mn></msub><mo>)</mo></mrow><mn>2</mn></msup><mo>=</mo><msup><mrow><mo>(</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>b</mi><mn>1</mn></msub><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><mn>2</mn><msub><mi>β</mi><mn>1</mn></msub><msub><mi>b</mi><mn>1</mn></msub><msub><mi>β</mi><mn>2</mn></msub><msub><mi>b</mi><mn>2</mn></msub><mo>+</mo><msup><mrow><mo>(</mo><msub><mi>β</mi><mn>2</mn></msub><msub><mi>b</mi><mn>2</mn></msub><mo>)</mo></mrow><mn>2</mn></msup></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> The intercept and <math alttext="b sub 1 of x equals x"><mrow><msub><mi>b</mi><mn>1</mn></msub><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mi>x</mi></mrow></math> have zero second derivative, so their rows and columns of <math alttext="bold Omega"><mi mathvariant="bold">Ω</mi></math> are zero: the penalty never touches the straight-line part. That is why <math alttext="lambda goes to infinity"><mrow><mi>λ</mi><mo>→</mo><mi>∞</mi></mrow></math> leaves the OLS line.</p>
+</div>
+
+<div class="eq">
+<math display="block" alttext="RSS sub lambda of beta equals the squared 2-norm of bold y minus bold B beta, plus lambda beta transpose bold Omega beta, which is bold y minus bold B beta, transpose, times bold y minus bold B beta, plus lambda beta transpose bold Omega beta">
+  <mrow><msub><mtext>RSS</mtext><mi>λ</mi></msub><mo>(</mo><mi>β</mi><mo>)</mo><mo>=</mo><msubsup><mrow><mo>‖</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">B</mi><mi>β</mi><mo>‖</mo></mrow><mn>2</mn><mn>2</mn></msubsup><mo>+</mo><mi>λ</mi><msup><mi>β</mi><mi>T</mi></msup><mi mathvariant="bold">Ω</mi><mi>β</mi><mo>=</mo><msup><mrow><mo>(</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">B</mi><mi>β</mi><mo>)</mo></mrow><mi>T</mi></msup><mo>(</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">B</mi><mi>β</mi><mo>)</mo><mo>+</mo><mi>λ</mi><msup><mi>β</mi><mi>T</mi></msup><mi mathvariant="bold">Ω</mi><mi>β</mi></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> In the original, the second form is squeezed in above the first, and the square on the norm is written high, where it runs into that line.</p>
+</div>
+
+<div class="eq">
+<math display="block" alttext="implies beta hat equals the inverse of bold B transpose bold B plus lambda bold Omega, times bold B transpose bold y">
+  <mrow><mo>⇒</mo><mover><mi>β</mi><mo>^</mo></mover><mo>=</mo><msup><mrow><mo>(</mo><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mi mathvariant="bold">B</mi><mo>+</mo><mi>λ</mi><mi mathvariant="bold">Ω</mi><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mi mathvariant="bold">y</mi></mrow>
+</math>
+</div>
+
+<p><strong>Note:</strong> <math alttext="bold B transpose bold B"><mrow><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mi mathvariant="bold">B</mi></mrow></math> is positive definite (eigenvalues <math alttext="greater than 0"><mrow><mo>&gt;</mo><mn>0</mn></mrow></math>).</p>
+
+<p>Looks like ridge regression.</p>
+
+<div class="eq">
+<math display="block" alttext="bold g hat sub lambda equals bold B beta hat, which equals bold S sub lambda bold y, where bold S sub lambda equals bold B times the inverse of bold B transpose bold B plus lambda bold Omega, times bold B transpose">
+  <mtable columnalign="left">
+    <mtr><mtd><mrow><msub><mover><mi mathvariant="bold">g</mi><mo>^</mo></mover><mi>λ</mi></msub><mo>=</mo><mi mathvariant="bold">B</mi><mover><mi>β</mi><mo>^</mo></mover><mo>=</mo><munder><munder accentunder="true"><mrow><mi mathvariant="bold">B</mi><msup><mrow><mo>(</mo><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mi mathvariant="bold">B</mi><mo>+</mo><mi>λ</mi><mi mathvariant="bold">Ω</mi><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup></mrow><mo>⏟</mo></munder><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub></munder><mi mathvariant="bold">y</mi></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mspace width="2.5em"></mspace><mo>=</mo><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub><mi mathvariant="bold">y</mi><mspace width="1em"></mspace><mtext>linear function of </mtext><mi mathvariant="bold">y</mi></mrow></mtd></mtr>
+  </mtable>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> <math alttext="bold S sub lambda"><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub></math>: <strong>linear smoother matrix</strong>.</p>
+</div>
+
+<p><strong>Check it:</strong> if <math alttext="lambda equals 0"><mrow><mi>λ</mi><mo>=</mo><mn>0</mn></mrow></math>,</p>
+
+<div class="eq">
+<math display="block" alttext="bold S sub 0 equals bold B times the inverse of bold B transpose bold B, times bold B transpose, which equals bold B bold B inverse times the inverse of bold B transpose, times bold B transpose, which equals I">
+  <mrow><msub><mi mathvariant="bold">S</mi><mn>0</mn></msub><mo>=</mo><mi mathvariant="bold">B</mi><msup><mrow><mo>(</mo><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mi mathvariant="bold">B</mi><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mo>=</mo><mi mathvariant="bold">B</mi><msup><mi mathvariant="bold">B</mi><mrow><mo>−</mo><mn>1</mn></mrow></msup><msup><mrow><mo>(</mo><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mo>=</mo><mi>I</mi></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> An arrow points to the step that splits the inverse: <math alttext="bold B"><mi mathvariant="bold">B</mi></math> is square, invertible.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> So with <math alttext="lambda equals 0"><mrow><mi>λ</mi><mo>=</mo><mn>0</mn></mrow></math> the fit interpolates every point. As with <math alttext="bold H"><mi mathvariant="bold">H</mi></math> in DSAI 601, the effective degrees of freedom are <math alttext="trace of bold S sub lambda"><mrow><mi>tr</mi><mo>(</mo><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub><mo>)</mo></mrow></math>, which fall from <math alttext="n"><mi>n</mi></math> at <math alttext="lambda equals 0"><mrow><mi>λ</mi><mo>=</mo><mn>0</mn></mrow></math> toward 2 as <math alttext="lambda goes to infinity"><mrow><mi>λ</mi><mo>→</mo><mi>∞</mi></mrow></math> (ISL 7.5.2).</p>
+</div>
+
+</main>
+
+<footer>
+  <p>Transcribed from the handwritten notes <em>ML_week_4_day_2.pdf</em> (6 pages). Equations are MathML; figures are inline SVG with title, description, and an expandable long description. Figure numbering continues from Week 4, Day 1. Figures 9–11 are fitted to simulated data: Figure 10 uses the natural-spline basis, and Figure 11 solves the penalized least-squares problem in Section 3.1 for a small and a moderate <math alttext="lambda"><mi>λ</mi></math>. Conforms to WCAG 2.2 Level AA.</p>
+</footer>
+</div>
+</body>
+</html>
