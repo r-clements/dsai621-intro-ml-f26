@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Generalized Additive Models: Fitting Four Kinds of Term — DSAI 621</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      max-width: 760px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #222;
+      background: #fff;
+      color-scheme: light;
+    }
+    a.back { font-size: 0.9rem; color: #1a5fb4; text-decoration: none; }
+    a.back:hover { text-decoration: underline; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1rem; margin: 1rem 0 0.25rem; }
+    p.instructions { color: #555; font-size: 0.95rem; margin-top: 0; }
+    p.a11y-instructions { border-left: 3px solid #1a5fb4; padding-left: 0.75rem; margin-top: 0.5rem; }
+    .model { font-size: 0.98rem; background: #f6f8fb; border-radius: 4px; padding: 0.5rem 0.75rem; margin: 0.5rem 0; }
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin: 0.6rem 0; }
+    .controls label { font-weight: 600; }
+    .controls input[type=range] { flex: 1 1 140px; min-width: 120px; accent-color: #1a5fb4; }
+    .controls output { font-variant-numeric: tabular-nums; min-width: 6ch; }
+    .progress-box { border: 1px solid #c9d6ea; border-radius: 4px; padding: 0.4rem 0.75rem; margin: 0.75rem 0; background: #fbfcfe; }
+    #progress-out { font-variant-numeric: tabular-nums; font-size: 0.92rem; display: block; margin-top: 0.15rem; }
+    button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
+    button.primary { background: #1a5fb4; color: #fff; border: 1px solid #1a5fb4; border-radius: 3px; }
+    button:disabled { cursor: default; opacity: 0.5; }
+    :focus-visible { outline: 3px solid #1a5fb4; outline-offset: 2px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } }
+    .panel { border: 1px solid #ddd; border-radius: 4px; padding: 0.25rem; }
+    .panel svg { display: block; width: 100%; height: auto; }
+    figure { margin: 0; }
+    .caption { font-size: 0.85rem; color: #555; margin-top: 0.25rem; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.85rem; margin: 0.35rem 0; padding: 0; list-style: none; }
+    .legend li { display: flex; align-items: center; gap: 0.35rem; }
+    .table-wrap { overflow-x: auto; margin-top: 0.5rem; }
+    table.stats { border-collapse: collapse; font-size: 0.88rem; font-variant-numeric: tabular-nums; width: 100%; }
+    table.stats caption { text-align: left; font-weight: 600; font-size: 0.9rem; padding-bottom: 0.2rem; }
+    table.stats th, table.stats td { border-bottom: 1px solid #e3e3e3; padding: 0.2rem 0.45rem; text-align: right; }
+    table.stats th[scope=row], table.stats thead th:first-child { text-align: left; font-weight: 400; }
+    table.stats thead th { font-weight: 600; color: #333; border-bottom: 2px solid #ccc; }
+    .axis text { font-size: 11px; }
+    .axis-label { font-size: 12px; fill: #333; }
+    .sub-title { font-size: 13px; font-weight: 600; fill: #222; }
+  </style>
+</head>
+<body>
+  <a class="back" href="../../">&larr; All topics</a>
+  <h1>Generalized Additive Models: Fitting Four Kinds of Term</h1>
+  <p class="model">log price = β<sub>0</sub> + <b>f<sub>1</sub>(age)</b> + <b>β<sub>2</sub>·size</b> + <b>γ(type)</b>
+    + <b>f<sub>4</sub>(east, north)</b> + ε</p>
+  <p id="instructions" class="instructions">
+    Simulated house prices with one term of each kind: a smooth curve in age, a straight line in size, one effect
+    per house type, and a smooth surface over location (an interaction between the two map coordinates). Every
+    panel shows the true term (dotted, or hollow diamonds) and the GAM's estimate (solid, or filled circles).
+    Change n and the df of the two smooth terms and watch the curve and the map go from flat to noisy. Then use the
+    fitting slider to replay backfitting one update at a time. Each update re-fits one term to the partial
+    residual, the data with the other three current terms removed (the grey points). Older houses sit near the
+    pricey north-west neighbourhood, so in the first sweep the age curve soaks up some of the location effect, and
+    the terms then trade it back. The age curve and the map are penalized splines (P-splines), the version of the
+    smoothing spline that pygam and mgcv use. The map is a tensor-product spline. (ISL 7.7, ESL 9.1; lecture
+    notes §2–§5.)
+  </p>
+  <p id="a11y-instructions" class="instructions a11y-instructions">
+    Keyboard and screen reader users: all controls are sliders and buttons (Shift+arrow moves a slider 5 steps).
+    Each chart has a text description that updates with it. The tables at the bottom of the page hold every term's
+    error, the house-type effects and the size slope, and they are announced when they change.
+  </p>
+
+  <div class="controls">
+    <label for="n-slider">n</label>
+    <input type="range" id="n-slider" min="100" max="2000" step="100" value="500">
+    <output id="n-out" for="n-slider">n = 500</output>
+    <button id="resample" type="button">New sample</button>
+    <button id="reset" type="button">Reset</button>
+  </div>
+  <div class="controls">
+    <label for="dfa-slider">df, age curve</label>
+    <input type="range" id="dfa-slider" min="1" max="15" step="0.5" value="5">
+    <output id="dfa-out" for="dfa-slider">df = 5</output>
+  </div>
+  <div class="controls">
+    <label for="dfl-slider">df, location map</label>
+    <input type="range" id="dfl-slider" min="3" max="60" step="1" value="20">
+    <output id="dfl-out" for="dfl-slider">df = 20</output>
+  </div>
+
+  <div class="progress-box">
+    <div class="controls" style="margin:0.2rem 0">
+      <label for="progress">Fitting progress</label>
+      <input type="range" id="progress" min="0" max="1" step="1" value="1">
+    </div>
+    <output id="progress-out" for="progress"></output>
+    <div class="controls" role="group" aria-label="Step through backfitting" style="margin:0.4rem 0 0.2rem">
+      <button id="start" type="button">Start</button>
+      <button id="back" type="button">◀ Back one update</button>
+      <button id="next" type="button" class="primary">Next update ▶</button>
+      <button id="play" type="button" aria-pressed="false">Play</button>
+      <button id="end" type="button">Converged</button>
+    </div>
+  </div>
+
+  <h2>The four terms</h2>
+  <ul class="legend" aria-hidden="true">
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="2" stroke-dasharray="2 3"/></svg><span>true term (dotted)</span></li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="3"/></svg><span>GAM estimate (solid)</span></li>
+    <li><svg width="14" height="10"><circle cx="7" cy="5" r="2.5" fill="#888" fill-opacity="0.5"/></svg><span>partial residual for that term (grey points)</span></li>
+    <li><svg width="16" height="14"><path d="M8,1 l6,6 l-6,6 l-6,-6 z" fill="none" stroke="#111" stroke-width="1.5"/></svg><span>true type effect (hollow diamond)</span></li>
+    <li><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#1a5fb4"/></svg><span>estimated type effect (filled circle)</span></li>
+  </ul>
+  <div class="grid2">
+    <figure class="panel"><div id="age-chart"></div></figure>
+    <figure class="panel"><div id="size-chart"></div></figure>
+    <figure class="panel"><div id="type-chart"></div></figure>
+    <figure class="panel"><div id="fit-chart"></div></figure>
+  </div>
+  <p class="caption">Every term is centered to mean zero over the houses, so only its shape matters (notes §1.3). The
+    highlighted panel title is the term changed by the current update. Bottom right: each house's fitted log price
+    against its true mean log price; a perfect fit lies on the dashed 45° line.</p>
+
+  <h2>The location term f<sub>4</sub>(east, north)</h2>
+  <ul class="legend" aria-hidden="true">
+    <li><svg width="60" height="12"><defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#2166ac"/><stop offset="0.5" stop-color="#f7f7f7"/><stop offset="1" stop-color="#b2182b"/></linearGradient></defs><rect width="60" height="12" fill="url(#lg)" stroke="#999"/></svg><span>blue = cheaper, red = pricier (scale bar under each map)</span></li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="1.5"/></svg><span>contours above 0 (solid)</span></li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="1.5" stroke-dasharray="4 3"/></svg><span>contours below 0 (dashed)</span></li>
+    <li><svg width="10" height="10"><circle cx="5" cy="5" r="1.6" fill="#111"/></svg><span>houses (dots, fitted map)</span></li>
+  </ul>
+  <div class="grid2">
+    <figure class="panel"><div id="map-true"></div></figure>
+    <figure class="panel"><div id="map-fit"></div></figure>
+  </div>
+  <p class="caption">Contours at ±0.1, ±0.2 and +0.3 on the log-price scale (+0.1 is about 10% above an average
+    location). Both maps share one colour scale. With too few df the hot spots blur into a gentle tilt; with too
+    many for the sample size, the fitted map grows spots that aren't there.</p>
+
+  <h2>The numbers</h2>
+  <div id="stats" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
