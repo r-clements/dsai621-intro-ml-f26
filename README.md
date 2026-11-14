@@ -102,7 +102,6 @@ uv sync
 | 8 | Bagging and Random Forests | 8, 15 | 8 |
 | 9 | Boosting | 10 | 8 |
 | 10 | Probability calibration | — | — |
-| 11 | Clustering: k-means, hierarchical | 14.3 | 12 |
 
 ## Quizzes
 

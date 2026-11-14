@@ -27,7 +27,6 @@ Section numbers are from ESL (2nd ed., 12th printing) and ISL (Python edition, I
 | 8 | Bagging and Random Forests | 8.7, 15.1–15.2 | 8.2.1–8.2.2 |
 | 9 | Boosting | 10.1–10.12 | 8.2.3 |
 | 10 | Probability calibration | not covered | not covered |
-| 11 | Clustering: k-means, hierarchical | 14.3 (14.3.6, 14.3.12) | 12.4 |
 
 
 ## Course Learning Outcomes
