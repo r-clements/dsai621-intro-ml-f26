@@ -1,24 +1,40 @@
 # Introduction to Machine Learning - DSAI 621
 
-## This Week: Week 4 (Mon 11/9 & Thu 11/12)
+## This Week: Week 5 (Mon 11/16 & Thu 11/19)
 
-**No quiz this week.** Quiz 3 is next **Monday, 11/16**.
+**Quiz 3 is Monday, 11/16.**
 
-**Topics:** Polynomial regression and splines.
+**Quiz 4 is Thursday, 11/19, and it's an open-note worksheet.** You can work with a partner if you want. It focuses on:
+- the [Quiz 4 practice problems](problem_sets/Quiz4_practice_problems.pdf) ([solutions](problem_sets/Quiz4_practice_problems_sol.pdf))
+- the spline demos: [Basis Expansions: Polynomials and Splines](https://robertclements.org/dsai621-intro-ml-f26/topics/basis-expansions/) and [Smoothing Splines](https://robertclements.org/dsai621-intro-ml-f26/topics/smoothers/)
+- the spline notebook, [`notebooks/polynomials_splines.ipynb`](notebooks/polynomials_splines.ipynb), including the smoothing spline sections (4 and 5)
+- the in-class spline activity
 
-**Read:** ISL 7.1 and 7.3–7.4; ESL 5.1–5.2.
+**Topics:** Finishing smoothing splines; generalized additive models (GAMs); starting decision trees.
 
-**Work on (for Quiz 3):**
-- [Quiz 3 practice problems](problem_sets/Quiz3_practice_problems.pdf) ([solutions](problem_sets/Quiz3_practice_problems_sol.pdf)). These aren't turned in, but the quiz draws on them, so try each problem before you look at the solutions.
-- Finish [`notebooks/lda_vs_logistic.ipynb`](notebooks/lda_vs_logistic.ipynb) and [`notebooks/qda_vs_naive_bayes.ipynb`](notebooks/qda_vs_naive_bayes.ipynb). Run `git pull` and then `uv sync` first.
-- Work through [`notebooks/polynomials_splines.ipynb`](notebooks/polynomials_splines.ipynb). You can skip the smoothing spline sections (4 and 5) for now: they are for Quiz 4, not Quiz 3.
+**Read:** ISL 7.5, 7.7 and 8.1; ESL 5.4–5.5, 9.1 and 9.2.
 
 **Interactive demos:**
-- [Basis Expansions: Polynomials and Splines](https://robertclements.org/dsai621-intro-ml-f26/topics/basis-expansions/)
+- [Generalized Additive Models: Fitting Four Kinds of Term](https://robertclements.org/dsai621-intro-ml-f26/topics/gam-terms/)
 - [All demos](https://robertclements.org/dsai621-intro-ml-f26/)
+
+**Notebooks:** A GAMs notebook is coming (date TBD).
 
 <details>
 <summary>Past weeks</summary>
+
+### Week 4 (Mon 11/9 & Thu 11/12)
+
+**Topics:** Polynomial regression, piecewise polynomials and cubic splines; natural cubic splines and smoothing splines.
+
+**Read:** ISL 7.1 and 7.3–7.5; ESL 5.1–5.2 and 5.4.
+
+- Class notes, Day 1: [handwritten](notes/hand-written/ML_week_4_day_1.pdf) · [accessible HTML](notes/html/ML_week_4_day_1.html)
+- Class notes, Day 2: [handwritten](notes/hand-written/ML_week_4_day_2.pdf) · [accessible HTML](notes/html/ML_week_4_day_2.html)
+- [Quiz 3 practice problems](problem_sets/Quiz3_practice_problems.pdf) ([solutions](problem_sets/Quiz3_practice_problems_sol.pdf))
+- Notebook: [`notebooks/polynomials_splines.ipynb`](notebooks/polynomials_splines.ipynb)
+- Interactive demos: [Basis Expansions: Polynomials and Splines](https://robertclements.org/dsai621-intro-ml-f26/topics/basis-expansions/) and [Smoothing Splines](https://robertclements.org/dsai621-intro-ml-f26/topics/smoothers/)
+
 
 ### Week 3 (Mon 11/2 & Thu 11/5)
 
@@ -29,6 +45,7 @@
 - Class notes, Day 1: [handwritten](notes/hand-written/ML_week_3_day_1.pdf) · [accessible HTML](notes/html/ML_week_3_day_1.html)
 - Class notes, Day 2: [handwritten](notes/hand-written/ML_week_3_day_2.pdf) · [accessible HTML](notes/html/ML_week_3_day_2.html)
 - [Quiz 3 practice problems](problem_sets/Quiz3_practice_problems.pdf) ([solutions](problem_sets/Quiz3_practice_problems_sol.pdf))
+- [Naive Bayes by hand activity](problem_sets/NB-activity.pdf) ([solutions](problem_sets/NB-activity-solutions.pdf))
 - Notebooks: [`notebooks/lda_vs_logistic.ipynb`](notebooks/lda_vs_logistic.ipynb) and [`notebooks/qda_vs_naive_bayes.ipynb`](notebooks/qda_vs_naive_bayes.ipynb)
 - Interactive demo: [LDA, QDA, Naive Bayes and Logistic Regression](https://robertclements.org/dsai621-intro-ml-f26/topics/lda-qda-boundaries/)
 
