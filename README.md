@@ -10,6 +10,8 @@
 - the spline notebook, [`notebooks/polynomials_splines.ipynb`](notebooks/polynomials_splines.ipynb), including the smoothing spline sections (4 and 5)
 - the in-class spline activity
 
+**There is no quiz next week (week of 11/23).**
+
 **Topics:** Finishing smoothing splines; generalized additive models (GAMs); starting decision trees.
 
 **Read:** ISL 7.5, 7.7 and 8.1; ESL 5.4–5.5, 9.1 and 9.2.
