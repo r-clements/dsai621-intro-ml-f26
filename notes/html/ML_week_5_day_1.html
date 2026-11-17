@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smoothing Splines and GAMs — Week 5, Day 1 | DSAI 621</title>
+<meta name="description" content="Accessible class notes on smoothing splines (the smoother matrix, effective degrees of freedom, choosing lambda by LOOCV) and generalized additive models (the model, GAMs with smoothing splines, centering, interpreting fitted terms, and backfitting).">
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #4a4a4a;
+    --rule: #c9c9c9;
+    --accent: #0b4f8a;
+    --accent-bg: #eef4fa;
+    --focus: #0b4f8a;
+    --pop: #a4262c;   /* population / true  — 5.9:1 on white */
+    --est: #5b2d8e;   /* estimate / fitted  — 8.5:1 on white */
+    --err: #8a5000;   /* errors / residuals — 5.1:1 on white */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f2; --muted: #cfcfcf; --rule: #555;
+      --accent: #8ab8e0; --accent-bg: #182430; --focus: #8ab8e0;
+      --pop: #ff9f99; --est: #cbb0ff; --err: #f0b458;
+    }
+    body { background: #131313; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--ink);
+    background: #fff;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #131313; } }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 5rem; }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible, :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--accent); color: #fff;
+    padding: .75rem 1rem; z-index: 10; text-decoration: none;
+  }
+  .skip:focus { left: .5rem; top: .5rem; }
+  h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; line-height: 1.3; margin: 2.5rem 0 .5rem;
+       padding-top: .75rem; border-top: 2px solid var(--rule); }
+  h3 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  p, li { max-width: 42rem; }
+  .lede { color: var(--muted); margin-top: 0; }
+  nav.toc {
+    background: var(--accent-bg); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 1rem 1.25rem; margin: 2rem 0;
+  }
+  nav.toc h2 { font-size: 1.05rem; margin: 0 0 .5rem; border: 0; padding: 0; }
+  nav.toc ol { margin: 0; padding-left: 1.25rem; }
+  nav.toc li { margin: .3rem 0; }
+  nav.toc a { display: inline-block; min-height: 24px; padding: 2px 0; }
+  table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+  caption { text-align: left; font-weight: 600; padding-bottom: .5rem; }
+  th, td { border: 1px solid var(--rule); padding: .5rem .7rem; text-align: left; }
+  thead th { background: var(--accent-bg); }
+  figure { margin: 1.5rem 0; }
+  figcaption { font-size: .95rem; color: var(--muted); margin-top: .5rem; }
+  svg { max-width: 100%; height: auto; display: block; }
+  details {
+    border: 1px solid var(--rule); border-radius: 6px;
+    padding: .5rem .85rem; margin: .75rem 0; background: var(--accent-bg);
+  }
+  summary { cursor: pointer; font-weight: 600; min-height: 24px; padding: .25rem 0; }
+  details[open] summary { margin-bottom: .5rem; }
+  math { font-size: 1.15em; }
+  math[display="block"] { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }
+  .eq { margin: 1.25rem 0; }
+  .note {
+    border-left: 4px solid var(--accent); background: var(--accent-bg);
+    padding: .75rem 1rem; margin: 1.25rem 0; border-radius: 0 6px 6px 0;
+  }
+  .note > :first-child { margin-top: 0; }
+  .note > :last-child { margin-bottom: 0; }
+  .tag {
+    display: inline-block; font-size: .8rem; font-weight: 700;
+    letter-spacing: .02em; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 4px;
+    padding: 0 .4em; white-space: nowrap;
+  }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 2px solid var(--rule);
+           color: var(--muted); font-size: .95rem; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps > li { margin: .75rem 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<div class="wrap">
+<header>
+  <p class="lede"><strong>DSAI 621 — Intro to Machine Learning</strong> · Fall 2026 · Week 5, Day 1</p>
+  <h1>Smoothing Splines and Generalized Additive Models</h1>
+  <p class="lede">Accessible transcription of the handwritten class notes. All equations are marked up in MathML so they can be read by a screen reader, magnified, or rendered in braille. All figures have text descriptions. Annotations written in a second pen colour in the original are reproduced here as labelled callouts, so none of their meaning depends on colour. A few short callouts marked <strong>Commentary</strong> were added in this transcription; they are not in the handwritten notes.</p>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+  <h2 id="toc-h">On this page</h2>
+  <ol>
+    <li><a href="#agenda">Agenda</a></li>
+    <li><a href="#smoothing">1. Smoothing splines</a></li>
+    <li><a href="#review">1.1 Review</a></li>
+    <li><a href="#fitted">1.2 Fitted values</a></li>
+    <li><a href="#df">1.3 d.f. and <em>λ</em></a></li>
+    <li><a href="#gams">2. Generalized additive models (GAMs)</a></li>
+    <li><a href="#model">2.1 The model</a></li>
+    <li><a href="#gam-ss">2.2 GAMs with smoothing splines</a></li>
+    <li><a href="#backfitting">2.3 Backfitting</a></li>
+    <li><a href="#bf-algorithm">2.3 Backfitting algorithm (ESL 9.1.1)</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+
+<h2 id="agenda">Agenda</h2>
+<ul>
+  <li>Smoothing splines</li>
+  <li>GAMs</li>
+</ul>
+
+<h2 id="smoothing">1. Smoothing splines</h2>
+
+<h3 id="review">1.1 Review</h3>
+
+<div class="eq">
+<math display="block" alttext="g hat sub lambda equals the argmin over g of the sum from i equals 1 to n of, y sub i minus g of x sub i, squared, plus lambda times the integral of g double prime of t squared d t">
+  <mrow><msub><mover><mi>g</mi><mo>^</mo></mover><mi>λ</mi></msub><mo>=</mo><munder><mrow><mi>arg</mi><mo>⁡</mo><mi>min</mi></mrow><mi>g</mi></munder><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mi>g</mi><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><mi>λ</mi><mo>∫</mo><msup><mrow><mo>(</mo><msup><mi>g</mi><mo>″</mo></msup><mo>(</mo><mi>t</mi><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mspace width="0.2em"></mspace><mi>d</mi><mi>t</mi></mrow>
+</math>
+</div>
+
+<p><strong>Solution:</strong> a natural cubic spline with knots at all points,</p>
+
+<div class="eq">
+<math display="block" alttext="g of x equals beta sub 0 plus the sum from j equals 1 to n minus 1 of beta sub j b sub j of x">
+  <mrow><mi>g</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></munderover><msub><mi>β</mi><mi>j</mi></msub><msub><mi>b</mi><mi>j</mi></msub><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+</math>
+</div>
+
+<p><strong>Fitting</strong>, with the penalized RSS:</p>
+
+<div class="eq">
+<math display="block" alttext="PRSS sub lambda of beta equals bold y minus bold B beta, transpose, times bold y minus bold B beta, plus lambda beta transpose bold Omega beta">
+  <mrow><msub><mtext>PRSS</mtext><mi>λ</mi></msub><mo>(</mo><mi>β</mi><mo>)</mo><mo>=</mo><msup><mrow><mo>(</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">B</mi><mi>β</mi><mo>)</mo></mrow><mi>T</mi></msup><mo>(</mo><mi mathvariant="bold">y</mi><mo>−</mo><mi mathvariant="bold">B</mi><mi>β</mi><mo>)</mo><mo>+</mo><mi>λ</mi><msup><mi>β</mi><mi>T</mi></msup><mi mathvariant="bold">Ω</mi><mi>β</mi></mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="implies beta hat equals the inverse of bold B transpose bold B plus lambda bold Omega, times bold B transpose bold y">
+  <mrow><mo>⇒</mo><mover><mi>β</mi><mo>^</mo></mover><mo>=</mo><msup><mrow><mo>(</mo><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mi mathvariant="bold">B</mi><mo>+</mo><mi>λ</mi><mi mathvariant="bold">Ω</mi><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mi mathvariant="bold">y</mi></mrow>
+</math>
+</div>
+
+<div class="eq">
+<math display="block" alttext="bold g hat sub lambda equals bold S sub lambda bold y, where bold S sub lambda equals bold B times the inverse of bold B transpose bold B plus lambda bold Omega, times bold B transpose">
+  <mrow><msub><mover><mi mathvariant="bold">g</mi><mo>^</mo></mover><mi>λ</mi></msub><mo>=</mo><munder><munder accentunder="true"><mrow><mi mathvariant="bold">B</mi><msup><mrow><mo>(</mo><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup><mi mathvariant="bold">B</mi><mo>+</mo><mi>λ</mi><mi mathvariant="bold">Ω</mi><mo>)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><msup><mi mathvariant="bold">B</mi><mi>T</mi></msup></mrow><mo>⏟</mo></munder><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub></munder><mi mathvariant="bold">y</mi></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> <math alttext="bold S sub lambda"><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub></math>: <strong>smoother matrix</strong>.</p>
+</div>
+
+<h3 id="fitted">1.2 Fitted values</h3>
+
+<div class="eq">
+<math display="block" alttext="bold g hat sub lambda equals bold S sub lambda bold y">
+  <mrow><msub><mover><mi mathvariant="bold">g</mi><mo>^</mo></mover><mi>λ</mi></msub><mo>=</mo><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub><mi mathvariant="bold">y</mi></mrow>
+</math>
+</div>
+
+<p>For <math alttext="x sub i"><msub><mi>x</mi><mi>i</mi></msub></math> from the training set,</p>
+
+<div class="eq">
+<math display="block" alttext="g hat sub lambda of x sub i equals the sum over j of the i j entry of bold S sub lambda, times y sub j">
+  <mrow><msub><mover><mi>g</mi><mo>^</mo></mover><mi>λ</mi></msub><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>=</mo><munder><mo>∑</mo><mi>j</mi></munder><msub><mrow><mo>{</mo><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub><mo>}</mo></mrow><mrow><mi>i</mi><mi>j</mi></mrow></msub><msub><mi>y</mi><mi>j</mi></msub></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> <strong>Weighted average of <math alttext="y"><mi>y</mi></math>’s.</strong></p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> Each row of <math alttext="bold S sub lambda"><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub></math> sums to 1, since a constant is never penalized and is fitted exactly. Some weights can be negative, though, so it isn’t an average in the strict sense.</p>
+</div>
+
+<p><strong>Note:</strong> <math alttext="bold S, n by n"><msub><mi mathvariant="bold">S</mi><mrow><mi>n</mi><mo>×</mo><mi>n</mi></mrow></msub></math> is symmetric, but not a projection matrix: <math alttext="bold S squared is not equal to bold S"><mrow><msup><mi mathvariant="bold">S</mi><mn>2</mn></msup><mo>≠</mo><mi mathvariant="bold">S</mi></mrow></math>.</p>
+
+<h3 id="df">1.3 d.f. and <math alttext="lambda"><mi>λ</mi></math></h3>
+
+<div class="eq">
+<math display="block" alttext="d.f. sub lambda equals the trace of bold S sub lambda">
+  <mrow><msub><mtext>d.f.</mtext><mi>λ</mi></msub><mo>=</mo><mi>tr</mi><mo>(</mo><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub><mo>)</mo></mrow>
+</math>
+</div>
+
+<p>= # of knobs the fit can turn, but our <math alttext="n"><mi>n</mi></math> knobs are limited by <math alttext="lambda"><mi>λ</mi></math>, so d.f. = some decimal value.</p>
+
+<p><strong>Choose <math alttext="lambda"><mi>λ</mi></math>:</strong> use C.V., or LOOCV.</p>
+
+<div class="eq">
+<math display="block" alttext="LOOCV: RSS sub LOOCV of lambda equals the sum from i equals 1 to n of, y sub i minus g hat sub lambda superscript minus i of x sub i, squared, which equals the sum from i equals 1 to n of, y sub i minus g hat sub lambda of x sub i, over 1 minus the i i entry of bold S sub lambda, all squared">
+  <mtable columnalign="left">
+    <mtr><mtd><mrow><mtext>LOOCV:</mtext><mspace width="0.5em"></mspace><msub><mtext>RSS</mtext><mtext>LOOCV</mtext></msub><mo>(</mo><mi>λ</mi><mo>)</mo><mo>=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msubsup><mover><mi>g</mi><mo>^</mo></mover><mi>λ</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msubsup><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mspace width="9em"></mspace><mo>=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><mfrac><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>g</mi><mo>^</mo></mover><mi>λ</mi></msub><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo></mrow><mrow><mn>1</mn><mo>−</mo><msub><mrow><mo>{</mo><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub><mo>}</mo></mrow><mrow><mi>i</mi><mi>i</mi></mrow></msub></mrow></mfrac><mo>)</mo></mrow><mn>2</mn></msup></mrow></mtd></mtr>
+  </mtable>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> <math alttext="g hat sub lambda superscript minus i"><msubsup><mover><mi>g</mi><mo>^</mo></mover><mi>λ</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msubsup></math>: the model without <math alttext="x sub i"><msub><mi>x</mi><mi>i</mi></msub></math>.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> This is the same shortcut as LOOCV for OLS in DSAI 601, with <math alttext="h sub i i"><msub><mi>h</mi><mrow><mi>i</mi><mi>i</mi></mrow></msub></math> replaced by <math alttext="the i i entry of bold S sub lambda"><msub><mrow><mo>{</mo><msub><mi mathvariant="bold">S</mi><mi>λ</mi></msub><mo>}</mo></mrow><mrow><mi>i</mi><mi>i</mi></mrow></msub></math> (ISL 5.1.2, 7.5.2). It needs only one fit per <math alttext="lambda"><mi>λ</mi></math>.</p>
+</div>
+
+<p>Open questions:</p>
+<ul>
+  <li>What about <math alttext="p greater than 1"><mrow><mi>p</mi><mo>&gt;</mo><mn>1</mn></mrow></math>?</li>
+  <li>What about categorical predictors or <math alttext="Y"><mi>Y</mi></math>?</li>
+  <li>Interactions?</li>
+</ul>
+
+<h2 id="gams">2. Generalized additive models (GAMs)</h2>
+
+<h3 id="model">2.1 The model</h3>
+
+<div class="eq">
+<math display="block" alttext="y sub i equals beta sub 0 plus f sub 1 of x sub i 1 plus dot dot dot plus f sub p of x sub i p plus epsilon sub i">
+  <mrow><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>f</mi><mn>1</mn></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub><mo>)</mo><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi>f</mi><mi>p</mi></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>p</mi></mrow></msub><mo>)</mo><mo>+</mo><msub><mi>ε</mi><mi>i</mi></msub></mrow>
+</math>
+</div>
+
+<p><math alttext="f sub j"><msub><mi>f</mi><mi>j</mi></msub></math>: unspecified function of one predictor.</p>
+
+<div class="eq">
+<math display="block" alttext="wage equals beta sub 0 plus f sub 1 of year plus f sub 2 of age plus f sub 3 of edu plus epsilon">
+  <mrow><mtext>wage</mtext><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>f</mi><mn>1</mn></msub><mo>(</mo><mtext>year</mtext><mo>)</mo><mo>+</mo><msub><mi>f</mi><mn>2</mn></msub><mo>(</mo><mtext>age</mtext><mo>)</mo><mo>+</mo><msub><mi>f</mi><mn>3</mn></msub><mo>(</mo><mtext>edu</mtext><mo>)</mo><mo>+</mo><mi>ε</mi></mrow>
+</math>
+</div>
+
+<p>If, e.g., <math alttext="f sub 2 of age equals beta sub 2 age"><mrow><msub><mi>f</mi><mn>2</mn></msub><mo>(</mo><mtext>age</mtext><mo>)</mo><mo>=</mo><msub><mi>β</mi><mn>2</mn></msub><mspace width="0.2em"></mspace><mtext>age</mtext></mrow></math> ← <strong>linear</strong></p>
+
+<p>Interpret <math alttext="f sub j"><msub><mi>f</mi><mi>j</mi></msub></math> as the effect of <math alttext="x sub j"><msub><mi>x</mi><mi>j</mi></msub></math> while holding the other predictors fixed.</p>
+
+<p><strong>Note:</strong> <math alttext="f sub j"><msub><mi>f</mi><mi>j</mi></msub></math> can be linear, polynomial, spline, step function, etc.</p>
+
+<h3 id="gam-ss">2.2 GAMs with smoothing splines</h3>
+
+<div class="eq">
+<math display="block" alttext="PRSS of beta sub 0, f sub 1 through f sub p, equals the sum from i equals 1 to n of, y sub i minus beta sub 0 minus the sum from j equals 1 to p of f sub j of x sub i j, squared, plus the sum from j equals 1 to p of lambda sub j times the integral of f sub j double prime of t sub j squared d t">
+  <mrow><mtext>PRSS</mtext><mo>(</mo><msub><mi>β</mi><mn>0</mn></msub><mo>,</mo><msub><mi>f</mi><mn>1</mn></msub><mo>,</mo><mo>…</mo><mo>,</mo><msub><mi>f</mi><mi>p</mi></msub><mo>)</mo><mo>=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mi>β</mi><mn>0</mn></msub><mo>−</mo><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>f</mi><mi>j</mi></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>λ</mi><mi>j</mi></msub><mo>∫</mo><msup><mrow><mo>(</mo><msubsup><mi>f</mi><mi>j</mi><mo>″</mo></msubsup><mo>(</mo><msub><mi>t</mi><mi>j</mi></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mspace width="0.2em"></mspace><mi>d</mi><mi>t</mi></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Possible error in original</span> The integration variable is <math alttext="t sub j"><msub><mi>t</mi><mi>j</mi></msub></math>, so the differential should be <math alttext="d t sub j"><mrow><mi>d</mi><msub><mi>t</mi><mi>j</mi></msub></mrow></math>, as in ESL 9.1.1.</p>
+</div>
+
+<p>Like before, the minimum is reached if the <math alttext="f hat sub j"><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub></math> are natural cubic splines with knots at all values of <math alttext="x sub 1 j through x sub n j"><mrow><msub><mi>x</mi><mrow><mn>1</mn><mi>j</mi></mrow></msub><mo>,</mo><mo>…</mo><mo>,</mo><msub><mi>x</mi><mrow><mi>n</mi><mi>j</mi></mrow></msub></mrow></math>.</p>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Side note</span> <strong>Centering:</strong> each <math alttext="x"><mi>x</mi></math> is centered, then <math alttext="beta hat sub 0 equals y bar"><mrow><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>=</mo><mover><mi>y</mi><mo>¯</mo></mover></mrow></math>, and every <math alttext="f hat sub j"><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub></math> is centered around <math alttext="y equals 0"><mrow><mi>y</mi><mo>=</mo><mn>0</mn></mrow></math> and</p>
+  <div class="eq">
+  <math display="block" alttext="the sum from i equals 1 to n of f hat sub j of x sub i j equals 0">
+    <mrow><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>)</mo><mo>=</mo><mn>0</mn></mrow>
+  </math>
+  </div>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> Strictly, it is the constraint <math alttext="the sum over i of f hat sub j of x sub i j equals 0"><mrow><msub><mo>∑</mo><mi>i</mi></msub><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>)</mo><mo>=</mo><mn>0</mn></mrow></math> that gives <math alttext="beta hat sub 0 equals y bar"><mrow><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>=</mo><mover><mi>y</mi><mo>¯</mo></mover></mrow></math> (ESL 9.1.1). Centering <math alttext="x"><mi>x</mi></math> achieves that only when <math alttext="f sub j"><msub><mi>f</mi><mi>j</mi></msub></math> is linear; a nonlinear <math alttext="f hat sub j"><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub></math> has to be centered itself.</p>
+</div>
+
+<div class="eq">
+<math display="block" alttext="wage hat equals y bar plus f hat sub 1 of year plus f hat sub 2 of age plus f hat of edu">
+  <mrow><mover><mtext>wage</mtext><mo>^</mo></mover><mo>=</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>+</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mn>1</mn></msub><mo>(</mo><mtext>year</mtext><mo>)</mo><mo>+</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mn>2</mn></msub><mo>(</mo><mtext>age</mtext><mo>)</mo><mo>+</mo><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mtext>edu</mtext><mo>)</mo></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Possible error in original</span> The last term is missing its subscript: <math alttext="f hat sub 3 of edu"><mrow><msub><mover><mi>f</mi><mo>^</mo></mover><mn>3</mn></msub><mo>(</mo><mtext>edu</mtext><mo>)</mo></mrow></math>.</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 400 250" role="img" aria-labelledby="fig1-t fig1-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig1-t">The fitted year term f hat of year: a straight line, crossing zero mid-range and equal to 5 thousand at 2020</title>
+  <desc id="fig1-d">Vertical axis f hat of year, horizontal axis year, with a dashed horizontal line at 0. A straight line rises from below zero on the left to above zero on the right. A marked point on the line at year 2020 has height 5k.</desc>
+  <line x1="70" y1="220" x2="340" y2="220" stroke="currentColor" stroke-width="2"/><polygon points="340,220 332,216 332,224" fill="currentColor"/><text x="346.0" y="225.0" font-size="15" fill="currentColor" text-anchor="start">year</text><line x1="70" y1="220" x2="70" y2="30" stroke="currentColor" stroke-width="2"/><polygon points="70,30 66,38 74,38" fill="currentColor"/><text x="80.0" y="36.0" font-size="15" fill="currentColor" text-anchor="start">f̂(year)</text><line x1="70" y1="145.0" x2="330" y2="145.0" stroke="currentColor" stroke-width="1.3" stroke-dasharray="4 4"/><line x1="64" y1="145.0" x2="70" y2="145.0" stroke="currentColor" stroke-width="2"/><text x="60.0" y="150.0" font-size="15" fill="currentColor" text-anchor="end">0</text><line x1="85.0" y1="213.8" x2="335.0" y2="85.8" stroke="var(--accent)" stroke-width="3"/><line x1="297.5" y1="105.0" x2="297.5" y2="220" stroke="var(--err)" stroke-width="1.3" stroke-dasharray="2 3"/><line x1="70" y1="105.0" x2="297.5" y2="105.0" stroke="var(--err)" stroke-width="1.3" stroke-dasharray="2 3"/><text x="297.5" y="242.0" font-size="14" fill="var(--err)" text-anchor="middle">2020</text><text x="60.0" y="110.0" font-size="14" fill="var(--err)" text-anchor="end">5k</text><circle cx="297.5" cy="105.0" r="5.5" fill="var(--err)"/>
+</svg>
+<figcaption>Figure 1. <math alttext="f hat of year"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mtext>year</mtext><mo>)</mo></mrow></math>: linear. The marked point is <math alttext="f hat of 2020 equals 5k"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mn>2020</mn><mo>)</mo><mo>=</mo><mtext>5k</mtext></mrow></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 1</summary>
+  <p>The vertical axis is <math alttext="f hat of year"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mtext>year</mtext><mo>)</mo></mrow></math> and the horizontal axis is year, with a dashed horizontal line at 0. A straight line rises from below zero on the left to above zero on the right. Dotted guide lines mark the point on the line at year 2020, where the height is 5k.</p>
+</details>
+
+<figure>
+<svg viewBox="0 0 400 250" role="img" aria-labelledby="fig2-t fig2-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig2-t">The fitted age term f hat of age: a smooth curve that rises steeply, peaks in middle age and then declines, equal to 10 thousand at age 30</title>
+  <desc id="fig2-d">Vertical axis f hat of age, horizontal axis age, with a dashed horizontal line at 0. A smooth curve starts well below zero at the youngest ages, climbs steeply and crosses zero in the late twenties, peaks in middle age, and then falls gently at older ages. A marked point on the curve at age 30 has height 10k.</desc>
+  <line x1="70" y1="220" x2="340" y2="220" stroke="currentColor" stroke-width="2"/><polygon points="340,220 332,216 332,224" fill="currentColor"/><text x="346.0" y="225.0" font-size="15" fill="currentColor" text-anchor="start">age</text><line x1="70" y1="220" x2="70" y2="30" stroke="currentColor" stroke-width="2"/><polygon points="70,30 66,38 74,38" fill="currentColor"/><text x="80.0" y="36.0" font-size="15" fill="currentColor" text-anchor="start">f̂(age)</text><line x1="70" y1="150.0" x2="330" y2="150.0" stroke="currentColor" stroke-width="1.3" stroke-dasharray="4 4"/><line x1="64" y1="150.0" x2="70" y2="150.0" stroke="currentColor" stroke-width="2"/><text x="60.0" y="155.0" font-size="15" fill="currentColor" text-anchor="end">0</text><path d="M80.0,196.5 L81.4,195.3 L82.9,194.0 L84.3,192.6 L85.7,191.2 L87.2,189.6 L88.6,188.0 L90.0,186.4 L91.5,184.6 L92.9,182.8 L94.3,180.9 L95.8,178.9 L97.2,176.9 L98.6,174.7 L100.1,172.5 L101.5,170.2 L102.9,167.9 L104.4,165.5 L105.8,163.0 L107.2,160.4 L108.7,157.8 L110.1,155.2 L111.5,152.4 L113.0,149.7 L114.4,146.9 L115.8,144.1 L117.3,141.2 L118.7,138.3 L120.1,135.4 L121.6,132.6 L123.0,129.7 L124.4,126.8 L125.9,123.9 L127.3,121.1 L128.7,118.2 L130.2,115.4 L131.6,112.7 L133.0,110.0 L134.5,107.3 L135.9,104.8 L137.3,102.2 L138.8,99.7 L140.2,97.3 L141.6,95.0 L143.1,92.7 L144.5,90.5 L145.9,88.4 L147.4,86.4 L148.8,84.4 L150.2,82.6 L151.7,80.7 L153.1,79.0 L154.5,77.4 L156.0,75.8 L157.4,74.3 L158.8,72.8 L160.3,71.5 L161.7,70.2 L163.1,68.9 L164.6,67.8 L166.0,66.7 L167.4,65.6 L168.9,64.6 L170.3,63.7 L171.7,62.8 L173.2,62.0 L174.6,61.2 L176.0,60.4 L177.5,59.7 L178.9,59.1 L180.3,58.5 L181.8,57.9 L183.2,57.3 L184.6,56.8 L186.1,56.3 L187.5,55.9 L188.9,55.4 L190.4,55.1 L191.8,54.7 L193.2,54.3 L194.7,54.0 L196.1,53.8 L197.5,53.5 L199.0,53.3 L200.4,53.1 L201.8,53.0 L203.3,52.8 L204.7,52.7 L206.1,52.6 L207.6,52.6 L209.0,52.5 L210.4,52.5 L211.9,52.5 L213.3,52.5 L214.7,52.6 L216.2,52.6 L217.6,52.7 L219.0,52.8 L220.5,52.9 L221.9,53.0 L223.3,53.2 L224.7,53.3 L226.2,53.5 L227.6,53.7 L229.0,53.9 L230.5,54.1 L231.9,54.4 L233.3,54.6 L234.8,54.9 L236.2,55.2 L237.6,55.5 L239.1,55.8 L240.5,56.1 L241.9,56.4 L243.4,56.7 L244.8,57.1 L246.2,57.5 L247.7,57.8 L249.1,58.2 L250.5,58.6 L252.0,59.0 L253.4,59.5 L254.8,59.9 L256.3,60.4 L257.7,60.8 L259.1,61.3 L260.6,61.8 L262.0,62.3 L263.4,62.8 L264.9,63.3 L266.3,63.8 L267.7,64.3 L269.2,64.9 L270.6,65.5 L272.0,66.0 L273.5,66.6 L274.9,67.2 L276.3,67.8 L277.8,68.4 L279.2,69.0 L280.6,69.7 L282.1,70.3 L283.5,71.0 L284.9,71.6 L286.4,72.3 L287.8,73.0 L289.2,73.7 L290.7,74.4 L292.1,75.1 L293.5,75.9 L295.0,76.6 L296.4,77.4 L297.8,78.1 L299.3,78.9 L300.7,79.7 L302.1,80.5 L303.6,81.3 L305.0,82.1 L306.4,82.9 L307.9,83.7 L309.3,84.6 L310.7,85.4 L312.2,86.3 L313.6,87.2 L315.0,88.1 L316.5,89.0 L317.9,89.9 L319.3,90.8 L320.8,91.7 L322.2,92.6 L323.6,93.6 L325.1,94.5 L326.5,95.5 L327.9,96.5 L329.4,97.5 L330.8,98.5 L332.2,99.5 L333.7,100.5 L335.1,101.5 L336.5,102.6 L338.0,103.6 L339.4,104.7 L340.8,105.8 L342.3,106.8 L343.7,107.9 L345.1,109.0 L346.6,110.1 L348.0,111.3 L349.4,112.4 L350.9,113.5 L352.3,114.7 L353.7,115.9 L355.2,117.0 L356.6,118.2 L358.0,119.4 L359.5,120.6 L360.9,121.8 L362.3,123.0 L363.8,124.3 L365.2,125.5" fill="none" stroke="var(--accent)" stroke-width="3"/><line x1="135.2" y1="106.0" x2="135.2" y2="220" stroke="var(--err)" stroke-width="1.3" stroke-dasharray="2 3"/><line x1="70" y1="106.0" x2="135.2" y2="106.0" stroke="var(--err)" stroke-width="1.3" stroke-dasharray="2 3"/><text x="135.2" y="242.0" font-size="14" fill="var(--err)" text-anchor="middle">30</text><text x="60.0" y="111.0" font-size="14" fill="var(--err)" text-anchor="end">10k</text><circle cx="135.2" cy="106.0" r="5.5" fill="var(--err)"/>
+</svg>
+<figcaption>Figure 2. <math alttext="f hat of age"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mtext>age</mtext><mo>)</mo></mrow></math>. The marked point is <math alttext="f hat of 30 equals 10k"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mn>30</mn><mo>)</mo><mo>=</mo><mtext>10k</mtext></mrow></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 2</summary>
+  <p>The vertical axis is <math alttext="f hat of age"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mtext>age</mtext><mo>)</mo></mrow></math> and the horizontal axis is age, with a dashed horizontal line at 0. A smooth curve starts below zero at the youngest ages, climbs steeply, crosses zero in the late twenties, peaks in middle age, and then declines at older ages. Dotted guide lines mark the point on the curve at age 30, where the height is 10k.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> The year term (Figure 1) is marked <strong>not penalized</strong>; the age term (Figure 2) is marked <strong>penalized</strong>.</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 400 250" role="img" aria-labelledby="fig3-t fig3-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig3-t">The fitted education term f hat of edu: one level per category, slightly below zero for HS, slightly above for Coll, and 20 thousand for Grad</title>
+  <desc id="fig3-d">Vertical axis f hat of edu, horizontal axis edu with three categories: HS, Coll and Grad. A dashed horizontal line marks 0. Each category has a short horizontal bar at its fitted value: HS just below zero, Coll a little above zero, and Grad much higher, at the marked value 20k.</desc>
+  <line x1="70" y1="220" x2="340" y2="220" stroke="currentColor" stroke-width="2"/><polygon points="340,220 332,216 332,224" fill="currentColor"/><text x="346.0" y="225.0" font-size="15" fill="currentColor" text-anchor="start">edu</text><line x1="70" y1="220" x2="70" y2="30" stroke="currentColor" stroke-width="2"/><polygon points="70,30 66,38 74,38" fill="currentColor"/><text x="80.0" y="36.0" font-size="15" fill="currentColor" text-anchor="start">f̂(edu)</text><line x1="70" y1="150.0" x2="330" y2="150.0" stroke="currentColor" stroke-width="1.3" stroke-dasharray="4 4"/><line x1="64" y1="150.0" x2="70" y2="150.0" stroke="currentColor" stroke-width="2"/><text x="60.0" y="155.0" font-size="15" fill="currentColor" text-anchor="end">0</text><line x1="130.0" y1="214" x2="130.0" y2="226" stroke="currentColor" stroke-width="2"/><text x="130.0" y="244.0" font-size="14" fill="currentColor" text-anchor="middle">HS</text><line x1="116.0" y1="161.0" x2="144.0" y2="161.0" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/><line x1="210.0" y1="214" x2="210.0" y2="226" stroke="currentColor" stroke-width="2"/><text x="210.0" y="244.0" font-size="14" fill="currentColor" text-anchor="middle">Coll</text><line x1="196.0" y1="132.4" x2="224.0" y2="132.4" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/><line x1="290.0" y1="214" x2="290.0" y2="226" stroke="currentColor" stroke-width="2"/><text x="290.0" y="244.0" font-size="14" fill="currentColor" text-anchor="middle">Grad</text><line x1="276.0" y1="62.0" x2="304.0" y2="62.0" stroke="var(--err)" stroke-width="4" stroke-linecap="round"/><line x1="70" y1="62.0" x2="274.0" y2="62.0" stroke="var(--err)" stroke-width="1.3" stroke-dasharray="2 3"/><text x="60.0" y="67.0" font-size="14" fill="var(--err)" text-anchor="end">20k</text><circle cx="290.0" cy="62.0" r="5.5" fill="var(--err)"/>
+</svg>
+<figcaption>Figure 3. Categorical <math alttext="f hat sub edu"><msub><mover><mi>f</mi><mo>^</mo></mover><mtext>edu</mtext></msub></math>: one value per level. The marked level is <math alttext="f hat of Grad equals 20k"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mtext>Grad</mtext><mo>)</mo><mo>=</mo><mtext>20k</mtext></mrow></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 3</summary>
+  <p>The vertical axis is <math alttext="f hat of edu"><mrow><mover><mi>f</mi><mo>^</mo></mover><mo>(</mo><mtext>edu</mtext><mo>)</mo></mrow></math>, and the horizontal axis lists three education levels: HS, Coll and Grad. A dashed horizontal line marks 0. Each level has a short horizontal bar at its fitted value: HS slightly below zero, Coll slightly above zero, and Grad much higher, at the marked value 20k.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> The education term is marked <strong>not penalized</strong>.</p>
+</div>
+
+<p><strong>Example</strong> (written in a second colour beside Figure 3): <math alttext="X equals 2020, 30, Grad"><mrow><mi>X</mi><mo>=</mo><mo>(</mo><mn>2020</mn><mo>,</mo><mn>30</mn><mo>,</mo><mtext>Grad</mtext><mo>)</mo></mrow></math>.</p>
+
+<div class="eq">
+<math display="block" alttext="wage hat equals y bar plus f hat sub year of 2020 plus f hat sub age of 30 plus f hat sub edu of Grad, which equals 40k plus 5k plus 10k plus 20k, which equals 75k, which equals y bar plus 35k">
+  <mtable columnalign="left">
+    <mtr><mtd><mrow><mover><mtext>wage</mtext><mo>^</mo></mover><mo>=</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>+</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mtext>year</mtext></msub><mo>(</mo><mn>2020</mn><mo>)</mo><mo>+</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mtext>age</mtext></msub><mo>(</mo><mn>30</mn><mo>)</mo><mo>+</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mtext>edu</mtext></msub><mo>(</mo><mtext>Grad</mtext><mo>)</mo></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mspace width="2.5em"></mspace><mo>=</mo><mtext>40k</mtext><mo>+</mo><mtext>5k</mtext><mo>+</mo><mtext>10k</mtext><mo>+</mo><mtext>20k</mtext></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mspace width="2.5em"></mspace><mo>=</mo><mtext>75k</mtext></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mspace width="2.5em"></mspace><mo>=</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>+</mo><mtext>35k</mtext></mrow></mtd></mtr>
+  </mtable>
+</math>
+</div>
+
+<h3 id="backfitting">2.3 Backfitting</h3>
+
+<p><strong>Intuition:</strong></p>
+
+<div class="eq">
+<math display="block" alttext="y sub i equals beta sub 0 plus beta sub 1 x sub i 1 plus beta sub 2 x sub i 2 plus epsilon sub i">
+  <mrow><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>β</mi><mn>2</mn></msub><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub><mo>+</mo><msub><mi>ε</mi><mi>i</mi></msub></mrow>
+</math>
+</div>
+
+<p>Start with <math alttext="beta sub 0 equals y bar"><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>=</mo><mover><mi>y</mi><mo>¯</mo></mover></mrow></math> and <math alttext="beta sub 1 equals beta sub 2 equals 0"><mrow><msub><mi>β</mi><mn>1</mn></msub><mo>=</mo><msub><mi>β</mi><mn>2</mn></msub><mo>=</mo><mn>0</mn></mrow></math>:</p>
+
+<div class="eq">
+<math display="block" alttext="y equals y bar plus beta sub 1 x sub 1 plus beta sub 2 x sub 2">
+  <mrow><mi>y</mi><mo>=</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>+</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>x</mi><mn>1</mn></msub><mo>+</mo><msub><mi>β</mi><mn>2</mn></msub><msub><mi>x</mi><mn>2</mn></msub></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> In the original, arrows above <math alttext="beta sub 1"><msub><mi>β</mi><mn>1</mn></msub></math> and <math alttext="beta sub 2"><msub><mi>β</mi><mn>2</mn></msub></math> are each labelled 0.</p>
+</div>
+
+<div class="scroll-x" role="region" aria-label="Backfitting table (scrolls sideways on narrow screens)" tabindex="0" style="overflow-x:auto">
+<table>
+  <caption>Backfitting, one coefficient at a time</caption>
+  <thead><tr><th scope="col">Step</th><th scope="col">Response (<math alttext="r sub i"><msub><mi>r</mi><mi>i</mi></msub></math>)</th><th scope="col">Regression</th><th scope="col">Estimate</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">1. update <math alttext="beta sub 1"><msub><mi>β</mi><mn>1</mn></msub></math></th>
+      <td><math alttext="y sub i minus y bar"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover></mrow></math></td>
+      <td><math alttext="r sub i equals beta sub 1 superscript 1 x sub i 1"><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msubsup><mi>β</mi><mn>1</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub></mrow></math></td>
+      <td><math alttext="beta hat sub 1 superscript 1"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup></math></td></tr>
+    <tr><th scope="row">update <math alttext="beta sub 2"><msub><mi>β</mi><mn>2</mn></msub></math></th>
+      <td><math alttext="y sub i minus y bar minus beta hat sub 1 superscript 1 x sub i 1"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>−</mo><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub></mrow></math></td>
+      <td><math alttext="r sub i equals beta sub 2 superscript 1 x sub i 2"><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msubsup><mi>β</mi><mn>2</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub></mrow></math></td>
+      <td><math alttext="beta hat sub 2 superscript 1"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup></math></td></tr>
+    <tr><th scope="row">2. update <math alttext="beta sub 1"><msub><mi>β</mi><mn>1</mn></msub></math></th>
+      <td><math alttext="y sub i minus y bar minus beta hat sub 2 superscript 1 x sub i 2"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>−</mo><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub></mrow></math></td>
+      <td><math alttext="r sub i equals beta sub 1 superscript 2 x sub i 1"><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msubsup><mi>β</mi><mn>1</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub></mrow></math></td>
+      <td><math alttext="beta hat sub 1 superscript 2"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup></math></td></tr>
+    <tr><th scope="row">update <math alttext="beta sub 2"><msub><mi>β</mi><mn>2</mn></msub></math></th>
+      <td><math alttext="y sub i minus y bar minus beta sub 1 superscript 2 x sub i 1"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>−</mo><msubsup><mi>β</mi><mn>1</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub></mrow></math></td>
+      <td><math alttext="r sub i equals beta sub 2 superscript 2 x sub i 2"><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msubsup><mi>β</mi><mn>2</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub></mrow></math></td>
+      <td><math alttext="beta hat sub 2 superscript 2"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup></math></td></tr>
+    <tr><th scope="row">⋮</th><td></td><td></td><td></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Possible error in original</span> In the last row the response uses <math alttext="beta sub 1 superscript 2"><msubsup><mi>β</mi><mn>1</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup></math> without its hat; it should be the estimate <math alttext="beta hat sub 1 superscript 2"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup></math> from the row above. The second set of notes, below, has the hat.</p>
+</div>
+
+<p>For the first update, as vectors:</p>
+
+<div class="eq">
+<math display="block" alttext="bold r equals the column y sub 1 minus y bar, y sub 2 minus y bar, dot dot dot, y sub n minus y bar; bold x sub 1 equals the column x sub 1 1, x sub 2 1, dot dot dot, x sub n 1; bold r equals beta sub 1 bold x sub 1">
+  <mrow>
+    <mi mathvariant="bold">r</mi><mo>=</mo><mrow><mo>(</mo><mtable><mtr><mtd><msub><mi>y</mi><mn>1</mn></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover></mtd></mtr><mtr><mtd><msub><mi>y</mi><mn>2</mn></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover></mtd></mtr><mtr><mtd><mo>⋮</mo></mtd></mtr><mtr><mtd><msub><mi>y</mi><mi>n</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover></mtd></mtr></mtable><mo>)</mo></mrow>
+    <mspace width="1.5em"></mspace>
+    <msub><mi mathvariant="bold">x</mi><mn>1</mn></msub><mo>=</mo><mrow><mo>(</mo><mtable><mtr><mtd><msub><mi>x</mi><mn>11</mn></msub></mtd></mtr><mtr><mtd><msub><mi>x</mi><mn>21</mn></msub></mtd></mtr><mtr><mtd><mo>⋮</mo></mtd></mtr><mtr><mtd><msub><mi>x</mi><mrow><mi>n</mi><mn>1</mn></mrow></msub></mtd></mtr></mtable><mo>)</mo></mrow>
+    <mspace width="1.5em"></mspace>
+    <mi mathvariant="bold">r</mi><mo>=</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi mathvariant="bold">x</mi><mn>1</mn></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> The original writes the predictor column as <math alttext="X sub 1"><msub><mi>X</mi><mn>1</mn></msub></math> and the response as <math alttext="r"><mi>r</mi></math>; they are written here as bold length-<math alttext="n"><mi>n</mi></math> vectors, following the course notation.</p>
+</div>
+
+<h4 id="bf-algorithm">Backfitting algorithm (ESL 9.1.1)</h4>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> From here to the end of Section 2.3, the notes come from a second set, <em>Backfitting.pdf</em> (pages 6–8), which covers the algorithm in more detail.</p>
+</div>
+
+<p>Fix all <math alttext="f sub k, k not equal to j"><mrow><msub><mi>f</mi><mi>k</mi></msub><mo>:</mo><mi>k</mi><mo>≠</mo><mi>j</mi></mrow></math>:</p>
+
+<div class="eq">
+<math display="block" alttext="PRSS equals the sum from i equals 1 to n of, y sub i minus beta sub 0 minus the sum over k not equal to j of f sub k of x sub i k, minus f sub j of x sub i j, squared, plus lambda sub j times the integral of f sub j double prime of t squared d t, plus a constant; the first three terms inside the square are labelled r sub i superscript j">
+  <mrow><mtext>PRSS</mtext><mo>=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><munder><munder accentunder="true"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mi>β</mi><mn>0</mn></msub><mo>−</mo><munder><mo>∑</mo><mrow><mi>k</mi><mo>≠</mo><mi>j</mi></mrow></munder><msub><mi>f</mi><mi>k</mi></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><mo>)</mo></mrow><mo>⏟</mo></munder><msubsup><mi>r</mi><mi>i</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msubsup></munder><mo>−</mo><msub><mi>f</mi><mi>j</mi></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><msub><mi>λ</mi><mi>j</mi></msub><mo>∫</mo><msup><mrow><mo>(</mo><msubsup><mi>f</mi><mi>j</mi><mo>″</mo></msubsup><mo>(</mo><mi>t</mi><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mi>d</mi><mi>t</mi><mo>+</mo><mtext>const</mtext></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> The bracketed part is <math alttext="r sub i superscript j"><msubsup><mi>r</mi><mi>i</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msubsup></math>. The constant is the penalties for all <math alttext="f sub k, k not equal to j"><msub><mi>f</mi><mrow><mi>k</mi><mo>≠</mo><mi>j</mi></mrow></msub></math>. Think of <math alttext="r sub i superscript j"><msubsup><mi>r</mi><mi>i</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msubsup></math> as the response:</p>
+  <div class="eq">
+  <math display="block" alttext="the sum from i equals 1 to n of, r sub i superscript j minus f sub j of x sub i j, squared, plus lambda sub j times the integral of f sub j double prime of t squared d t">
+    <mrow><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><msubsup><mi>r</mi><mi>i</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msubsup><mo>−</mo><msub><mi>f</mi><mi>j</mi></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><msub><mi>λ</mi><mi>j</mi></msub><mo>∫</mo><msup><mrow><msubsup><mi>f</mi><mi>j</mi><mo>″</mo></msubsup><mo>(</mo><mi>t</mi><mo>)</mo></mrow><mn>2</mn></msup><mi>d</mi><mi>t</mi></mrow>
+  </math>
+  </div>
+</div>
+
+<p><strong>Algorithm:</strong></p>
+
+<ol>
+  <li>
+    <p>Set <math alttext="beta hat sub 0 equals y bar"><mrow><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>=</mo><mover><mi>y</mi><mo>¯</mo></mover></mrow></math> and <math alttext="bold f hat sub j equals 0 for all j"><mrow><msub><mover><mi mathvariant="bold">f</mi><mo>^</mo></mover><mi>j</mi></msub><mo>=</mo><mn>0</mn></mrow></math> for all <math alttext="j"><mi>j</mi></math>.</p>
+  </li>
+  <li>
+    <p>Cycle over <math alttext="j equals 1, 2, through p"><mrow><mi>j</mi><mo>=</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mo>…</mo><mo>,</mo><mi>p</mi></mrow></math>:</p>
+    <div class="eq">
+    <math display="block" alttext="bold f hat sub j gets bold S sub j applied to, bold y minus beta hat sub 0 times bold 1 minus the sum over k not equal to j of bold f hat sub k">
+      <mrow><msub><mover><mi mathvariant="bold">f</mi><mo>^</mo></mover><mi>j</mi></msub><mo>←</mo><msub><mi mathvariant="bold">S</mi><mi>j</mi></msub><mo>(</mo><mi mathvariant="bold">y</mi><mo>−</mo><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mn mathvariant="bold">1</mn><mo>−</mo><munder><mo>∑</mo><mrow><mi>k</mi><mo>≠</mo><mi>j</mi></mrow></munder><msub><mover><mi mathvariant="bold">f</mi><mo>^</mo></mover><mi>k</mi></msub><mo>)</mo></mrow>
+    </math>
+    </div>
+    <div class="note">
+      <p><span class="tag" style="color:var(--pop)">Annotation</span> The argument written out, the <strong>partial residual</strong> <math alttext="bold r superscript j"><msup><mi mathvariant="bold">r</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msup></math>:</p>
+      <div class="eq">
+      <math display="block" alttext="the column y sub 1 through y sub n, minus, the column of y bars plus the column with entries f hat sub 1 of x sub 1 1 plus f hat sub 2 of x sub 1 2 plus dot dot dot, through f hat sub 1 of x sub n 1 plus dot dot dot; equals the partial residual bold r superscript j">
+        <mrow><mrow><mo>(</mo><mtable><mtr><mtd><msub><mi>y</mi><mn>1</mn></msub></mtd></mtr><mtr><mtd><mo>⋮</mo></mtd></mtr><mtr><mtd><msub><mi>y</mi><mi>n</mi></msub></mtd></mtr></mtable><mo>)</mo></mrow><mo>−</mo><mrow><mo>[</mo><mrow><mo>(</mo><mtable><mtr><mtd><mover><mi>y</mi><mo>¯</mo></mover></mtd></mtr><mtr><mtd><mo>⋮</mo></mtd></mtr><mtr><mtd><mover><mi>y</mi><mo>¯</mo></mover></mtd></mtr></mtable><mo>)</mo></mrow><mo>+</mo><mrow><mo>(</mo><mtable><mtr><mtd><mrow><msub><mover><mi>f</mi><mo>^</mo></mover><mn>1</mn></msub><mo>(</mo><msub><mi>x</mi><mn>11</mn></msub><mo>)</mo><mo>+</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mn>2</mn></msub><mo>(</mo><msub><mi>x</mi><mn>12</mn></msub><mo>)</mo><mo>+</mo><mo>⋯</mo></mrow></mtd></mtr><mtr><mtd><mo>⋮</mo></mtd></mtr><mtr><mtd><mrow><msub><mover><mi>f</mi><mo>^</mo></mover><mn>1</mn></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>n</mi><mn>1</mn></mrow></msub><mo>)</mo><mo>+</mo><mo>⋯</mo></mrow></mtd></mtr></mtable><mo>)</mo></mrow><mo>]</mo></mrow><mo>=</mo><msup><mi mathvariant="bold">r</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msup></mrow>
+      </math>
+      </div>
+    </div>
+    <div class="note">
+      <p><span class="tag" style="color:var(--accent)">Commentary</span> The written-out sum, which starts <math alttext="f hat sub 1 plus f hat sub 2 plus dot dot dot"><mrow><msub><mover><mi>f</mi><mo>^</mo></mover><mn>1</mn></msub><mo>+</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mn>2</mn></msub><mo>+</mo><mo>⋯</mo></mrow></math>, should skip <math alttext="k equals j"><mrow><mi>k</mi><mo>=</mo><mi>j</mi></mrow></math>: as in the line above it, the partial residual leaves out <math alttext="f hat sub j"><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub></math>.</p>
+    </div>
+    <div class="eq">
+    <math display="block" alttext="bold S sub j of bold r superscript j equals the smoothing spline with bold r superscript j as the response">
+      <mrow><msub><mi mathvariant="bold">S</mi><mi>j</mi></msub><mo>(</mo><msup><mi mathvariant="bold">r</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msup><mo>)</mo><mo>=</mo><mtext>smoothing spline with </mtext><msup><mi mathvariant="bold">r</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msup><mtext> as response</mtext></mrow>
+    </math>
+    </div>
+    <div class="eq">
+    <math display="block" alttext="f hat sub j equals the argmin over f sub j of the sum from i equals 1 to n of, r sub i superscript j minus f sub j of x sub i j, squared, plus lambda sub j times the integral of f sub j double prime of t squared d t">
+      <mrow><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub><mo>=</mo><munder><mrow><mi>arg</mi><mo>⁡</mo><mi>min</mi></mrow><msub><mi>f</mi><mi>j</mi></msub></munder><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><msubsup><mi>r</mi><mi>i</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msubsup><mo>−</mo><msub><mi>f</mi><mi>j</mi></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><msub><mi>λ</mi><mi>j</mi></msub><mo>∫</mo><msup><mrow><mo>(</mo><msubsup><mi>f</mi><mi>j</mi><mo>″</mo></msubsup><mo>(</mo><mi>t</mi><mo>)</mo><mo>)</mo></mrow><mn>2</mn></msup><mi>d</mi><mi>t</mi></mrow>
+    </math>
+    </div>
+    <div class="note">
+      <p><span class="tag" style="color:var(--pop)">Annotation</span> Fit a smoothing spline for predictor <math alttext="j"><mi>j</mi></math> where <math alttext="bold y equals bold r superscript j"><mrow><mi mathvariant="bold">y</mi><mo>=</mo><msup><mi mathvariant="bold">r</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msup></mrow></math>.</p>
+    </div>
+    <p>Center <math alttext="f hat sub j"><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub></math>:</p>
+    <div class="eq">
+    <math display="block" alttext="bold f hat sub j gets bold f hat sub j minus, 1 over n times the sum over i of f hat sub j of x sub i j, times bold 1">
+      <mrow><msub><mover><mi mathvariant="bold">f</mi><mo>^</mo></mover><mi>j</mi></msub><mo>←</mo><msub><mover><mi mathvariant="bold">f</mi><mo>^</mo></mover><mi>j</mi></msub><mo>−</mo><mrow><mo>(</mo><mfrac><mn>1</mn><mi>n</mi></mfrac><munder><mo>∑</mo><mi>i</mi></munder><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>)</mo><mo>)</mo></mrow><mn mathvariant="bold">1</mn></mrow>
+    </math>
+    </div>
+    <div class="note">
+      <p><span class="tag" style="color:var(--pop)">Annotation</span> An arrow points at the subtracted term: it is the vector <math alttext="the column f bar sub j, dot dot dot, f bar sub j"><mrow><mo>(</mo><msub><mover><mi>f</mi><mo>¯</mo></mover><mi>j</mi></msub><mo>,</mo><mo>…</mo><mo>,</mo><msub><mover><mi>f</mi><mo>¯</mo></mover><mi>j</mi></msub><msup><mo>)</mo><mi>T</mi></msup></mrow></math>.</p>
+    </div>
+  </li>
+  <li>
+    <p>Repeat step 2 until convergence: the <math alttext="bold f hat sub j"><msub><mover><mi mathvariant="bold">f</mi><mo>^</mo></mover><mi>j</mi></msub></math> don’t change much.</p>
+  </li>
+</ol>
+
+<h4 id="bf-intuition">Intuition, three rounds</h4>
+
+<div class="eq">
+<math display="block" alttext="y sub i equals beta sub 0 plus beta sub 1 x sub i 1 plus beta sub 2 x sub i 2 plus epsilon sub i; beta sub 0 equals y bar, beta hat sub 1 equals beta hat sub 2 equals 0">
+  <mrow><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>β</mi><mn>2</mn></msub><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub><mo>+</mo><msub><mi>ε</mi><mi>i</mi></msub><mspace width="2em"></mspace><msub><mi>β</mi><mn>0</mn></msub><mo>=</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>,</mo><mspace width="0.5em"></mspace><msub><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn></msub><mo>=</mo><msub><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn></msub><mo>=</mo><mn>0</mn></mrow>
+</math>
+</div>
+
+<div class="scroll-x" role="region" aria-label="Backfitting table, three rounds (scrolls sideways on narrow screens)" tabindex="0" style="overflow-x:auto">
+<table>
+  <caption>Backfitting, three rounds (from <em>Backfitting.pdf</em>)</caption>
+  <thead><tr><th scope="col">Step</th><th scope="col">Response (<math alttext="r sub i"><msub><mi>r</mi><mi>i</mi></msub></math>)</th><th scope="col">Regression</th><th scope="col">Estimate</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">1. update <math alttext="beta sub 1"><msub><mi>β</mi><mn>1</mn></msub></math></th><td><math alttext="y sub i minus y bar"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover></mrow></math></td><td><math alttext="r sub i equals beta sub 1 superscript 1 x sub i 1"><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msubsup><mi>β</mi><mn>1</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub></mrow></math></td><td><math alttext="beta hat sub 1 superscript 1"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup></math></td></tr>
+    <tr><th scope="row">update <math alttext="beta sub 2"><msub><mi>β</mi><mn>2</mn></msub></math></th><td><math alttext="y sub i minus y bar minus beta hat sub 1 superscript 1 x sub i 1"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>−</mo><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub></mrow></math></td><td><math alttext="r sub i equals beta sub 2 superscript 1 x sub i 2"><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msubsup><mi>β</mi><mn>2</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub></mrow></math></td><td><math alttext="beta hat sub 2 superscript 1"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup></math></td></tr>
+    <tr><th scope="row">2. update <math alttext="beta sub 1"><msub><mi>β</mi><mn>1</mn></msub></math></th><td><math alttext="y sub i minus y bar minus beta hat sub 2 superscript 1 x sub i 2"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>−</mo><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn><mrow><mo>(</mo><mn>1</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub></mrow></math></td><td><math alttext="r sub i equals beta sub 1 superscript 2 x sub i 1"><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msubsup><mi>β</mi><mn>1</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub></mrow></math></td><td><math alttext="beta hat sub 1 superscript 2"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup></math></td></tr>
+    <tr><th scope="row">update <math alttext="beta sub 2"><msub><mi>β</mi><mn>2</mn></msub></math></th><td><math alttext="y sub i minus y bar minus beta hat sub 1 superscript 2 x sub i 1"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>−</mo><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub></mrow></math></td><td><math alttext="r sub i equals beta sub 2 superscript 2 x sub i 2"><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msubsup><mi>β</mi><mn>2</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub></mrow></math></td><td><math alttext="beta hat sub 2 superscript 2"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup></math></td></tr>
+    <tr><th scope="row">3. update <math alttext="beta sub 1"><msub><mi>β</mi><mn>1</mn></msub></math></th><td><math alttext="y sub i minus y bar minus beta hat sub 2 superscript 2 x sub i 2"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>−</mo><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub></mrow></math></td><td><math alttext="r sub i equals beta sub 1 superscript 3 x sub i 1"><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msubsup><mi>β</mi><mn>1</mn><mrow><mo>(</mo><mn>3</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub></mrow></math></td><td><math alttext="beta hat sub 1 superscript 3"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn><mrow><mo>(</mo><mn>3</mn><mo>)</mo></mrow></msubsup></math></td></tr>
+    <tr><th scope="row">update <math alttext="beta sub 2"><msub><mi>β</mi><mn>2</mn></msub></math></th><td><math alttext="y sub i minus y bar minus beta hat sub 1 superscript 3 x sub i 1"><mrow><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>−</mo><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>1</mn><mrow><mo>(</mo><mn>3</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub></mrow></math></td><td><math alttext="r sub i equals beta sub 2 superscript 3 x sub i 2"><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msubsup><mi>β</mi><mn>2</mn><mrow><mo>(</mo><mn>3</mn><mo>)</mo></mrow></msubsup><msub><mi>x</mi><mrow><mi>i</mi><mn>2</mn></mrow></msub></mrow></math></td><td><math alttext="beta hat sub 2 superscript 3"><msubsup><mover><mi>β</mi><mo>^</mo></mover><mn>2</mn><mrow><mo>(</mo><mn>3</mn><mo>)</mo></mrow></msubsup></math></td></tr>
+    <tr><th scope="row">⋮</th><td></td><td></td><td></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>For GAMs,</strong> model <math alttext="r"><mi>r</mi></math> as a smoothing spline of <math alttext="r"><mi>r</mi></math> on <math alttext="x sub i j"><msub><mi>x</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></math>.</p>
+
+
+</main>
+
+<footer>
+  <p>Transcribed from the handwritten notes <em>ML_week_5_day_1.pdf</em> (5 pages), with the backfitting algorithm and three-round table in Section 2.3 from <em>Backfitting.pdf</em> (pages 6–8). Equations are MathML; figures are inline SVG with title, description, and an expandable long description. Figures 1–3 are schematic redrawings of the sketches; only the marked values (5k, 10k, 20k) come from the notes. Conforms to WCAG 2.2 Level AA.</p>
+</footer>
+</div>
+</body>
+</html>
