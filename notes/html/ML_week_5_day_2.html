@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAMs and Decision Trees — Week 5, Day 2 | DSAI 621</title>
+<meta name="description" content="Accessible class notes wrapping up generalized additive models (degrees of freedom, choosing smoothing parameters by GCV, classification, pros and cons) and introducing decision trees: the model, splitting intuition for regression and classification, tree structure and greedy fitting.">
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #4a4a4a;
+    --rule: #c9c9c9;
+    --accent: #0b4f8a;
+    --accent-bg: #eef4fa;
+    --focus: #0b4f8a;
+    --pop: #a4262c;   /* population / true  — 5.9:1 on white */
+    --est: #5b2d8e;   /* estimate / fitted  — 8.5:1 on white */
+    --err: #8a5000;   /* errors / residuals — 5.1:1 on white */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f2; --muted: #cfcfcf; --rule: #555;
+      --accent: #8ab8e0; --accent-bg: #182430; --focus: #8ab8e0;
+      --pop: #ff9f99; --est: #cbb0ff; --err: #f0b458;
+    }
+    body { background: #131313; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--ink);
+    background: #fff;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #131313; } }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 5rem; }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible, :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--accent); color: #fff;
+    padding: .75rem 1rem; z-index: 10; text-decoration: none;
+  }
+  .skip:focus { left: .5rem; top: .5rem; }
+  h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; line-height: 1.3; margin: 2.5rem 0 .5rem;
+       padding-top: .75rem; border-top: 2px solid var(--rule); }
+  h3 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  p, li { max-width: 42rem; }
+  .lede { color: var(--muted); margin-top: 0; }
+  nav.toc {
+    background: var(--accent-bg); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 1rem 1.25rem; margin: 2rem 0;
+  }
+  nav.toc h2 { font-size: 1.05rem; margin: 0 0 .5rem; border: 0; padding: 0; }
+  nav.toc ol { margin: 0; padding-left: 1.25rem; }
+  nav.toc li { margin: .3rem 0; }
+  nav.toc a { display: inline-block; min-height: 24px; padding: 2px 0; }
+  table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+  caption { text-align: left; font-weight: 600; padding-bottom: .5rem; }
+  th, td { border: 1px solid var(--rule); padding: .5rem .7rem; text-align: left; }
+  thead th { background: var(--accent-bg); }
+  figure { margin: 1.5rem 0; }
+  figcaption { font-size: .95rem; color: var(--muted); margin-top: .5rem; }
+  svg { max-width: 100%; height: auto; display: block; }
+  details {
+    border: 1px solid var(--rule); border-radius: 6px;
+    padding: .5rem .85rem; margin: .75rem 0; background: var(--accent-bg);
+  }
+  summary { cursor: pointer; font-weight: 600; min-height: 24px; padding: .25rem 0; }
+  details[open] summary { margin-bottom: .5rem; }
+  math { font-size: 1.15em; }
+  math[display="block"] { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }
+  .eq { margin: 1.25rem 0; }
+  .note {
+    border-left: 4px solid var(--accent); background: var(--accent-bg);
+    padding: .75rem 1rem; margin: 1.25rem 0; border-radius: 0 6px 6px 0;
+  }
+  .note > :first-child { margin-top: 0; }
+  .note > :last-child { margin-bottom: 0; }
+  .tag {
+    display: inline-block; font-size: .8rem; font-weight: 700;
+    letter-spacing: .02em; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 4px;
+    padding: 0 .4em; white-space: nowrap;
+  }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 2px solid var(--rule);
+           color: var(--muted); font-size: .95rem; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps > li { margin: .75rem 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<div class="wrap">
+<header>
+  <p class="lede"><strong>DSAI 621 — Intro to Machine Learning</strong> · Fall 2026 · Week 5, Day 2</p>
+  <h1>Wrapping Up GAMs; Decision Trees</h1>
+  <p class="lede">Accessible transcription of the handwritten class notes. All equations are marked up in MathML so they can be read by a screen reader, magnified, or rendered in braille. All figures have text descriptions. Annotations written in a second pen colour in the original are reproduced here as labelled callouts, so none of their meaning depends on colour. A few short callouts marked <strong>Commentary</strong> were added in this transcription; they are not in the handwritten notes.</p>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+  <h2 id="toc-h">On this page</h2>
+  <ol>
+    <li><a href="#agenda">Agenda</a></li>
+    <li><a href="#gams">1. GAMs</a></li>
+    <li><a href="#review">1.1 Review</a></li>
+    <li><a href="#df">1.2 d.f. and <em>λ<sub>j</sub></em></a></li>
+    <li><a href="#classification">1.3 Classification</a></li>
+    <li><a href="#pros-cons">1.4 Pros and cons</a></li>
+    <li><a href="#trees">2. Decision trees</a></li>
+    <li><a href="#tree-model">2.1 The model</a></li>
+    <li><a href="#intuition">2.2 Intuition</a></li>
+    <li><a href="#structure">2.3 Tree structure</a></li>
+    <li><a href="#fitting">2.3 Fitting</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+
+<h2 id="agenda">Agenda</h2>
+<ul>
+  <li>GAMs</li>
+  <li>Decision trees</li>
+</ul>
+
+<h2 id="gams">1. GAMs</h2>
+
+<h3 id="review">1.1 Review</h3>
+
+<div class="eq">
+<math display="block" alttext="y sub i equals beta sub 0 plus f sub 1 of x sub i 1 plus dot dot dot plus f sub p of x sub i p plus epsilon sub i">
+  <mrow><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>f</mi><mn>1</mn></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mn>1</mn></mrow></msub><mo>)</mo><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi>f</mi><mi>p</mi></msub><mo>(</mo><msub><mi>x</mi><mrow><mi>i</mi><mi>p</mi></mrow></msub><mo>)</mo><mo>+</mo><msub><mi>ε</mi><mi>i</mi></msub></mrow>
+</math>
+</div>
+
+<p><math alttext="f sub j"><msub><mi>f</mi><mi>j</mi></msub></math> = linear, smooth, step (categorical)</p>
+
+<div class="eq">
+<math display="block" alttext="wage hat equals beta hat sub 0 plus f hat sub 1 of year plus f hat sub 2 of age plus f hat sub 3 of edu; beta hat sub 0 equals y bar">
+  <mrow><mover><mtext>wage</mtext><mo>^</mo></mover><mo>=</mo><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>+</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mn>1</mn></msub><mo>(</mo><mtext>year</mtext><mo>)</mo><mo>+</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mn>2</mn></msub><mo>(</mo><mtext>age</mtext><mo>)</mo><mo>+</mo><msub><mover><mi>f</mi><mo>^</mo></mover><mn>3</mn></msub><mo>(</mo><mtext>edu</mtext><mo>)</mo><mspace width="2em"></mspace><msub><mover><mi>β</mi><mo>^</mo></mover><mn>0</mn></msub><mo>=</mo><mover><mi>y</mi><mo>¯</mo></mover></mrow>
+</math>
+</div>
+
+<figure>
+<svg viewBox="0 0 710 200" role="img" aria-labelledby="fig4-t fig4-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig4-t">The GAM fit as y bar plus three fitted terms: a straight line in year, a smooth S-shaped curve in age, and a step for each education level</title>
+  <desc id="fig4-d">Reading left to right: y bar, plus a small plot of the year term, a straight rising line; plus a plot of the age term, a smooth curve that rises steeply and then levels off and turns down slightly; plus a plot of the education term, a short horizontal bar at each of HS, Coll and Grad, rising from just below zero to well above it. Each plot has a tick marking zero on its vertical axis.</desc>
+  <text x="8.0" y="112.0" font-size="20" fill="var(--accent)" text-anchor="start">ȳ +</text><line x1="70" y1="170" x2="220" y2="170" stroke="currentColor" stroke-width="2"/><polygon points="220,170 212,166 212,174" fill="currentColor"/><text x="226.0" y="175.0" font-size="15" fill="currentColor" text-anchor="start">year</text><line x1="70" y1="170" x2="70" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="70,20 66,28 74,28" fill="currentColor"/><text x="80.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start"></text><line x1="64" y1="110" x2="70" y2="110" stroke="currentColor" stroke-width="2"/><text x="60.0" y="115.0" font-size="14" fill="currentColor" text-anchor="end">0</text><line x1="88" y1="155" x2="205" y2="40" stroke="var(--accent)" stroke-width="3"/><text x="255.0" y="117.0" font-size="22" fill="var(--accent)" text-anchor="middle">+</text><line x1="290" y1="170" x2="440" y2="170" stroke="currentColor" stroke-width="2"/><polygon points="440,170 432,166 432,174" fill="currentColor"/><text x="446.0" y="175.0" font-size="15" fill="currentColor" text-anchor="start">age</text><line x1="290" y1="170" x2="290" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="290,20 286,28 294,28" fill="currentColor"/><text x="300.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start"></text><line x1="284" y1="110" x2="290" y2="110" stroke="currentColor" stroke-width="2"/><text x="280.0" y="115.0" font-size="14" fill="currentColor" text-anchor="end">0</text><path d="M305.0,147.6 L306.6,147.3 L308.2,147.0 L309.7,146.7 L311.3,146.4 L312.9,146.0 L314.5,145.5 L316.1,145.1 L317.7,144.6 L319.2,144.0 L320.8,143.4 L322.4,142.7 L324.0,141.9 L325.6,141.1 L327.2,140.2 L328.7,139.2 L330.3,138.2 L331.9,137.0 L333.5,135.7 L335.1,134.4 L336.6,132.9 L338.2,131.4 L339.8,129.7 L341.4,127.9 L343.0,126.0 L344.6,124.0 L346.1,121.9 L347.7,119.7 L349.3,117.4 L350.9,114.9 L352.5,112.4 L354.1,109.9 L355.6,107.2 L357.2,104.5 L358.8,101.8 L360.4,99.0 L362.0,96.3 L363.5,93.5 L365.1,90.8 L366.7,88.1 L368.3,85.4 L369.9,82.8 L371.5,80.3 L373.0,77.9 L374.6,75.5 L376.2,73.3 L377.8,71.2 L379.4,69.2 L380.9,67.3 L382.5,65.5 L384.1,63.8 L385.7,62.2 L387.3,60.7 L388.9,59.4 L390.4,58.1 L392.0,57.0 L393.6,55.9 L395.2,54.9 L396.8,54.0 L398.4,53.2 L399.9,52.7 L401.5,52.4 L403.1,52.1 L404.7,51.9 L406.3,51.8 L407.8,51.7 L409.4,51.6 L411.0,51.6 L412.6,51.6 L414.2,51.7 L415.8,51.8 L417.3,51.9 L418.9,52.0 L420.5,52.2 L422.1,52.4 L423.7,52.6 L425.3,52.8 L426.8,53.0 L428.4,53.3 L430.0,53.6" fill="none" stroke="var(--accent)" stroke-width="3"/><text x="475.0" y="117.0" font-size="22" fill="var(--accent)" text-anchor="middle">+</text><line x1="510" y1="170" x2="660" y2="170" stroke="currentColor" stroke-width="2"/><polygon points="660,170 652,166 652,174" fill="currentColor"/><text x="666.0" y="175.0" font-size="15" fill="currentColor" text-anchor="start">edu</text><line x1="510" y1="170" x2="510" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="510,20 506,28 514,28" fill="currentColor"/><text x="520.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start"></text><line x1="504" y1="110" x2="510" y2="110" stroke="currentColor" stroke-width="2"/><text x="500.0" y="115.0" font-size="14" fill="currentColor" text-anchor="end">0</text><line x1="540" y1="165" x2="540" y2="175" stroke="currentColor" stroke-width="2"/><text x="540.0" y="190.0" font-size="12" fill="currentColor" text-anchor="middle">HS</text><line x1="530" y1="122" x2="550" y2="122" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/><line x1="582" y1="165" x2="582" y2="175" stroke="currentColor" stroke-width="2"/><text x="582.0" y="190.0" font-size="12" fill="currentColor" text-anchor="middle">Coll</text><line x1="572" y1="94" x2="592" y2="94" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/><line x1="624" y1="165" x2="624" y2="175" stroke="currentColor" stroke-width="2"/><text x="624.0" y="190.0" font-size="12" fill="currentColor" text-anchor="middle">Grad</text><line x1="614" y1="45" x2="634" y2="45" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/>
+</svg>
+<figcaption>Figure 4. The fitted wage model as <math alttext="y bar"><mover><mi>y</mi><mo>¯</mo></mover></math> plus three fitted terms: linear in year, smooth in age, and a step for each education level.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 4</summary>
+  <p>Reading left to right: <math alttext="y bar"><mover><mi>y</mi><mo>¯</mo></mover></math>, plus a small plot of the year term, a straight rising line; plus a plot of the age term, a smooth curve that rises steeply and then levels off; plus a plot of the education term, with a short horizontal bar at each of HS, Coll and Grad, rising from just below zero to well above it. Each plot marks zero on its vertical axis.</p>
+</details>
+
+<p><strong>Backfitting algorithm:</strong> fit the <math alttext="f sub j"><msub><mi>f</mi><mi>j</mi></msub></math> one at a time, on partial residuals:</p>
+
+<div class="eq">
+<math display="block" alttext="r sub i equals y sub i minus y bar minus, the fitted value from the model without f hat sub j">
+  <mrow><msub><mi>r</mi><mi>i</mi></msub><mo>=</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><mover><mi>y</mi><mo>¯</mo></mover><mo>−</mo><mrow><mo>[</mo><mtext>fitted value from model without </mtext><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub><mo>]</mo></mrow></mrow>
+</math>
+</div>
+
+<h3 id="df">1.2 d.f. and <math alttext="lambda sub j"><msub><mi>λ</mi><mi>j</mi></msub></math></h3>
+
+<p>Surprisingly, we can write</p>
+
+<div class="eq">
+<math display="block" alttext="bold y hat equals bold R bold y, where bold R, n by n, equals bold R sub 0 plus dot dot dot plus bold R sub p">
+  <mrow><mover><mi mathvariant="bold">y</mi><mo>^</mo></mover><mo>=</mo><mi mathvariant="bold">R</mi><mi mathvariant="bold">y</mi><mspace width="2em"></mspace><msub><mi mathvariant="bold">R</mi><mrow><mi>n</mi><mo>×</mo><mi>n</mi></mrow></msub><mo>=</mo><msub><mi mathvariant="bold">R</mi><mn>0</mn></msub><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi mathvariant="bold">R</mi><mi>p</mi></msub></mrow>
+</math>
+</div>
+
+<p>So, <math alttext="d.f. equals trace of bold R"><mrow><mtext>d.f.</mtext><mo>=</mo><mi>tr</mi><mo>(</mo><mi mathvariant="bold">R</mi><mo>)</mo></mrow></math>, or count term by term:</p>
+
+<table>
+  <caption>Degrees of freedom for each kind of term</caption>
+  <thead><tr><th scope="col">Term</th><th scope="col">d.f.</th><th scope="col">Why?</th></tr></thead>
+  <tbody>
+    <tr><th scope="row"><math alttext="beta sub 0"><msub><mi>β</mi><mn>0</mn></msub></math></th><td>1</td><td></td></tr>
+    <tr><th scope="row">linear <math alttext="beta sub j x sub j"><mrow><msub><mi>β</mi><mi>j</mi></msub><msub><mi>x</mi><mi>j</mi></msub></mrow></math></th><td>1</td><td>slope</td></tr>
+    <tr><th scope="row">categorical (<math alttext="K"><mi>K</mi></math> levels)</th><td><math alttext="K minus 1"><mrow><mi>K</mi><mo>−</mo><mn>1</mn></mrow></math></td><td>−1 because it’s centered (mean 0)</td></tr>
+    <tr><th scope="row">natural spline</th><td><math alttext="d"><mi>d</mi></math></td><td><math alttext="d"><mi>d</mi></math> columns, no intercept</td></tr>
+    <tr><th scope="row">smoothing spline</th><td><math alttext="trace of bold S sub j minus 1"><mrow><mi>tr</mi><mo>(</mo><msub><mi mathvariant="bold">S</mi><mi>j</mi></msub><mo>)</mo><mo>−</mo><mn>1</mn></mrow></math></td><td>−1 for the constant (<math alttext="beta sub 0"><msub><mi>β</mi><mn>0</mn></msub></math>)</td></tr>
+  </tbody>
+</table>
+
+<div class="eq">
+<math display="block" alttext="d.f. is approximately 1 plus the sum over j of d.f. sub j">
+  <mrow><mtext>d.f.</mtext><mo>≈</mo><mn>1</mn><mo>+</mo><munder><mo>∑</mo><mi>j</mi></munder><msub><mtext>d.f.</mtext><mi>j</mi></msub></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> Not exact because of correlation between predictors.</p>
+</div>
+
+<p><strong>Choosing <math alttext="lambda sub j"><msub><mi>λ</mi><mi>j</mi></msub></math>.</strong> Each smoother gets its own <math alttext="lambda sub j"><msub><mi>λ</mi><mi>j</mi></msub></math>.</p>
+<ul>
+  <li>Focus on d.f. instead</li>
+  <li>Visually check and choose an appropriate d.f.</li>
+  <li>Use generalized CV (GCV):</li>
+</ul>
+
+<div class="eq">
+<math display="block" alttext="GCV equals, 1 over n times the sum from i equals 1 to n of y sub i minus y hat sub i squared, over, 1 minus trace of bold R over n, squared">
+  <mrow><mtext>GCV</mtext><mo>=</mo><mfrac><mrow><mfrac><mn>1</mn><mi>n</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>y</mi><mo>^</mo></mover><mi>i</mi></msub><mo>)</mo></mrow><mn>2</mn></msup></mrow><msup><mrow><mo>(</mo><mn>1</mn><mo>−</mo><mi>tr</mi><mo>(</mo><mi mathvariant="bold">R</mi><mo>)</mo><mo>/</mo><mi>n</mi><mo>)</mo></mrow><mn>2</mn></msup></mfrac></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> LOOCV shortcut for GAMs.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> GCV takes the LOOCV shortcut and replaces each diagonal entry <math alttext="the i i entry of bold R"><msub><mrow><mo>{</mo><mi mathvariant="bold">R</mi><mo>}</mo></mrow><mrow><mi>i</mi><mi>i</mi></mrow></msub></math> by their average, <math alttext="trace of bold R over n"><mrow><mi>tr</mi><mo>(</mo><mi mathvariant="bold">R</mi><mo>)</mo><mo>/</mo><mi>n</mi></mrow></math>. So it approximates LOOCV rather than equalling it (ESL 7.10.1).</p>
+</div>
+
+<p>Find the lowest GCV over a grid of <math alttext="lambda"><mi>λ</mi></math> values for each predictor. For example, with 3 predictors (<math alttext="lambda sub 1, lambda sub 2, lambda sub 3"><mrow><msub><mi>λ</mi><mn>1</mn></msub><mo>,</mo><msub><mi>λ</mi><mn>2</mn></msub><mo>,</mo><msub><mi>λ</mi><mn>3</mn></msub></mrow></math>) and 3 values each, there are <math alttext="3 times 3 times 3 equals 27"><mrow><mn>3</mn><mo>×</mo><mn>3</mn><mo>×</mo><mn>3</mn><mo>=</mo><mn>27</mn></mrow></math> combinations. Number of fits:</p>
+<ul>
+  <li><math alttext="k"><mi>k</mi></math>-fold CV: <math alttext="k times 27"><mrow><mi>k</mi><mo>·</mo><mn>27</mn></mrow></math></li>
+  <li>LOOCV: <math alttext="n times 27"><mrow><mi>n</mi><mo>·</mo><mn>27</mn></mrow></math></li>
+  <li>GCV: 27</li>
+</ul>
+
+<h3 id="classification">1.3 Classification</h3>
+
+<div class="eq">
+<math display="block" alttext="log of pi over 1 minus pi equals beta sub 0 plus f sub 1 of X sub 1 plus dot dot dot plus f sub p of X sub p">
+  <mrow><mi>log</mi><mfrac><mi>π</mi><mrow><mn>1</mn><mo>−</mo><mi>π</mi></mrow></mfrac><mo>=</mo><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><msub><mi>f</mi><mn>1</mn></msub><mo>(</mo><msub><mi>X</mi><mn>1</mn></msub><mo>)</mo><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi>f</mi><mi>p</mi></msub><mo>(</mo><msub><mi>X</mi><mi>p</mi></msub><mo>)</mo></mrow>
+</math>
+</div>
+
+<p>Fitting is harder.</p>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> The backfitting loop runs inside the iteratively reweighted least squares loop that fits logistic regression (“local scoring”, ESL Algorithm 9.2).</p>
+</div>
+
+<h3 id="pros-cons">1.4 Pros and cons</h3>
+
+<p><strong>Pros:</strong></p>
+<ul>
+  <li>Nonlinear effects are estimated automatically</li>
+  <li><math alttext="f hat sub j"><msub><mover><mi>f</mi><mo>^</mo></mover><mi>j</mi></msub></math> are interpretable</li>
+  <li>d.f. intuitive</li>
+  <li>Interactions can be modeled as
+    <ul>
+      <li>a smooth surface (<math alttext="x sub j"><msub><mi>x</mi><mi>j</mi></msub></math> and <math alttext="x sub k"><msub><mi>x</mi><mi>k</mi></msub></math> are continuous)</li>
+      <li>a different curve per category (<math alttext="x sub j"><msub><mi>x</mi><mi>j</mi></msub></math> continuous, <math alttext="x sub k"><msub><mi>x</mi><mi>k</mi></msub></math> categorical)</li>
+    </ul>
+  </li>
+  <li>Inference: since <math alttext="bold y hat equals bold R bold y"><mrow><mover><mi mathvariant="bold">y</mi><mo>^</mo></mover><mo>=</mo><mi mathvariant="bold">R</mi><mi mathvariant="bold">y</mi></mrow></math>, use <math alttext="F"><mi>F</mi></math>-tests to compare models.</li>
+</ul>
+
+<p><strong>Cons:</strong></p>
+<ul>
+  <li>Additivity may be wrong. Add interactions yourself.</li>
+  <li>Backfitting might be slow.</li>
+</ul>
+
+<h2 id="trees">2. Decision trees</h2>
+
+<h3 id="tree-model">2.1 The model</h3>
+
+<div class="eq">
+<math display="block" alttext="f of X equals the sum from m equals 1 to the number of terminal nodes T of c sub m times the indicator that X is in R sub m">
+  <mrow><mi>f</mi><mo>(</mo><mi>X</mi><mo>)</mo><mo>=</mo><munderover><mo>∑</mo><mrow><mi>m</mi><mo>=</mo><mn>1</mn></mrow><mrow><mo>|</mo><mi>T</mi><mo>|</mo></mrow></munderover><msub><mi>c</mi><mi>m</mi></msub><mi>I</mi><mo>(</mo><mi>X</mi><mo>∈</mo><msub><mi>R</mi><mi>m</mi></msub><mo>)</mo></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> A small surprised-face doodle is drawn beside this formula.</p>
+</div>
+
+<h3 id="intuition">2.2 Intuition</h3>
+
+<h4 id="intuition-regression">Regression</h4>
+
+<figure>
+<svg viewBox="0 0 470 252" role="img" aria-labelledby="fig5-t fig5-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig5-t">One split at x 1 equals 4.5: each side is predicted by the mean of its y values</title>
+  <desc id="fig5-d">Axes y and x 1. Four low points sit left of a dotted vertical line at s 1 equals 4.5, and five higher points sit to its right. A horizontal segment on each side marks the mean of the y values there: low on the left, high on the right.</desc>
+  <line x1="50" y1="210" x2="420" y2="210" stroke="currentColor" stroke-width="2"/><polygon points="420,210 412,206 412,214" fill="currentColor"/><text x="426.0" y="215.0" font-size="15" fill="currentColor" text-anchor="start">x<tspan baseline-shift="sub" font-size="11">1</tspan></text><line x1="50" y1="210" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="60.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><line x1="229.0" y1="25" x2="229.0" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="58.0" y1="179.0" x2="227.0" y2="179.0" stroke="var(--accent)" stroke-width="3"/><line x1="231.0" y1="67.7" x2="436.0" y2="67.7" stroke="var(--accent)" stroke-width="3"/><g fill="currentColor"><circle cx="96.0" cy="184.2" r="3.2"/><circle cx="130.2" cy="173.8" r="3.2"/><circle cx="160.6" cy="184.2" r="3.2"/><circle cx="194.8" cy="173.8" r="3.2"/><circle cx="248.0" cy="89.8" r="3.2"/><circle cx="274.6" cy="74.0" r="3.2"/><circle cx="301.2" cy="89.8" r="3.2"/><circle cx="346.8" cy="47.8" r="3.2"/><circle cx="384.8" cy="37.2" r="3.2"/></g><text x="229.0" y="236.0" font-size="14" fill="var(--accent)" text-anchor="middle">s<tspan baseline-shift="sub" font-size="11">1</tspan> = 4.5</text>
+</svg>
+<figcaption>Figure 5. One split at <math alttext="s sub 1 equals 4.5"><mrow><msub><mi>s</mi><mn>1</mn></msub><mo>=</mo><mn>4.5</mn></mrow></math>: each side is predicted by the mean of its <math alttext="y"><mi>y</mi></math> values.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 5</summary>
+  <p>Axes <math alttext="y"><mi>y</mi></math> and <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math>. Four low points sit to the left of a dotted vertical line at <math alttext="s sub 1 equals 4.5"><mrow><msub><mi>s</mi><mn>1</mn></msub><mo>=</mo><mn>4.5</mn></mrow></math>, and five higher points sit to its right. A horizontal segment on each side marks the mean of the <math alttext="y"><mi>y</mi></math> values there.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Annotation</span> Predict with the mean of <math alttext="y"><mi>y</mi></math> in each region.</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 470 252" role="img" aria-labelledby="fig6-t fig6-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig6-t">Two splits, at 4.5 and 7: three regions predicted by y hat equals 2, 11 and 15</title>
+  <desc id="fig6-d">The same points, now with dotted vertical lines at s 1 equals 4.5 and s 2 equals 7. The three regions are predicted by their means: y hat equals 2 on the left, 11 in the middle, and 15 on the right.</desc>
+  <line x1="50" y1="210" x2="420" y2="210" stroke="currentColor" stroke-width="2"/><polygon points="420,210 412,206 412,214" fill="currentColor"/><text x="426.0" y="215.0" font-size="15" fill="currentColor" text-anchor="start">x<tspan baseline-shift="sub" font-size="11">1</tspan></text><line x1="50" y1="210" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="60.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><line x1="229.0" y1="25" x2="229.0" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="324.0" y1="25" x2="324.0" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="58.0" y1="179.0" x2="227.0" y2="179.0" stroke="var(--accent)" stroke-width="3"/><line x1="231.0" y1="84.5" x2="322.0" y2="84.5" stroke="var(--accent)" stroke-width="3"/><line x1="326.0" y1="42.5" x2="436.0" y2="42.5" stroke="var(--accent)" stroke-width="3"/><g fill="currentColor"><circle cx="96.0" cy="184.2" r="3.2"/><circle cx="130.2" cy="173.8" r="3.2"/><circle cx="160.6" cy="184.2" r="3.2"/><circle cx="194.8" cy="173.8" r="3.2"/><circle cx="248.0" cy="89.8" r="3.2"/><circle cx="274.6" cy="74.0" r="3.2"/><circle cx="301.2" cy="89.8" r="3.2"/><circle cx="346.8" cy="47.8" r="3.2"/><circle cx="384.8" cy="37.2" r="3.2"/></g><text x="229.0" y="236.0" font-size="14" fill="var(--accent)" text-anchor="middle">s<tspan baseline-shift="sub" font-size="11">1</tspan> = 4.5</text><text x="324.0" y="236.0" font-size="14" fill="var(--accent)" text-anchor="middle">s<tspan baseline-shift="sub" font-size="11">2</tspan> = 7</text><text x="63.7" y="171.0" font-size="14" fill="var(--accent)" text-anchor="start">ŷ = 2</text><text x="276.5" y="106.5" font-size="14" fill="var(--accent)" text-anchor="middle">ŷ = 11</text><text x="365.8" y="32.5" font-size="14" fill="var(--accent)" text-anchor="middle">ŷ = 15</text>
+</svg>
+<figcaption>Figure 6. A second split at <math alttext="s sub 2 equals 7"><mrow><msub><mi>s</mi><mn>2</mn></msub><mo>=</mo><mn>7</mn></mrow></math> gives three regions, predicted by <math alttext="y hat equals 2, 11 and 15"><mrow><mover><mi>y</mi><mo>^</mo></mover><mo>=</mo><mn>2</mn><mo>,</mo><mn>11</mn><mo>,</mo><mn>15</mn></mrow></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 6</summary>
+  <p>The same points, now with dotted vertical lines at <math alttext="s sub 1 equals 4.5"><mrow><msub><mi>s</mi><mn>1</mn></msub><mo>=</mo><mn>4.5</mn></mrow></math> and <math alttext="s sub 2 equals 7"><mrow><msub><mi>s</mi><mn>2</mn></msub><mo>=</mo><mn>7</mn></mrow></math>. Each of the three regions has a horizontal segment at its mean: <math alttext="y hat equals 2"><mrow><mover><mi>y</mi><mo>^</mo></mover><mo>=</mo><mn>2</mn></mrow></math> on the left, 11 in the middle and 15 on the right.</p>
+</details>
+
+<figure>
+<svg viewBox="0 0 470 252" role="img" aria-labelledby="fig7-t fig7-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig7-t">Many splits: a dotted line between every pair of neighbouring points, so each point gets its own region</title>
+  <desc id="fig7-d">The same points with a dotted vertical line between every pair of neighbouring points. Each region contains a single point, and its horizontal segment passes through that point, so the fit follows the data exactly.</desc>
+  <line x1="50" y1="210" x2="420" y2="210" stroke="currentColor" stroke-width="2"/><polygon points="420,210 412,206 412,214" fill="currentColor"/><text x="426.0" y="215.0" font-size="15" fill="currentColor" text-anchor="start">x<tspan baseline-shift="sub" font-size="11">1</tspan></text><line x1="50" y1="210" x2="50" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="50,20 46,28 54,28" fill="currentColor"/><text x="60.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><line x1="113.1" y1="25" x2="113.1" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="145.4" y1="25" x2="145.4" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="177.7" y1="25" x2="177.7" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="221.4" y1="25" x2="221.4" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="261.3" y1="25" x2="261.3" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="287.9" y1="25" x2="287.9" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="324.0" y1="25" x2="324.0" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="365.8" y1="25" x2="365.8" y2="218" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 3"/><line x1="58.0" y1="184.2" x2="111.1" y2="184.2" stroke="var(--accent)" stroke-width="3"/><line x1="115.1" y1="173.8" x2="143.4" y2="173.8" stroke="var(--accent)" stroke-width="3"/><line x1="147.4" y1="184.2" x2="175.7" y2="184.2" stroke="var(--accent)" stroke-width="3"/><line x1="179.7" y1="173.8" x2="219.4" y2="173.8" stroke="var(--accent)" stroke-width="3"/><line x1="223.4" y1="89.8" x2="259.3" y2="89.8" stroke="var(--accent)" stroke-width="3"/><line x1="263.3" y1="74.0" x2="285.9" y2="74.0" stroke="var(--accent)" stroke-width="3"/><line x1="289.9" y1="89.8" x2="322.0" y2="89.8" stroke="var(--accent)" stroke-width="3"/><line x1="326.0" y1="47.8" x2="363.8" y2="47.8" stroke="var(--accent)" stroke-width="3"/><line x1="367.8" y1="37.2" x2="436.0" y2="37.2" stroke="var(--accent)" stroke-width="3"/><g fill="currentColor"><circle cx="96.0" cy="184.2" r="3.2"/><circle cx="130.2" cy="173.8" r="3.2"/><circle cx="160.6" cy="184.2" r="3.2"/><circle cx="194.8" cy="173.8" r="3.2"/><circle cx="248.0" cy="89.8" r="3.2"/><circle cx="274.6" cy="74.0" r="3.2"/><circle cx="301.2" cy="89.8" r="3.2"/><circle cx="346.8" cy="47.8" r="3.2"/><circle cx="384.8" cy="37.2" r="3.2"/></g><text x="221.4" y="236.0" font-size="14" fill="var(--accent)" text-anchor="middle">s<tspan baseline-shift="sub" font-size="11">1</tspan> = 4.5</text>
+</svg>
+<figcaption>Figure 7. You could keep going, splitting until every point has its own region.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 7</summary>
+  <p>The same points with a dotted vertical line between every pair of neighbouring points. Each region holds a single point, and its horizontal segment passes through that point, so the fit follows the data exactly.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> You could keep going: <strong>overfitting</strong>.</p>
+</div>
+
+<h4 id="intuition-classification">Classification (<math alttext="p equals 2"><mrow><mi>p</mi><mo>=</mo><mn>2</mn></mrow></math>)</h4>
+
+<figure>
+<svg viewBox="0 0 470 290" role="img" aria-labelledby="fig8-t fig8-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig8-t">Classification with two predictors: a vertical split at x 1 equals 4 and a horizontal split at x 2 equals 6 on the right give three regions, each containing only one class</title>
+  <desc id="fig8-d">A rectangle with axes x 1 and x 2 holds training points written as the digits 1 and 2. A dotted vertical line at s 1 equals 4 divides it; the right part is divided again by a dotted horizontal line at s 2 equals 6. The left region holds only 1s, the upper right region only 1s, and the lower right region only 2s. Each region has its predicted class written inside a circle: 1, 1 and 2.</desc>
+  <rect x="60" y="20" width="320" height="230" fill="none" stroke="currentColor" stroke-width="2"/><line x1="188.0" y1="20" x2="188.0" y2="250" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 3"/><line x1="188.0" y1="112.0" x2="380" y2="112.0" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 3"/><text x="188.0" y="272.0" font-size="14" fill="var(--accent)" text-anchor="middle">s<tspan baseline-shift="sub" font-size="11">1</tspan> = 4</text><text x="388.0" y="117.0" font-size="14" fill="var(--accent)" text-anchor="start">s<tspan baseline-shift="sub" font-size="11">2</tspan> = 6</text><text x="50.0" y="34.0" font-size="15" fill="currentColor" text-anchor="end">x<tspan baseline-shift="sub" font-size="11">2</tspan></text><text x="386.0" y="254.0" font-size="15" fill="currentColor" text-anchor="start">x<tspan baseline-shift="sub" font-size="11">1</tspan></text><text x="92.0" y="62.8" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="175.2" y="62.8" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="143.2" y="104.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="88.8" y="150.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="143.2" y="150.2" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="111.2" y="189.3" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="232.8" y="97.3" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="296.8" y="49.0" font-size="16" fill="currentColor" text-anchor="middle">1</text><text x="239.2" y="147.9" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="328.8" y="143.3" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="293.6" y="166.3" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="261.6" y="214.6" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="306.4" y="214.6" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><text x="348.0" y="200.8" font-size="16" fill="currentColor" text-anchor="middle" font-weight="700">2</text><circle cx="124.0" cy="121.2" r="14" fill="none" stroke="var(--pop)" stroke-width="2.5"/><text x="124.0" y="127.2" font-size="17" fill="var(--pop)" text-anchor="middle" font-weight="700">1</text><circle cx="303.2" cy="75.2" r="14" fill="none" stroke="var(--pop)" stroke-width="2.5"/><text x="303.2" y="81.2" font-size="17" fill="var(--pop)" text-anchor="middle" font-weight="700">1</text><circle cx="284.0" cy="181.0" r="14" fill="none" stroke="var(--pop)" stroke-width="2.5"/><text x="284.0" y="187.0" font-size="17" fill="var(--pop)" text-anchor="middle" font-weight="700">2</text>
+</svg>
+<figcaption>Figure 8. Splits at <math alttext="s sub 1 equals 4"><mrow><msub><mi>s</mi><mn>1</mn></msub><mo>=</mo><mn>4</mn></mrow></math> on <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> and then <math alttext="s sub 2 equals 6"><mrow><msub><mi>s</mi><mn>2</mn></msub><mo>=</mo><mn>6</mn></mrow></math> on <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math> give three regions, each containing a single class. The circled digit in each region is its prediction.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 8</summary>
+  <p>A rectangle with axes <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math> and <math alttext="x sub 2"><msub><mi>x</mi><mn>2</mn></msub></math> holds training points written as the digits 1 and 2. A dotted vertical line at <math alttext="s sub 1 equals 4"><mrow><msub><mi>s</mi><mn>1</mn></msub><mo>=</mo><mn>4</mn></mrow></math> divides it, and the right part is divided again by a dotted horizontal line at <math alttext="s sub 2 equals 6"><mrow><msub><mi>s</mi><mn>2</mn></msub><mo>=</mo><mn>6</mn></mrow></math>. The left region holds only 1s, the upper right region only 1s, and the lower right region only 2s. The predicted class for each region is written inside a circle: 1, 1 and 2.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Annotation</span> Stop here: each region is homogeneous (same <math alttext="y"><mi>y</mi></math> values).</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> <strong>A tree divides the predictor space into <math alttext="the number of terminal nodes T"><mrow><mo>|</mo><mi>T</mi><mo>|</mo></mrow></math> non-overlapping regions <math alttext="R sub 1 through R sub T"><mrow><msub><mi>R</mi><mn>1</mn></msub><mo>,</mo><mo>…</mo><mo>,</mo><msub><mi>R</mi><mrow><mo>|</mo><mi>T</mi><mo>|</mo></mrow></msub></mrow></math>, and predicts the same <math alttext="y hat"><mover><mi>y</mi><mo>^</mo></mover></math> for every point in the region.</strong></p>
+</div>
+
+<h3 id="structure">2.3 Tree structure</h3>
+
+<ul>
+  <li><strong>Recursive, binary splitting:</strong> always split a region into two, then split those two regions, and repeat until some stopping criterion.</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 520 295" role="img" aria-labelledby="fig9-t fig9-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig9-t">Regression tree: split X 1 at 4.5, then split the right branch at 7; leaves predict 2, 11 and 15</title>
+  <desc id="fig9-d">A tree drawn top-down. The root node, labelled root node, splits on X 1: the branch less than 4.5 goes to a leaf with y hat equals 2, and the branch greater than or equal to 4.5 goes to a second node, also on X 1. That node splits at 7: less than 7 leads to a leaf with y hat equals 11, and greater than or equal to 7 to a leaf with y hat equals 15. Arrows label the three end points as leaf, or terminal, nodes.</desc>
+  <circle cx="200" cy="40" r="6" fill="currentColor"/><text x="200.0" y="26.0" font-size="16" fill="currentColor" text-anchor="middle">X<tspan baseline-shift="sub" font-size="11">1</tspan></text><line x1="200" y1="40" x2="110" y2="120" stroke="currentColor" stroke-width="2"/><text x="143.0" y="76.0" font-size="16" fill="currentColor" text-anchor="end">&lt; 4.5</text><line x1="200" y1="40" x2="290" y2="120" stroke="currentColor" stroke-width="2"/><text x="257.0" y="76.0" font-size="16" fill="currentColor" text-anchor="start">≥ 4.5</text><circle cx="110" cy="120" r="5" fill="currentColor"/><circle cx="290" cy="120" r="6" fill="currentColor"/><text x="305.0" y="112.0" font-size="16" fill="currentColor" text-anchor="start">X<tspan baseline-shift="sub" font-size="11">1</tspan></text><line x1="290" y1="120" x2="220" y2="200" stroke="currentColor" stroke-width="2"/><text x="243.0" y="156.0" font-size="16" fill="currentColor" text-anchor="end">&lt; 7</text><line x1="290" y1="120" x2="360" y2="200" stroke="currentColor" stroke-width="2"/><text x="337.0" y="156.0" font-size="16" fill="currentColor" text-anchor="start">≥ 7</text><circle cx="220" cy="200" r="5" fill="currentColor"/><circle cx="360" cy="200" r="5" fill="currentColor"/><text x="110.0" y="146.0" font-size="16" fill="var(--accent)" text-anchor="middle">ŷ = 2</text><text x="220.0" y="226.0" font-size="16" fill="var(--accent)" text-anchor="middle">ŷ = 11</text><text x="360.0" y="226.0" font-size="16" fill="var(--accent)" text-anchor="middle">ŷ = 15</text><text x="300.0" y="32.0" font-size="15" fill="var(--pop)" text-anchor="start">root node</text><line x1="296.0" y1="28.0" x2="212.0" y2="38.0" stroke="var(--pop)" stroke-width="1.4"/><polygon points="212.0,38.0 219.8,33.5 220.6,40.5" fill="var(--pop)"/><text x="235.0" y="282.0" font-size="15" fill="var(--pop)" text-anchor="middle">leaf / terminal nodes</text><line x1="200.0" y1="268.0" x2="112.0" y2="154.0" stroke="var(--pop)" stroke-width="1.4"/><polygon points="112.0,154.0 119.8,158.4 114.3,162.7" fill="var(--pop)"/><line x1="225.0" y1="268.0" x2="220.0" y2="234.0" stroke="var(--pop)" stroke-width="1.4"/><polygon points="220.0,234.0 224.7,241.7 217.7,242.7" fill="var(--pop)"/><line x1="260.0" y1="268.0" x2="352.0" y2="234.0" stroke="var(--pop)" stroke-width="1.4"/><polygon points="352.0,234.0 345.4,240.2 343.0,233.6" fill="var(--pop)"/>
+</svg>
+<figcaption>Figure 9. Example: the regression tree for Figure 6.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 9</summary>
+  <p>A tree drawn top-down. The root node splits on <math alttext="X sub 1"><msub><mi>X</mi><mn>1</mn></msub></math>: the branch <math alttext="less than 4.5"><mrow><mo>&lt;</mo><mn>4.5</mn></mrow></math> goes to a leaf with <math alttext="y hat equals 2"><mrow><mover><mi>y</mi><mo>^</mo></mover><mo>=</mo><mn>2</mn></mrow></math>, and the branch <math alttext="greater than or equal to 4.5"><mrow><mo>≥</mo><mn>4.5</mn></mrow></math> goes to a second node, also on <math alttext="X sub 1"><msub><mi>X</mi><mn>1</mn></msub></math>. That node splits at 7: <math alttext="less than 7"><mrow><mo>&lt;</mo><mn>7</mn></mrow></math> leads to a leaf with <math alttext="y hat equals 11"><mrow><mover><mi>y</mi><mo>^</mo></mover><mo>=</mo><mn>11</mn></mrow></math>, and <math alttext="greater than or equal to 7"><mrow><mo>≥</mo><mn>7</mn></mrow></math> to a leaf with <math alttext="y hat equals 15"><mrow><mover><mi>y</mi><mo>^</mo></mover><mo>=</mo><mn>15</mn></mrow></math>. Labels mark the top node as the <em>root node</em> and the three end points as <em>leaf / terminal nodes</em>.</p>
+</details>
+
+<figure>
+<svg viewBox="0 0 520 250" role="img" aria-labelledby="fig10-t fig10-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig10-t">Classification tree: split X 1 at 4, then split the right branch on X 2 at 6; leaves predict classes 1, 2 and 1</title>
+  <desc id="fig10-d">A tree drawn top-down. The root node splits on X 1: less than 4 goes to a leaf with y hat equals 1, and greater than or equal to 4 goes to a node that splits on X 2 at 6. Less than 6 leads to a leaf with y hat equals 2, and greater than or equal to 6 to a leaf with y hat equals 1.</desc>
+  <circle cx="200" cy="40" r="6" fill="currentColor"/><text x="200.0" y="26.0" font-size="16" fill="currentColor" text-anchor="middle">X<tspan baseline-shift="sub" font-size="11">1</tspan></text><line x1="200" y1="40" x2="110" y2="120" stroke="currentColor" stroke-width="2"/><text x="143.0" y="76.0" font-size="16" fill="currentColor" text-anchor="end">&lt; 4</text><line x1="200" y1="40" x2="290" y2="120" stroke="currentColor" stroke-width="2"/><text x="257.0" y="76.0" font-size="16" fill="currentColor" text-anchor="start">≥ 4</text><circle cx="110" cy="120" r="5" fill="currentColor"/><circle cx="290" cy="120" r="6" fill="currentColor"/><text x="305.0" y="112.0" font-size="16" fill="currentColor" text-anchor="start">X<tspan baseline-shift="sub" font-size="11">2</tspan></text><line x1="290" y1="120" x2="220" y2="200" stroke="currentColor" stroke-width="2"/><text x="243.0" y="156.0" font-size="16" fill="currentColor" text-anchor="end">&lt; 6</text><line x1="290" y1="120" x2="360" y2="200" stroke="currentColor" stroke-width="2"/><text x="337.0" y="156.0" font-size="16" fill="currentColor" text-anchor="start">≥ 6</text><circle cx="220" cy="200" r="5" fill="currentColor"/><circle cx="360" cy="200" r="5" fill="currentColor"/><text x="110.0" y="146.0" font-size="16" fill="var(--accent)" text-anchor="middle">ŷ = 1</text><text x="220.0" y="226.0" font-size="16" fill="var(--accent)" text-anchor="middle">ŷ = 2</text><text x="360.0" y="226.0" font-size="16" fill="var(--accent)" text-anchor="middle">ŷ = 1</text>
+</svg>
+<figcaption>Figure 10. Example: the classification tree for Figure 8.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 10</summary>
+  <p>A tree drawn top-down. The root node splits on <math alttext="X sub 1"><msub><mi>X</mi><mn>1</mn></msub></math>: <math alttext="less than 4"><mrow><mo>&lt;</mo><mn>4</mn></mrow></math> goes to a leaf with <math alttext="y hat equals 1"><mrow><mover><mi>y</mi><mo>^</mo></mover><mo>=</mo><mn>1</mn></mrow></math>, and <math alttext="greater than or equal to 4"><mrow><mo>≥</mo><mn>4</mn></mrow></math> goes to a node that splits on <math alttext="X sub 2"><msub><mi>X</mi><mn>2</mn></msub></math> at 6. <math alttext="less than 6"><mrow><mo>&lt;</mo><mn>6</mn></mrow></math> leads to a leaf with <math alttext="y hat equals 2"><mrow><mover><mi>y</mi><mo>^</mo></mover><mo>=</mo><mn>2</mn></mrow></math>, and <math alttext="greater than or equal to 6"><mrow><mo>≥</mo><mn>6</mn></mrow></math> to a leaf with <math alttext="y hat equals 1"><mrow><mover><mi>y</mi><mo>^</mo></mover><mo>=</mo><mn>1</mn></mrow></math>.</p>
+</details>
+
+<figure>
+<svg viewBox="0 0 380 185" role="img" aria-labelledby="fig11-t fig11-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig11-t">A parent, or decision, node with its two child nodes</title>
+  <desc id="fig11-d">A single node at the top, labelled parent or decision node, with two branches leading down to two nodes labelled child nodes.</desc>
+  <line x1="150" y1="40" x2="95" y2="120" stroke="currentColor" stroke-width="2"/><line x1="150" y1="40" x2="205" y2="120" stroke="currentColor" stroke-width="2"/><circle cx="150" cy="40" r="6" fill="currentColor"/><circle cx="95" cy="120" r="5" fill="currentColor"/><circle cx="205" cy="120" r="5" fill="currentColor"/><text x="250.0" y="30.0" font-size="15" fill="var(--pop)" text-anchor="start">parent /</text><text x="250.0" y="48.0" font-size="15" fill="var(--pop)" text-anchor="start">decision node</text><line x1="246.0" y1="36.0" x2="162.0" y2="40.0" stroke="var(--pop)" stroke-width="1.4"/><polygon points="162.0,40.0 170.1,36.1 170.4,43.1" fill="var(--pop)"/><text x="150.0" y="168.0" font-size="15" fill="var(--pop)" text-anchor="middle">child nodes</text><line x1="130.0" y1="152.0" x2="100.0" y2="130.0" stroke="var(--pop)" stroke-width="1.4"/><polygon points="100.0,130.0 108.8,132.1 104.6,137.7" fill="var(--pop)"/><line x1="170.0" y1="152.0" x2="200.0" y2="130.0" stroke="var(--pop)" stroke-width="1.4"/><polygon points="200.0,130.0 195.4,137.7 191.2,132.1" fill="var(--pop)"/>
+</svg>
+<figcaption>Figure 11. A parent (decision) node and its two child nodes.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 11</summary>
+  <p>A single node at the top, labelled <em>parent / decision node</em>, with two branches leading down to two nodes labelled <em>child nodes</em>.</p>
+</details>
+
+<h3 id="fitting">2.3 Fitting</h3>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> The original numbers this section 2.3, the same as the previous one.</p>
+</div>
+
+<p><strong>Regression:</strong> find regions to minimize</p>
+
+<div class="eq">
+<math display="block" alttext="the sum from m equals 1 to the number of terminal nodes T of the sum over i in R sub m of, y sub i minus y hat sub R sub m, squared">
+  <mrow><munderover><mo>∑</mo><mrow><mi>m</mi><mo>=</mo><mn>1</mn></mrow><mrow><mo>|</mo><mi>T</mi><mo>|</mo></mrow></munderover><munder><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><msub><mi>R</mi><mi>m</mi></msub></mrow></munder><msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>y</mi><mo>^</mo></mover><msub><mi>R</mi><mi>m</mi></msub></msub><mo>)</mo></mrow><mn>2</mn></msup></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> <strong>Too difficult! Use a greedy algorithm instead.</strong></p>
+</div>
+
+<ul>
+  <li><strong>Top-down:</strong> all points start in the root node.</li>
+  <li><strong>Greedy:</strong> make the best split at each node.</li>
+</ul>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> “Greedy” means each split is the best one available at that moment, with no look-ahead to later splits. ISL calls this recursive binary splitting (ISL 8.1.1).</p>
+</div>
+
+</main>
+
+<footer>
+  <p>Transcribed from the handwritten notes <em>ML_week_5_day_2.pdf</em> (7 pages). Equations are MathML; figures are inline SVG with title, description, and an expandable long description. Figure numbering continues from Week 5, Day 1. The data in Figures 5–7 are invented so that the region means are exactly the 2, 11 and 15 in the notes. Conforms to WCAG 2.2 Level AA.</p>
+</footer>
+</div>
+</body>
+</html>
