@@ -1,29 +1,39 @@
 # Introduction to Machine Learning - DSAI 621
 
-## This Week: Week 5 (Mon 11/16 & Thu 11/19)
+## This Week: Week 6 (week of 11/23)
 
-**Quiz 3 is Monday, 11/16.**
+**No quiz this week.**
 
-**Quiz 4 is Thursday, 11/19, and it's an open-note worksheet.** You can work with a partner if you want. It focuses on:
-- the [Quiz 4 practice problems](problem_sets/Quiz4_practice_problems.pdf) ([solutions](problem_sets/Quiz4_practice_problems_sol.pdf))
-- the spline demos: [Basis Expansions: Polynomials and Splines](https://robertclements.org/dsai621-intro-ml-f26/topics/basis-expansions/) and [Smoothing Splines](https://robertclements.org/dsai621-intro-ml-f26/topics/smoothers/)
-- the spline notebook, [`notebooks/polynomials_splines.ipynb`](notebooks/polynomials_splines.ipynb), including the smoothing spline sections (4 and 5)
-- the in-class spline activity
+**Quiz 5 is next Monday, 11/30.** It covers **GAMs and decision trees only**. To prepare:
+- the [Quiz 5 practice problems](problem_sets/Quiz5_practice_problems.pdf) ([solutions](problem_sets/Quiz5_practice_problems_sol.pdf))
+- the notebooks [`notebooks/gams.ipynb`](notebooks/gams.ipynb) and [`notebooks/decision_trees.ipynb`](notebooks/decision_trees.ipynb)
+- the demos [Generalized Additive Models: Fitting Four Kinds of Term](https://robertclements.org/dsai621-intro-ml-f26/topics/gam-terms/) and [Decision Trees: Gini, Entropy and Error](https://robertclements.org/dsai621-intro-ml-f26/topics/decision-trees/)
 
-**There is no quiz next week (week of 11/23).**
+**Topics:** Decision trees; introduction to bagging.
 
-**Topics:** Finishing smoothing splines; generalized additive models (GAMs); starting decision trees.
-
-**Read:** ISL 7.5, 7.7 and 8.1; ESL 5.4–5.5, 9.1 and 9.2.
+**Read:** ISL 8.1 and 8.2.1; ESL 9.2 and 8.7.
 
 **Interactive demos:**
-- [Generalized Additive Models: Fitting Four Kinds of Term](https://robertclements.org/dsai621-intro-ml-f26/topics/gam-terms/)
+- [Decision Trees: Gini, Entropy and Error](https://robertclements.org/dsai621-intro-ml-f26/topics/decision-trees/)
 - [All demos](https://robertclements.org/dsai621-intro-ml-f26/)
 
-**Notebooks:** A GAMs notebook is coming (date TBD).
+**Notebook:** [`notebooks/decision_trees.ipynb`](notebooks/decision_trees.ipynb)
 
 <details>
 <summary>Past weeks</summary>
+
+### Week 5 (Mon 11/16 & Thu 11/19)
+
+**Topics:** Smoothing splines and generalized additive models (GAMs); wrapping up GAMs and starting decision trees.
+
+**Read:** ISL 7.5, 7.7 and 8.1; ESL 5.4–5.5, 9.1 and 9.2.
+
+- Class notes, Day 1: [handwritten](notes/hand-written/ML_week_5_day_1.pdf) · [accessible HTML](notes/html/ML_week_5_day_1.html)
+- Class notes, Day 2: [handwritten](notes/hand-written/ML_week_5_day_2.pdf) · [accessible HTML](notes/html/ML_week_5_day_2.html)
+- [Quiz 4 practice problems](problem_sets/Quiz4_practice_problems.pdf) ([solutions](problem_sets/Quiz4_practice_problems_sol.pdf))
+- Notebook: [`notebooks/gams.ipynb`](notebooks/gams.ipynb)
+- Interactive demo: [Generalized Additive Models: Fitting Four Kinds of Term](https://robertclements.org/dsai621-intro-ml-f26/topics/gam-terms/)
+
 
 ### Week 4 (Mon 11/9 & Thu 11/12)
 
