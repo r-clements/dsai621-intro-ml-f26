@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bagging: Averaging Trees — DSAI 621</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      max-width: 760px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #222;
+      background: #fff;
+      color-scheme: light;
+    }
+    a.back { font-size: 0.9rem; color: #1a5fb4; text-decoration: none; }
+    a.back:hover { text-decoration: underline; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.05rem; margin: 1.2rem 0 0.25rem; }
+    h3 { font-size: 0.92rem; margin: 0.2rem 0 0.2rem; }
+    p.instructions { color: #555; font-size: 0.95rem; margin-top: 0; }
+    p.a11y-instructions {
+      border-left: 3px solid #1a5fb4;
+      padding-left: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .controls {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem;
+      margin: 0.75rem 0;
+    }
+    .controls label { font-weight: 600; }
+    .controls input[type=range] { flex: 1 1 220px; min-width: 160px; accent-color: #1a5fb4; }
+    .controls output { font-variant-numeric: tabular-nums; min-width: 7ch; font-weight: 600; }
+    button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
+    button:disabled, input:disabled { cursor: not-allowed; }
+    :focus-visible { outline: 3px solid #1a5fb4; outline-offset: 2px; }
+    .panel { border: 1px solid #ddd; border-radius: 4px; padding: 0.25rem; }
+    .panel svg { display: block; width: 100%; height: auto; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .row > figure { flex: 1 1 300px; margin: 0; min-width: 0; }
+    figure { margin: 0; }
+    figcaption { font-size: 0.85rem; color: #555; margin-top: 0.25rem; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.85rem; margin: 0.35rem 0; padding: 0; list-style: none; }
+    .legend li { display: flex; align-items: center; gap: 0.35rem; }
+    #status { font-size: 0.9rem; color: #555; min-height: 1.2em; margin: 0.25rem 0; }
+    #stats { font-size: 0.95rem; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+    #stats .stat { margin-right: 0.5rem; white-space: nowrap; }
+    #stats .stat:not(:last-child)::after { content: " | "; color: #999; font-weight: 400; }
+    #stats .stat-value { font-weight: 600; }
+    .axis text { font-size: 11px; }
+    .axis-label { font-size: 12px; fill: #333; }
+    table.data { border-collapse: collapse; width: 100%; font-size: 0.92rem; font-variant-numeric: tabular-nums; margin-top: 0.5rem; }
+    table.data th, table.data td { padding: 0.3rem 0.45rem; text-align: right; border-bottom: 1px solid #e3e3e3; }
+    table.data th:first-child, table.data td:first-child { text-align: left; }
+    table.data caption { text-align: left; font-size: 0.85rem; color: #555; caption-side: bottom; padding-top: 0.4rem; }
+    td.change { color: #444; }
+  </style>
+</head>
+<body>
+  <a class="back" href="../../">&larr; All topics</a>
+  <h1>Bagging: Averaging Trees Smooths the Staircase</h1>
+  <p id="instructions" class="instructions">
+    The data are Example B from the notes: n = 100 points with x uniform on [0, 1] and
+    y = f(x) + noise, where f(x) = sin(12(x + 0.2)) / (x + 0.2) and the noise has variance 1.
+    A fully grown regression tree fits a staircase that chases the noise. <strong>Bagging</strong>
+    grows a fully grown tree on each of B bootstrap samples (n points drawn with replacement) and
+    averages their predictions. Move the slider to average more trees. The top plot shows one
+    training set: watch the staircase's jumps get smaller and the fit get smoother. The bottom plots repeat the whole
+    thing on 200 training sets and show 30 of them: watch the band of fits narrow (the variance roughly halves)
+    while their average stays almost exactly on f (bias rises only slightly). With a single
+    predictor there is nothing for a random forest to hide at a split, so here a random forest
+    and bagging are the same thing. (ISL 8.2.1–8.2.2; ESL 8.7, 15.2.)
+  </p>
+  <p id="a11y-instructions" class="instructions a11y-instructions">
+    Keyboard and screen reader users: Tab to the slider and use the arrow keys to step through
+    B = 1, 2, 3, 5, 10, 20, 50, 100 and 200 trees (Home and End jump to 1 and 200). "Next training
+    set" shows another of the 200 training sets in the top plot. The squared bias and variance are
+    announced in the statistics line below the slider, they are also in the table at the bottom,
+    and each plot's description gives its numbers.
+  </p>
+
+  <div class="controls">
+    <label for="b-slider">Trees averaged, B</label>
+    <input type="range" id="b-slider" min="0" max="8" step="1" value="0" disabled
+           aria-describedby="instructions a11y-instructions">
+    <output id="b-out" for="b-slider">B = 1</output>
+    <button id="next" type="button" disabled>Next training set</button>
+    <button id="reset" type="button" disabled>Reset</button>
+  </div>
+  <p id="status" role="status">Simulating 200 training sets…</p>
+
+  <div id="stats" aria-live="polite" aria-atomic="true">
+    <span class="stat">B = <span id="s-b" class="stat-value">1</span></span>
+    <span class="stat">single tree: bias² <span id="s-tb" class="stat-value">–</span>, variance <span id="s-tv" class="stat-value">–</span></span>
+    <span class="stat">bagged: bias² <span id="s-bb" class="stat-value">–</span>, variance <span id="s-bv" class="stat-value">–</span></span>
+  </div>
+
+  <h2 id="one-heading">One training set</h2>
+  <ul class="legend" aria-hidden="true">
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="2.5"/></svg>true f(x)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c64600" stroke-width="1.6" stroke-dasharray="5 3"/></svg>one tree on all the data (dashed)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="1" stroke-opacity="0.35"/></svg>bootstrap trees (faint, up to 20 drawn)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="3"/></svg>bagged average (thick)</li>
+    <li><svg width="30" height="10"><circle cx="15" cy="5" r="3" fill="none" stroke="#666"/></svg>training data (open circles)</li>
+  </ul>
+  <figure class="panel">
+    <div id="one"></div>
+  </figure>
+
+  <h2 id="many-heading">Thirty of the 200 training sets</h2>
+  <ul class="legend" aria-hidden="true">
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="2.5"/></svg>true f(x)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="1" stroke-opacity="0.5"/></svg>one fit per training set (thin)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c64600" stroke-width="2.5" stroke-dasharray="6 4"/></svg>average of all 200 fits (dashed)</li>
+  </ul>
+  <div class="row">
+    <figure>
+      <h3 id="left-heading">One tree per training set</h3>
+      <div class="panel" id="left"></div>
+    </figure>
+    <figure>
+      <h3 id="right-heading">Bagged, B = 1, per training set</h3>
+      <div class="panel" id="right"></div>
+    </figure>
+  </div>
+
+  <h2 id="table-heading">Bias and variance, averaged over x in [0, 1]</h2>
+  <table class="data" aria-labelledby="table-heading">
+    <thead><tr>
+      <th scope="col">Fit</th><th scope="col">Squared bias</th><th scope="col">Variance</th>
+      <th scope="col">Expected test MSE</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+    <caption>
+      From 200 simulated training sets. Expected test MSE = 1 (the noise variance) + squared bias +
+      variance. The squared bias is the squared gap between the average fit and f, minus the part of
+      that gap due to averaging only 200 fits (the variance divided by 200); without that
+      correction, a fully grown tree's tiny bias would be swamped by simulation noise.
+    </caption>
+  </table>
+
+  <script src="app.js"></script>
+</body>
+</html>
