@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Bagging: Averaging Trees — DSAI 621</title>
+  <title>Bagging and Random Forests — DSAI 621</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
@@ -18,8 +18,9 @@
     a.back { font-size: 0.9rem; color: #1a5fb4; text-decoration: none; }
     a.back:hover { text-decoration: underline; }
     h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
-    h2 { font-size: 1.05rem; margin: 1.2rem 0 0.25rem; }
-    h3 { font-size: 0.92rem; margin: 0.2rem 0 0.2rem; }
+    h2 { font-size: 1.2rem; margin: 2rem 0 0.4rem; padding-top: 1rem; border-top: 2px solid #e3e3e3; }
+    h3 { font-size: 1.05rem; margin: 1.2rem 0 0.25rem; }
+    h4 { font-size: 0.92rem; margin: 0.2rem 0 0.2rem; }
     p.instructions { color: #555; font-size: 0.95rem; margin-top: 0; }
     p.a11y-instructions {
       border-left: 3px solid #1a5fb4;
@@ -33,6 +34,14 @@
     .controls label { font-weight: 600; }
     .controls input[type=range] { flex: 1 1 220px; min-width: 160px; accent-color: #1a5fb4; }
     .controls output { font-variant-numeric: tabular-nums; min-width: 7ch; font-weight: 600; }
+    .controls.grid { display: grid; grid-template-columns: auto 1fr auto; }
+    .controls.grid input[type=range] { width: 100%; min-width: 120px; }
+    .controls.grid output { min-width: 12ch; }
+    @media (max-width: 520px) {
+      .controls.grid { grid-template-columns: 1fr auto; }
+      .controls.grid label { grid-column: 1 / -1; margin-top: 0.25rem; }
+    }
+    .buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.25rem 0 0.5rem; }
     button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
     button:disabled, input:disabled { cursor: not-allowed; }
     :focus-visible { outline: 3px solid #1a5fb4; outline-offset: 2px; }
@@ -41,44 +50,52 @@
     .row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
     .row > figure { flex: 1 1 300px; margin: 0; min-width: 0; }
     figure { margin: 0; }
-    figcaption { font-size: 0.85rem; color: #555; margin-top: 0.25rem; }
     .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.85rem; margin: 0.35rem 0; padding: 0; list-style: none; }
     .legend li { display: flex; align-items: center; gap: 0.35rem; }
-    #status { font-size: 0.9rem; color: #555; min-height: 1.2em; margin: 0.25rem 0; }
-    #stats { font-size: 0.95rem; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
-    #stats .stat { margin-right: 0.5rem; white-space: nowrap; }
-    #stats .stat:not(:last-child)::after { content: " | "; color: #999; font-weight: 400; }
-    #stats .stat-value { font-weight: 600; }
+    .status { font-size: 0.9rem; color: #555; min-height: 1.2em; margin: 0.25rem 0; }
+    .stats { font-size: 0.95rem; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+    .stats .stat { margin-right: 0.5rem; white-space: nowrap; }
+    .stats .stat:not(:last-child)::after { content: " | "; color: #999; font-weight: 400; }
+    .stats .stat-value { font-weight: 600; }
     .axis text { font-size: 11px; }
     .axis-label { font-size: 12px; fill: #333; }
     table.data { border-collapse: collapse; width: 100%; font-size: 0.92rem; font-variant-numeric: tabular-nums; margin-top: 0.5rem; }
     table.data th, table.data td { padding: 0.3rem 0.45rem; text-align: right; border-bottom: 1px solid #e3e3e3; }
     table.data th:first-child, table.data td:first-child { text-align: left; }
     table.data caption { text-align: left; font-size: 0.85rem; color: #555; caption-side: bottom; padding-top: 0.4rem; }
-    td.change { color: #444; }
+    tr.current th, tr.current td { font-weight: 700; }
   </style>
 </head>
 <body>
   <a class="back" href="../../">&larr; All topics</a>
-  <h1>Bagging: Averaging Trees Smooths the Staircase</h1>
+  <h1>Bagging and Random Forests</h1>
+  <p class="instructions">
+    Part 1 averages bootstrap trees (bagging) and shows the variance falling. Part 2 adds the two
+    random forest settings, the number of predictors tried at each split and the minimum leaf
+    size, and shows the variance falling further.
+  </p>
+
+  <!-- ==================== Part 1: bagging ==================== -->
+  <h2 id="part1">Part 1. Bagging: averaging trees smooths the staircase</h2>
   <p id="instructions" class="instructions">
     The data are Example B from the notes: n = 100 points with x uniform on [0, 1] and
     y = f(x) + noise, where f(x) = sin(12(x + 0.2)) / (x + 0.2) and the noise has variance 1.
     A fully grown regression tree fits a staircase that chases the noise. <strong>Bagging</strong>
     grows a fully grown tree on each of B bootstrap samples (n points drawn with replacement) and
     averages their predictions. Move the slider to average more trees. The top plot shows one
-    training set: watch the staircase's jumps get smaller and the fit get smoother. The bottom plots repeat the whole
-    thing on 200 training sets and show 30 of them: watch the band of fits narrow (the variance roughly halves)
-    while their average stays almost exactly on f (bias rises only slightly). With a single
-    predictor there is nothing for a random forest to hide at a split, so here a random forest
-    and bagging are the same thing. (ISL 8.2.1–8.2.2; ESL 8.7, 15.2.)
+    training set: watch the staircase's jumps get smaller and the fit get smoother. The bottom plots
+    repeat the whole thing on 200 training sets and show 30 of them: watch the band of fits narrow
+    (the variance roughly halves) while their average stays almost exactly on f (bias rises only
+    slightly). With a single predictor there is nothing for a random forest to hide at a split, so
+    here a random forest and bagging are the same thing; Part 2 uses five predictors.
+    (ISL 8.2.1; ESL 8.7.)
   </p>
   <p id="a11y-instructions" class="instructions a11y-instructions">
     Keyboard and screen reader users: Tab to the slider and use the arrow keys to step through
     B = 1, 2, 3, 5, 10, 20, 50, 100 and 200 trees (Home and End jump to 1 and 200). "Next training
     set" shows another of the 200 training sets in the top plot. The squared bias and variance are
-    announced in the statistics line below the slider, they are also in the table at the bottom,
-    and each plot's description gives its numbers.
+    announced in the statistics line below the slider, they are also in the table at the end of
+    Part 1, and each plot's description gives its numbers.
   </p>
 
   <div class="controls">
@@ -86,18 +103,18 @@
     <input type="range" id="b-slider" min="0" max="8" step="1" value="0" disabled
            aria-describedby="instructions a11y-instructions">
     <output id="b-out" for="b-slider">B = 1</output>
-    <button id="next" type="button" disabled>Next training set</button>
-    <button id="reset" type="button" disabled>Reset</button>
+    <button id="next" type="button" aria-label="Next training set, bagging" disabled>Next training set</button>
+    <button id="reset" type="button" aria-label="Reset bagging" disabled>Reset</button>
   </div>
-  <p id="status" role="status">Simulating 200 training sets…</p>
+  <p id="status" class="status" role="status">Simulating 200 training sets…</p>
 
-  <div id="stats" aria-live="polite" aria-atomic="true">
+  <div id="stats" class="stats" aria-live="polite" aria-atomic="true">
     <span class="stat">B = <span id="s-b" class="stat-value">1</span></span>
     <span class="stat">single tree: bias² <span id="s-tb" class="stat-value">–</span>, variance <span id="s-tv" class="stat-value">–</span></span>
     <span class="stat">bagged: bias² <span id="s-bb" class="stat-value">–</span>, variance <span id="s-bv" class="stat-value">–</span></span>
   </div>
 
-  <h2 id="one-heading">One training set</h2>
+  <h3 id="one-heading">One training set</h3>
   <ul class="legend" aria-hidden="true">
     <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="2.5"/></svg>true f(x)</li>
     <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c64600" stroke-width="1.6" stroke-dasharray="5 3"/></svg>one tree on all the data (dashed)</li>
@@ -109,7 +126,7 @@
     <div id="one"></div>
   </figure>
 
-  <h2 id="many-heading">Thirty of the 200 training sets</h2>
+  <h3 id="many-heading">Thirty of the 200 training sets</h3>
   <ul class="legend" aria-hidden="true">
     <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="2.5"/></svg>true f(x)</li>
     <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="1" stroke-opacity="0.5"/></svg>one fit per training set (thin)</li>
@@ -117,16 +134,16 @@
   </ul>
   <div class="row">
     <figure>
-      <h3 id="left-heading">One tree per training set</h3>
+      <h4 id="left-heading">One tree per training set</h4>
       <div class="panel" id="left"></div>
     </figure>
     <figure>
-      <h3 id="right-heading">Bagged, B = 1, per training set</h3>
+      <h4 id="right-heading">Bagged, B = 1, per training set</h4>
       <div class="panel" id="right"></div>
     </figure>
   </div>
 
-  <h2 id="table-heading">Bias and variance, averaged over x in [0, 1]</h2>
+  <h3 id="table-heading">Bias and variance, averaged over x in [0, 1]</h3>
   <table class="data" aria-labelledby="table-heading">
     <thead><tr>
       <th scope="col">Fit</th><th scope="col">Squared bias</th><th scope="col">Variance</th>
@@ -141,6 +158,98 @@
     </caption>
   </table>
 
+  <!-- ==================== Part 2: random forests ==================== -->
+  <h2 id="part2">Part 2. Random forests: decorrelating the trees</h2>
+  <p id="rf-instructions" class="instructions">
+    Part 1 stops at about half the variance because bagged trees are alike: they are grown on
+    overlapping samples and all split first on the strongest predictor. A <strong>random
+    forest</strong> lets each split choose from only <strong>m</strong> of the p predictors, drawn
+    at random, so the trees differ more and their average varies less. A larger <strong>minimum
+    leaf size</strong> stops each tree before it chases single points. The data are Example C from
+    the notes: y = x<sub>1</sub> + x<sub>2</sub> + x<sub>3</sub> + noise (variance 1), where
+    x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub> are standard normal with correlation 0.8 and
+    x<sub>4</sub>, x<sub>5</sub> are pure noise, so p = 5, with n = 200 and B = 100 trees.
+    Five predictors can't be drawn, so the plots show every fit along the diagonal
+    x<sub>1</sub> = x<sub>2</sub> = x<sub>3</sub> = t (with x<sub>4</sub> = x<sub>5</sub> = 0), where
+    most of the data lie and the truth is the line 3t. Start at m = 5 (bagging) and leaf size 1,
+    then lower m and raise the leaf size: watch the band of forests on the right narrow below the
+    bagged band on the left, until at m = 1 or large leaves the forests start missing the line
+    (bias). (ISL 8.2.2; ESL 15.2–15.4.)
+  </p>
+  <p id="rf-a11y-instructions" class="instructions a11y-instructions">
+    Keyboard and screen reader users: Tab to either slider and use the arrow keys. The first sets m
+    from 1 to 5; the second sets the minimum leaf size to 1, 3, 5 or 10. "Next training set" shows
+    another training set in the top plot of Part 2. The squared bias and variance of bagging and of
+    the current forest are announced in the statistics line below the buttons, they are also in the
+    table at the end of Part 2, and each plot's description gives its numbers.
+  </p>
+
+  <div class="controls grid">
+    <label for="rf-m-slider">Predictors tried per split, m</label>
+    <input type="range" id="rf-m-slider" min="1" max="5" step="1" value="5" disabled
+           aria-describedby="rf-instructions rf-a11y-instructions">
+    <output id="rf-m-out" for="rf-m-slider">m = 5 (bagging)</output>
+    <label for="rf-leaf-slider">Minimum leaf size</label>
+    <input type="range" id="rf-leaf-slider" min="0" max="3" step="1" value="0" disabled
+           aria-describedby="rf-instructions rf-a11y-instructions">
+    <output id="rf-leaf-out" for="rf-leaf-slider">1 (fully grown)</output>
+  </div>
+  <div class="buttons">
+    <button id="rf-next" type="button" aria-label="Next training set, random forests" disabled>Next training set</button>
+    <button id="rf-reset" type="button" aria-label="Reset random forests" disabled>Reset</button>
+  </div>
+  <p id="rf-status" class="status" role="status">Loading the simulated fits…</p>
+
+  <div id="rf-stats" class="stats" aria-live="polite" aria-atomic="true">
+    <span class="stat">bagging: bias² <span id="rf-s-bb" class="stat-value">–</span>, variance <span id="rf-s-bv" class="stat-value">–</span></span>
+    <span class="stat"><span id="rf-s-name">forest</span>: bias² <span id="rf-s-fb" class="stat-value">–</span>, variance <span id="rf-s-fv" class="stat-value">–</span></span>
+  </div>
+
+  <h3 id="rf-one-heading">One training set</h3>
+  <ul class="legend" aria-hidden="true">
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="2.5"/></svg>truth, 3t</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c64600" stroke-width="1.6" stroke-dasharray="5 3"/></svg>one fully grown tree on all the data (dashed)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="1" stroke-opacity="0.35"/></svg>6 of the forest's trees (faint)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="3"/></svg>forest average of 100 trees (thick)</li>
+    <li><svg width="30" height="10"><circle cx="15" cy="5" r="3" fill="none" stroke="#666"/></svg><span>training data, at t = mean of x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub> (open circles)</span></li>
+  </ul>
+  <figure class="panel">
+    <div id="rf-one"></div>
+  </figure>
+
+  <h3 id="rf-many-heading">Thirty of the 100 training sets</h3>
+  <ul class="legend" aria-hidden="true">
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#111" stroke-width="2.5"/></svg>truth, 3t</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#1a5fb4" stroke-width="1" stroke-opacity="0.5"/></svg>one fit per training set (thin)</li>
+    <li><svg width="30" height="10"><line x1="0" x2="30" y1="5" y2="5" stroke="#c64600" stroke-width="2.5" stroke-dasharray="6 4"/></svg>average of all 100 fits (dashed)</li>
+  </ul>
+  <div class="row">
+    <figure>
+      <h4 id="rf-left-heading">Bagging (m = 5, leaf size 1)</h4>
+      <div class="panel" id="rf-left"></div>
+    </figure>
+    <figure>
+      <h4 id="rf-right-heading">Random forest</h4>
+      <div class="panel" id="rf-right"></div>
+    </figure>
+  </div>
+
+  <h3 id="rf-table-heading">Bias and variance, averaged over t in [−2, 2]</h3>
+  <table class="data" aria-labelledby="rf-table-heading">
+    <thead><tr>
+      <th scope="col">Fit</th><th scope="col">Squared bias</th><th scope="col">Variance</th>
+      <th scope="col">Expected test MSE</th>
+    </tr></thead>
+    <tbody id="rf-rows"></tbody>
+    <caption>
+      From 100 simulated training sets, fitted with scikit-learn and evaluated along the diagonal.
+      Expected test MSE = 1 (the noise variance) + squared bias + variance. The squared bias is the
+      squared gap between the average fit and 3t, minus the part of that gap due to averaging only
+      100 fits (the variance divided by 100).
+    </caption>
+  </table>
+
   <script src="app.js"></script>
+  <script src="rf.js"></script>
 </body>
 </html>
