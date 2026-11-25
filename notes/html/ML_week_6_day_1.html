@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision Trees: Fitting, Impurity and Pruning — Week 6, Day 1 | DSAI 621</title>
+<meta name="description" content="Accessible class notes on fitting decision trees: the greedy splitting algorithm, regression loss and predictions, classification impurity measures (classification error, Gini index, entropy), stopping rules, cost-complexity pruning, and pros and cons.">
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #4a4a4a;
+    --rule: #c9c9c9;
+    --accent: #0b4f8a;
+    --accent-bg: #eef4fa;
+    --focus: #0b4f8a;
+    --pop: #a4262c;   /* population / true  — 5.9:1 on white */
+    --est: #5b2d8e;   /* estimate / fitted  — 8.5:1 on white */
+    --err: #8a5000;   /* errors / residuals — 5.1:1 on white */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f2f2f2; --muted: #cfcfcf; --rule: #555;
+      --accent: #8ab8e0; --accent-bg: #182430; --focus: #8ab8e0;
+      --pop: #ff9f99; --est: #cbb0ff; --err: #f0b458;
+    }
+    body { background: #131313; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--ink);
+    background: #fff;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #131313; } }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 5rem; }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible, :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--accent); color: #fff;
+    padding: .75rem 1rem; z-index: 10; text-decoration: none;
+  }
+  .skip:focus { left: .5rem; top: .5rem; }
+  h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; line-height: 1.3; margin: 2.5rem 0 .5rem;
+       padding-top: .75rem; border-top: 2px solid var(--rule); }
+  h3 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  p, li { max-width: 42rem; }
+  .lede { color: var(--muted); margin-top: 0; }
+  nav.toc {
+    background: var(--accent-bg); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 1rem 1.25rem; margin: 2rem 0;
+  }
+  nav.toc h2 { font-size: 1.05rem; margin: 0 0 .5rem; border: 0; padding: 0; }
+  nav.toc ol { margin: 0; padding-left: 1.25rem; }
+  nav.toc li { margin: .3rem 0; }
+  nav.toc a { display: inline-block; min-height: 24px; padding: 2px 0; }
+  table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+  caption { text-align: left; font-weight: 600; padding-bottom: .5rem; }
+  th, td { border: 1px solid var(--rule); padding: .5rem .7rem; text-align: left; }
+  thead th { background: var(--accent-bg); }
+  figure { margin: 1.5rem 0; }
+  figcaption { font-size: .95rem; color: var(--muted); margin-top: .5rem; }
+  svg { max-width: 100%; height: auto; display: block; }
+  details {
+    border: 1px solid var(--rule); border-radius: 6px;
+    padding: .5rem .85rem; margin: .75rem 0; background: var(--accent-bg);
+  }
+  summary { cursor: pointer; font-weight: 600; min-height: 24px; padding: .25rem 0; }
+  details[open] summary { margin-bottom: .5rem; }
+  math { font-size: 1.15em; }
+  math[display="block"] { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }
+  .eq { margin: 1.25rem 0; }
+  .note {
+    border-left: 4px solid var(--accent); background: var(--accent-bg);
+    padding: .75rem 1rem; margin: 1.25rem 0; border-radius: 0 6px 6px 0;
+  }
+  .note > :first-child { margin-top: 0; }
+  .note > :last-child { margin-bottom: 0; }
+  .tag {
+    display: inline-block; font-size: .8rem; font-weight: 700;
+    letter-spacing: .02em; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 4px;
+    padding: 0 .4em; white-space: nowrap;
+  }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 2px solid var(--rule);
+           color: var(--muted); font-size: .95rem; }
+  ol.steps { padding-left: 1.4rem; }
+  ol.steps > li { margin: .75rem 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<div class="wrap">
+<header>
+  <p class="lede"><strong>DSAI 621 — Intro to Machine Learning</strong> · Fall 2026 · Week 6, Day 1</p>
+  <h1>Decision Trees: Fitting, Impurity, Stopping and Pruning</h1>
+  <p class="lede">Accessible transcription of the handwritten class notes. All equations are marked up in MathML so they can be read by a screen reader, magnified, or rendered in braille. All figures have text descriptions. Annotations written in a second pen colour in the original are reproduced here as labelled callouts, so none of their meaning depends on colour. A few short callouts marked <strong>Commentary</strong> were added in this transcription; they are not in the handwritten notes.</p>
+</header>
+
+<nav class="toc" aria-labelledby="toc-h">
+  <h2 id="toc-h">On this page</h2>
+  <ol>
+    <li><a href="#trees">1. Decision trees</a></li>
+    <li><a href="#fitting">1.1 Fitting</a></li>
+    <li><a href="#loss">1.2 Loss and predictions</a></li>
+    <li><a href="#stopping">1.3 Stopping</a></li>
+    <li><a href="#pruning">1.4 Cost-complexity pruning</a></li>
+    <li><a href="#summary">1.5 Summary</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+
+<h2 id="trees">1. Decision trees</h2>
+
+<h3 id="fitting">1.1 Fitting</h3>
+
+<ul>
+  <li><strong>Top-down:</strong> start with all points in the root.</li>
+  <li><strong>Greedy:</strong> always make the best split.</li>
+</ul>
+
+<p><strong>Algorithm.</strong> For a node:</p>
+<ul>
+  <li>For each predictor:
+    <ul>
+      <li>For each possible cutpoint <math alttext="s"><mi>s</mi></math> (unique <math alttext="x"><mi>x</mi></math> values):
+        <ul><li>split the data, and calculate the loss.</li></ul>
+      </li>
+    </ul>
+  </li>
+</ul>
+<ul>
+  <li>Return the predictor <math alttext="j"><mi>j</mi></math> and cutpoint <math alttext="s"><mi>s</mi></math> that reduce the loss the most.</li>
+  <li>Repeat recursively until a stopping criterion.</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 220 175" role="img" aria-labelledby="fig1-t fig1-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig1-t">A small binary tree: the root splits once, and its right child splits again</title>
+  <desc id="fig1-d">A root node with two branches. The left branch ends in a leaf; the right branch leads to a node that splits into two leaves.</desc>
+  <line x1="100" y1="25" x2="55" y2="95" stroke="currentColor" stroke-width="2"/><line x1="100" y1="25" x2="140" y2="85" stroke="currentColor" stroke-width="2"/><line x1="140" y1="85" x2="115" y2="150" stroke="currentColor" stroke-width="2"/><line x1="140" y1="85" x2="170" y2="150" stroke="currentColor" stroke-width="2"/><circle cx="100" cy="25" r="6" fill="currentColor"/><circle cx="55" cy="95" r="6" fill="currentColor"/><circle cx="140" cy="85" r="6" fill="currentColor"/><circle cx="115" cy="150" r="6" fill="currentColor"/><circle cx="170" cy="150" r="6" fill="currentColor"/>
+</svg>
+<figcaption>Figure 1. A small tree, drawn beside the algorithm.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 1</summary>
+  <p>A root node with two branches. The left branch ends in a leaf; the right branch leads to a node that splits into two leaves.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> If <math alttext="X sub 1 equals 1, 2, 3"><mrow><msub><mi>X</mi><mn>1</mn></msub><mo>=</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn></mrow></math> and <math alttext="X sub 2 equals 10, 15"><mrow><msub><mi>X</mi><mn>2</mn></msub><mo>=</mo><mn>10</mn><mo>,</mo><mn>15</mn></mrow></math>, check these: <math alttext="X sub 1 equals 1.5"><mrow><msub><mi>X</mi><mn>1</mn></msub><mo>=</mo><mn>1.5</mn></mrow></math>, <math alttext="X sub 1 equals 2.5"><mrow><msub><mi>X</mi><mn>1</mn></msub><mo>=</mo><mn>2.5</mn></mrow></math>, <math alttext="X sub 2 equals 12.5"><mrow><msub><mi>X</mi><mn>2</mn></msub><mo>=</mo><mn>12.5</mn></mrow></math>.</p>
+</div>
+
+<div class="eq">
+<math display="block" alttext="R sub 1 of j and s equals the set of X such that X sub j is less than s, the left-hand side; R sub 2 of j and s equals the set of X such that X sub j is greater than or equal to s, the right-hand side">
+  <mrow><munder><mrow><msub><mi>R</mi><mn>1</mn></msub><mo>(</mo><mi>j</mi><mo>,</mo><mi>s</mi><mo>)</mo></mrow><mtext>LHS</mtext></munder><mo>=</mo><mo>{</mo><mi>X</mi><mo>|</mo><msub><mi>X</mi><mi>j</mi></msub><mo>&lt;</mo><mi>s</mi><mo>}</mo><mspace width="2em"></mspace><munder><mrow><msub><mi>R</mi><mn>2</mn></msub><mo>(</mo><mi>j</mi><mo>,</mo><mi>s</mi><mo>)</mo></mrow><mtext>RHS</mtext></munder><mo>=</mo><mo>{</mo><mi>X</mi><mo>|</mo><msub><mi>X</mi><mi>j</mi></msub><mo>≥</mo><mi>s</mi><mo>}</mo></mrow>
+</math>
+</div>
+
+<h3 id="loss">1.2 Loss and predictions</h3>
+
+<h4 id="loss-regression">Regression</h4>
+
+<p><strong>Predictions:</strong></p>
+
+<div class="eq">
+<math display="block" alttext="y hat sub R sub m equals 1 over n sub R sub m times the sum over i such that y sub i is in R sub m of y sub i">
+  <mrow><msub><mover><mi>y</mi><mo>^</mo></mover><msub><mi>R</mi><mi>m</mi></msub></msub><mo>=</mo><mfrac><mn>1</mn><msub><mi>n</mi><msub><mi>R</mi><mi>m</mi></msub></msub></mfrac><munder><mo>∑</mo><mrow><mi>i</mi><mo>:</mo><msub><mi>y</mi><mi>i</mi></msub><mo>∈</mo><msub><mi>R</mi><mi>m</mi></msub></mrow></munder><msub><mi>y</mi><mi>i</mi></msub></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> Mean of the training-set <math alttext="y"><mi>y</mi></math> values in the node.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Possible error in original</span> The sum is indexed by <math alttext="i such that y sub i is in R sub m"><mrow><mi>i</mi><mo>:</mo><msub><mi>y</mi><mi>i</mi></msub><mo>∈</mo><msub><mi>R</mi><mi>m</mi></msub></mrow></math>. Regions are defined on the predictors, so it should be <math alttext="i such that x sub i is in R sub m"><mrow><mi>i</mi><mo>:</mo><msub><mi>x</mi><mi>i</mi></msub><mo>∈</mo><msub><mi>R</mi><mi>m</mi></msub></mrow></math>, as in the loss below.</p>
+</div>
+
+<p>Drawn beside it: a node containing the values 2, 3, 4, 5, 6.</p>
+
+<p><strong>Loss:</strong></p>
+
+<div class="eq">
+<math display="block" alttext="the sum over i such that x sub i is in R sub 1 of, y sub i minus y hat sub R sub 1, squared, plus the sum over i such that x sub i is in R sub 2 of, y sub i minus y hat sub R sub 2, squared">
+  <mrow><munder><mo>∑</mo><mrow><mi>i</mi><mo>:</mo><msub><mi>x</mi><mi>i</mi></msub><mo>∈</mo><msub><mi>R</mi><mn>1</mn></msub></mrow></munder><msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>y</mi><mo>^</mo></mover><msub><mi>R</mi><mn>1</mn></msub></msub><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><munder><mo>∑</mo><mrow><mi>i</mi><mo>:</mo><msub><mi>x</mi><mi>i</mi></msub><mo>∈</mo><msub><mi>R</mi><mn>2</mn></msub></mrow></munder><msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>y</mi><mo>^</mo></mover><msub><mi>R</mi><mn>2</mn></msub></msub><mo>)</mo></mrow><mn>2</mn></msup></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> Arrows link the first sum to the left child of a split node and the second sum to the right child.</p>
+</div>
+
+<p><strong>Example</strong> (written in a second colour): the parent node has RSS = 200, with <math alttext="x sub 1 equals 1 through 8"><mrow><msub><mi>x</mi><mn>1</mn></msub><mo>=</mo><mn>1</mn><mo>,</mo><mo>…</mo><mo>,</mo><mn>8</mn></mrow></math> and <math alttext="n sub t equals 8"><mrow><msub><mi>n</mi><mi>t</mi></msub><mo>=</mo><mn>8</mn></mrow></math>.</p>
+
+<table>
+  <caption>Every cutpoint for the 8-point example; the best one is marked</caption>
+  <thead><tr><th scope="col"><math alttext="s"><mi>s</mi></math></th><th scope="col"><math alttext="n sub L, n sub R"><mrow><msub><mi>n</mi><mi>L</mi></msub><mo>,</mo><msub><mi>n</mi><mi>R</mi></msub></mrow></math></th><th scope="col">RSS(L) + RSS(R)</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">1.5</th><td>1, 7</td><td>155</td></tr>
+    <tr><th scope="row">2.5</th><td>2, 6</td><td>126</td></tr>
+    <tr><th scope="row">3.5</th><td>3, 5</td><td>67</td></tr>
+    <tr><th scope="row">4.5 (best)</th><td>4, 4</td><td><strong>19</strong></td></tr>
+    <tr><th scope="row">5.5</th><td>5, 3</td><td>58</td></tr>
+    <tr><th scope="row">6.5</th><td>6, 2</td><td>111</td></tr>
+    <tr><th scope="row">7.5</th><td>7, 1</td><td>130</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> In the original, the best row (<math alttext="s equals 4.5"><mrow><mi>s</mi><mo>=</mo><mn>4.5</mn></mrow></math>, RSS 19) is marked by highlighting.</p>
+</div>
+
+<h4 id="loss-classification">Classification</h4>
+
+<p><strong>Prediction:</strong></p>
+
+<div class="eq">
+<math display="block" alttext="p hat sub m k equals 1 over n sub m times the sum over i such that x sub i is in R sub m of the indicator that y sub i equals k">
+  <mrow><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mi>k</mi></mrow></msub><mo>=</mo><mfrac><mn>1</mn><msub><mi>n</mi><mi>m</mi></msub></mfrac><munder><mo>∑</mo><mrow><mi>i</mi><mo>:</mo><msub><mi>x</mi><mi>i</mi></msub><mo>∈</mo><msub><mi>R</mi><mi>m</mi></msub></mrow></munder><mn>1</mn><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>=</mo><mi>k</mi><mo>)</mo></mrow>
+</math>
+</div>
+
+<p>For a node containing 1, 1, 2, 2, 2, 3, 3, 3, 3:</p>
+
+<div class="eq">
+<math display="block" alttext="p hat sub m 1 equals 2 ninths, p hat sub m 2 equals 3 ninths, p hat sub m 3 equals 4 ninths; y hat sub m equals the argmax over k of p hat sub m k, which is 3">
+  <mtable columnalign="left">
+    <mtr><mtd><mrow><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mn>1</mn></mrow></msub><mo>=</mo><mfrac><mn>2</mn><mn>9</mn></mfrac><mspace width="1.5em"></mspace><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mn>2</mn></mrow></msub><mo>=</mo><mfrac><mn>3</mn><mn>9</mn></mfrac><mspace width="1.5em"></mspace><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mn>3</mn></mrow></msub><mo>=</mo><mfrac><mn>4</mn><mn>9</mn></mfrac></mrow></mtd></mtr>
+    <mtr><mtd><mrow><msub><mover><mi>y</mi><mo>^</mo></mover><mi>m</mi></msub><mo>=</mo><munder><mrow><mi>arg</mi><mo>⁡</mo><mi>max</mi></mrow><mi>k</mi></munder><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mi>k</mi></mrow></msub><mo>=</mo><mn>3</mn></mrow></mtd></mtr>
+  </mtable>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> <strong>Majority class!!</strong></p>
+</div>
+
+<p><strong>Loss:</strong> 3 impurity measures.</p>
+
+<div class="scroll-x" role="region" aria-label="Impurity measures table (scrolls sideways on narrow screens)" tabindex="0" style="overflow-x:auto">
+<table>
+  <caption>Three impurity measures for a node</caption>
+  <thead><tr><th scope="col">Measure</th><th scope="col">Formula</th><th scope="col">Two classes (<math alttext="p equals p hat sub m 1"><mrow><mi>p</mi><mo>=</mo><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mn>1</mn></mrow></msub></mrow></math>)</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Classification error</th><td><math alttext="E equals 1 minus max over k of p hat sub m k"><mrow><mi>E</mi><mo>=</mo><mn>1</mn><mo>−</mo><munder><mi>max</mi><mi>k</mi></munder><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mi>k</mi></mrow></msub></mrow></math></td><td><math alttext="min of p and 1 minus p"><mrow><mi>min</mi><mo>(</mo><mi>p</mi><mo>,</mo><mn>1</mn><mo>−</mo><mi>p</mi><mo>)</mo></mrow></math></td></tr>
+    <tr><th scope="row">Gini index</th><td><math alttext="G equals the sum from k equals 1 to K of p hat sub m k times 1 minus p hat sub m k"><mrow><mi>G</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mi>k</mi></mrow></msub><mo>(</mo><mn>1</mn><mo>−</mo><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mi>k</mi></mrow></msub><mo>)</mo></mrow></math></td><td><math alttext="2 p times 1 minus p"><mrow><mn>2</mn><mi>p</mi><mo>(</mo><mn>1</mn><mo>−</mo><mi>p</mi><mo>)</mo></mrow></math></td></tr>
+    <tr><th scope="row">Entropy (cross-entropy, deviance)</th><td><math alttext="D equals minus the sum from k equals 1 to K of p hat sub m k log p hat sub m k"><mrow><mi>D</mi><mo>=</mo><mo>−</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mi>k</mi></mrow></msub><mi>log</mi><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mi>k</mi></mrow></msub></mrow></math></td><td><math alttext="minus p log p minus 1 minus p times log of 1 minus p"><mrow><mo>−</mo><mi>p</mi><mi>log</mi><mi>p</mi><mo>−</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>p</mi><mo>)</mo><mi>log</mi><mo>(</mo><mn>1</mn><mo>−</mo><mi>p</mi><mo>)</mo></mrow></math></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>Example</strong> (written in a second colour): a node containing 1, 2, 2, so <math alttext="y hat equals 2"><mrow><mover><mi>y</mi><mo>^</mo></mover><mo>=</mo><mn>2</mn></mrow></math>, <math alttext="p hat sub m 1 equals one third"><mrow><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mn>1</mn></mrow></msub><mo>=</mo><mfrac><mn>1</mn><mn>3</mn></mfrac></mrow></math> and <math alttext="p hat sub m 2 equals two thirds"><mrow><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mn>2</mn></mrow></msub><mo>=</mo><mfrac><mn>2</mn><mn>3</mn></mfrac></mrow></math>.</p>
+
+<div class="eq">
+<math display="block" alttext="Classification error: one third. Gini: one third times two thirds plus two thirds times one third, or 2 times one third times two thirds. Deviance: minus one third log one third minus two thirds log two thirds">
+  <mtable columnalign="left">
+    <mtr><mtd><mrow><mtext>Classification error: </mtext><mfrac><mn>1</mn><mn>3</mn></mfrac></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mtext>Gini: </mtext><mfrac><mn>1</mn><mn>3</mn></mfrac><mrow><mo>(</mo><mfrac><mn>2</mn><mn>3</mn></mfrac><mo>)</mo></mrow><mo>+</mo><mfrac><mn>2</mn><mn>3</mn></mfrac><mrow><mo>(</mo><mfrac><mn>1</mn><mn>3</mn></mfrac><mo>)</mo></mrow><mspace width="1em"></mspace><mtext>or</mtext><mspace width="1em"></mspace><mn>2</mn><mo>·</mo><mfrac><mn>1</mn><mn>3</mn></mfrac><mrow><mo>(</mo><mfrac><mn>2</mn><mn>3</mn></mfrac><mo>)</mo></mrow></mrow></mtd></mtr>
+    <mtr><mtd><mrow><mtext>Deviance: </mtext><mo>−</mo><mfrac><mn>1</mn><mn>3</mn></mfrac><mi>log</mi><mfrac><mn>1</mn><mn>3</mn></mfrac><mo>−</mo><mfrac><mn>2</mn><mn>3</mn></mfrac><mi>log</mi><mfrac><mn>2</mn><mn>3</mn></mfrac></mrow></mtd></mtr>
+  </mtable>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> In the Gini and deviance lines, the 2s in “2/3” are written so that they resemble 3s; they are read here as 2/3, matching <math alttext="p hat sub m 2 equals two thirds"><mrow><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mn>2</mn></mrow></msub><mo>=</mo><mfrac><mn>2</mn><mn>3</mn></mfrac></mrow></math>.</p>
+</div>
+
+<p><strong>Total loss</strong> of a split:</p>
+
+<div class="eq">
+<math display="block" alttext="Total loss equals n sub L over n sub t times Q sub L plus n sub R over n sub t times Q sub R">
+  <mrow><mtext>Total loss</mtext><mo>=</mo><mfrac><msub><mi>n</mi><mi>L</mi></msub><msub><mi>n</mi><mi>t</mi></msub></mfrac><msub><mi>Q</mi><mi>L</mi></msub><mo>+</mo><mfrac><msub><mi>n</mi><mi>R</mi></msub><msub><mi>n</mi><mi>t</mi></msub></mfrac><msub><mi>Q</mi><mi>R</mi></msub></mrow>
+</math>
+</div>
+
+<ul>
+  <li><math alttext="Q"><mi>Q</mi></math> = impurity measure</li>
+  <li><math alttext="n sub t"><msub><mi>n</mi><mi>t</mi></msub></math> = # of observations in the parent node</li>
+  <li><math alttext="n sub L, n sub R"><mrow><msub><mi>n</mi><mi>L</mi></msub><mo>,</mo><msub><mi>n</mi><mi>R</mi></msub></mrow></math> = # of observations in the LHS and RHS</li>
+</ul>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> If the node is 1, 1, 1, 1, 1 (pure): <math alttext="E equals 0, G equals 0, D equals 0"><mrow><mi>E</mi><mo>=</mo><mn>0</mn><mo>,</mo><mi>G</mi><mo>=</mo><mn>0</mn><mo>,</mo><mi>D</mi><mo>=</mo><mn>0</mn></mrow></math>.</p>
+  <p>If the node is 1, 1, 2, 2: <math alttext="E equals .5, G equals .5, D equals minus log .5"><mrow><mi>E</mi><mo>=</mo><mn>.5</mn><mo>,</mo><mi>G</mi><mo>=</mo><mn>.5</mn><mo>,</mo><mi>D</mi><mo>=</mo><mo>−</mo><mi>log</mi><mn>.5</mn></mrow></math>.</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 520 305" role="img" aria-labelledby="fig2-t fig2-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig2-t">Classification error, Gini index and entropy for two classes, plotted against p: all are zero at p equals 0 and 1 and largest at p equals one half</title>
+  <desc id="fig2-d">Horizontal axis p, the proportion of class 1, from 0 to 1, with .5 marked; vertical axis marked at .5. Three curves start at zero at p equals 0, rise to a peak of .5 at p equals one half, and return to zero at p equals 1. Classification error E (dotted) is a tent made of two straight lines. The Gini index G (dashed) is a smooth arch above it, and the entropy D (solid) is a slightly fuller arch above that. The ends are labelled best case and the middle worst case.</desc>
+  <line x1="60" y1="250" x2="440" y2="250" stroke="currentColor" stroke-width="2"/><polygon points="440,250 432,246 432,254" fill="currentColor"/><text x="446.0" y="255.0" font-size="15" fill="currentColor" text-anchor="start">p = p̂<tspan baseline-shift="sub" font-size="11">m1</tspan></text><line x1="60" y1="250" x2="60" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="60,20 56,28 64,28" fill="currentColor"/><text x="70.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start"></text><line x1="60" y1="245" x2="60" y2="255" stroke="currentColor" stroke-width="2"/><text x="60.0" y="272.0" font-size="14" fill="currentColor" text-anchor="middle">0</text><line x1="220.0" y1="245" x2="220.0" y2="255" stroke="currentColor" stroke-width="2"/><text x="220.0" y="272.0" font-size="14" fill="currentColor" text-anchor="middle">.5</text><line x1="380" y1="245" x2="380" y2="255" stroke="currentColor" stroke-width="2"/><text x="380.0" y="272.0" font-size="14" fill="currentColor" text-anchor="middle">1</text><line x1="54" y1="50.0" x2="60" y2="50.0" stroke="currentColor" stroke-width="2"/><text x="50.0" y="55.0" font-size="14" fill="currentColor" text-anchor="end">.5</text><path d="M60.0,250.0 L61.1,243.5 L62.1,238.4 L63.2,233.8 L64.3,229.5 L65.4,225.5 L66.4,221.6 L67.5,218.0 L68.6,214.4 L69.6,211.0 L70.7,207.7 L71.8,204.5 L72.8,201.4 L73.9,198.4 L75.0,195.5 L76.1,192.6 L77.1,189.8 L78.2,187.0 L79.3,184.4 L80.3,181.7 L81.4,179.2 L82.5,176.6 L83.5,174.2 L84.6,171.8 L85.7,169.4 L86.8,167.0 L87.8,164.8 L88.9,162.5 L90.0,160.3 L91.0,158.1 L92.1,156.0 L93.2,153.9 L94.2,151.8 L95.3,149.8 L96.4,147.8 L97.5,145.8 L98.5,143.9 L99.6,142.0 L100.7,140.1 L101.7,138.3 L102.8,136.5 L103.9,134.7 L105.0,132.9 L106.0,131.2 L107.1,129.5 L108.2,127.8 L109.2,126.1 L110.3,124.5 L111.4,122.9 L112.4,121.3 L113.5,119.7 L114.6,118.2 L115.7,116.7 L116.7,115.2 L117.8,113.7 L118.9,112.3 L119.9,110.8 L121.0,109.4 L122.1,108.1 L123.1,106.7 L124.2,105.3 L125.3,104.0 L126.4,102.7 L127.4,101.4 L128.5,100.2 L129.6,98.9 L130.6,97.7 L131.7,96.5 L132.8,95.3 L133.8,94.1 L134.9,93.0 L136.0,91.8 L137.1,90.7 L138.1,89.6 L139.2,88.5 L140.3,87.5 L141.3,86.4 L142.4,85.4 L143.5,84.4 L144.5,83.4 L145.6,82.4 L146.7,81.4 L147.8,80.5 L148.8,79.6 L149.9,78.7 L151.0,77.8 L152.0,76.9 L153.1,76.0 L154.2,75.2 L155.3,74.3 L156.3,73.5 L157.4,72.7 L158.5,71.9 L159.5,71.1 L160.6,70.4 L161.7,69.6 L162.7,68.9 L163.8,68.2 L164.9,67.5 L166.0,66.8 L167.0,66.1 L168.1,65.5 L169.2,64.8 L170.2,64.2 L171.3,63.6 L172.4,63.0 L173.4,62.4 L174.5,61.8 L175.6,61.3 L176.7,60.7 L177.7,60.2 L178.8,59.7 L179.9,59.2 L180.9,58.7 L182.0,58.2 L183.1,57.8 L184.1,57.3 L185.2,56.9 L186.3,56.5 L187.4,56.0 L188.4,55.7 L189.5,55.3 L190.6,54.9 L191.6,54.6 L192.7,54.2 L193.8,53.9 L194.8,53.6 L195.9,53.3 L197.0,53.0 L198.1,52.7 L199.1,52.5 L200.2,52.2 L201.3,52.0 L202.3,51.8 L203.4,51.6 L204.5,51.4 L205.6,51.2 L206.6,51.0 L207.7,50.9 L208.8,50.7 L209.8,50.6 L210.9,50.5 L212.0,50.4 L213.0,50.3 L214.1,50.2 L215.2,50.1 L216.3,50.1 L217.3,50.0 L218.4,50.0 L219.5,50.0 L220.5,50.0 L221.6,50.0 L222.7,50.0 L223.7,50.1 L224.8,50.1 L225.9,50.2 L227.0,50.3 L228.0,50.4 L229.1,50.5 L230.2,50.6 L231.2,50.7 L232.3,50.9 L233.4,51.0 L234.4,51.2 L235.5,51.4 L236.6,51.6 L237.7,51.8 L238.7,52.0 L239.8,52.2 L240.9,52.5 L241.9,52.7 L243.0,53.0 L244.1,53.3 L245.2,53.6 L246.2,53.9 L247.3,54.2 L248.4,54.6 L249.4,54.9 L250.5,55.3 L251.6,55.7 L252.6,56.0 L253.7,56.5 L254.8,56.9 L255.9,57.3 L256.9,57.8 L258.0,58.2 L259.1,58.7 L260.1,59.2 L261.2,59.7 L262.3,60.2 L263.3,60.7 L264.4,61.3 L265.5,61.8 L266.6,62.4 L267.6,63.0 L268.7,63.6 L269.8,64.2 L270.8,64.8 L271.9,65.5 L273.0,66.1 L274.0,66.8 L275.1,67.5 L276.2,68.2 L277.3,68.9 L278.3,69.6 L279.4,70.4 L280.5,71.1 L281.5,71.9 L282.6,72.7 L283.7,73.5 L284.7,74.3 L285.8,75.2 L286.9,76.0 L288.0,76.9 L289.0,77.8 L290.1,78.7 L291.2,79.6 L292.2,80.5 L293.3,81.4 L294.4,82.4 L295.5,83.4 L296.5,84.4 L297.6,85.4 L298.7,86.4 L299.7,87.5 L300.8,88.5 L301.9,89.6 L302.9,90.7 L304.0,91.8 L305.1,93.0 L306.2,94.1 L307.2,95.3 L308.3,96.5 L309.4,97.7 L310.4,98.9 L311.5,100.2 L312.6,101.4 L313.6,102.7 L314.7,104.0 L315.8,105.3 L316.9,106.7 L317.9,108.1 L319.0,109.4 L320.1,110.8 L321.1,112.3 L322.2,113.7 L323.3,115.2 L324.3,116.7 L325.4,118.2 L326.5,119.7 L327.6,121.3 L328.6,122.9 L329.7,124.5 L330.8,126.1 L331.8,127.8 L332.9,129.5 L334.0,131.2 L335.0,132.9 L336.1,134.7 L337.2,136.5 L338.3,138.3 L339.3,140.1 L340.4,142.0 L341.5,143.9 L342.5,145.8 L343.6,147.8 L344.7,149.8 L345.8,151.8 L346.8,153.9 L347.9,156.0 L349.0,158.1 L350.0,160.3 L351.1,162.5 L352.2,164.8 L353.2,167.0 L354.3,169.4 L355.4,171.8 L356.5,174.2 L357.5,176.6 L358.6,179.2 L359.7,181.7 L360.7,184.4 L361.8,187.0 L362.9,189.8 L363.9,192.6 L365.0,195.5 L366.1,198.4 L367.2,201.4 L368.2,204.5 L369.3,207.7 L370.4,211.0 L371.4,214.4 L372.5,218.0 L373.6,221.6 L374.6,225.5 L375.7,229.5 L376.8,233.8 L377.9,238.4 L378.9,243.5 L380.0,250.0" fill="none" stroke="var(--est)" stroke-width="3"/><text x="410.0" y="75.0" font-size="17" fill="var(--est)" text-anchor="start" font-weight="700">D</text><line x1="406.0" y1="70.0" x2="326.2" y2="113.7" stroke="var(--est)" stroke-width="1.3"/><polygon points="326.2,113.7 331.8,106.7 335.2,112.8" fill="var(--est)"/><path d="M60.0,250.0 L61.1,247.3 L62.1,244.7 L63.2,242.1 L64.3,239.4 L65.4,236.8 L66.4,234.3 L67.5,231.7 L68.6,229.2 L69.6,226.6 L70.7,224.1 L71.8,221.7 L72.8,219.2 L73.9,216.7 L75.0,214.3 L76.1,211.9 L77.1,209.5 L78.2,207.1 L79.3,204.7 L80.3,202.4 L81.4,200.1 L82.5,197.8 L83.5,195.5 L84.6,193.2 L85.7,190.9 L86.8,188.7 L87.8,186.5 L88.9,184.3 L90.0,182.1 L91.0,179.9 L92.1,177.8 L93.2,175.7 L94.2,173.5 L95.3,171.5 L96.4,169.4 L97.5,167.3 L98.5,165.3 L99.6,163.3 L100.7,161.2 L101.7,159.3 L102.8,157.3 L103.9,155.3 L105.0,153.4 L106.0,151.5 L107.1,149.6 L108.2,147.7 L109.2,145.9 L110.3,144.0 L111.4,142.2 L112.4,140.4 L113.5,138.6 L114.6,136.8 L115.7,135.1 L116.7,133.3 L117.8,131.6 L118.9,129.9 L119.9,128.2 L121.0,126.6 L122.1,124.9 L123.1,123.3 L124.2,121.7 L125.3,120.1 L126.4,118.5 L127.4,117.0 L128.5,115.4 L129.6,113.9 L130.6,112.4 L131.7,110.9 L132.8,109.4 L133.8,108.0 L134.9,106.6 L136.0,105.1 L137.1,103.7 L138.1,102.4 L139.2,101.0 L140.3,99.7 L141.3,98.3 L142.4,97.0 L143.5,95.7 L144.5,94.5 L145.6,93.2 L146.7,92.0 L147.8,90.8 L148.8,89.6 L149.9,88.4 L151.0,87.2 L152.0,86.1 L153.1,85.0 L154.2,83.8 L155.3,82.8 L156.3,81.7 L157.4,80.6 L158.5,79.6 L159.5,78.6 L160.6,77.6 L161.7,76.6 L162.7,75.6 L163.8,74.7 L164.9,73.7 L166.0,72.8 L167.0,71.9 L168.1,71.0 L169.2,70.2 L170.2,69.3 L171.3,68.5 L172.4,67.7 L173.4,66.9 L174.5,66.2 L175.6,65.4 L176.7,64.7 L177.7,64.0 L178.8,63.3 L179.9,62.6 L180.9,61.9 L182.0,61.3 L183.1,60.7 L184.1,60.0 L185.2,59.5 L186.3,58.9 L187.4,58.3 L188.4,57.8 L189.5,57.3 L190.6,56.8 L191.6,56.3 L192.7,55.8 L193.8,55.4 L194.8,54.9 L195.9,54.5 L197.0,54.1 L198.1,53.8 L199.1,53.4 L200.2,53.1 L201.3,52.7 L202.3,52.4 L203.4,52.1 L204.5,51.9 L205.6,51.6 L206.6,51.4 L207.7,51.2 L208.8,51.0 L209.8,50.8 L210.9,50.6 L212.0,50.5 L213.0,50.4 L214.1,50.3 L215.2,50.2 L216.3,50.1 L217.3,50.1 L218.4,50.0 L219.5,50.0 L220.5,50.0 L221.6,50.0 L222.7,50.1 L223.7,50.1 L224.8,50.2 L225.9,50.3 L227.0,50.4 L228.0,50.5 L229.1,50.6 L230.2,50.8 L231.2,51.0 L232.3,51.2 L233.4,51.4 L234.4,51.6 L235.5,51.9 L236.6,52.1 L237.7,52.4 L238.7,52.7 L239.8,53.1 L240.9,53.4 L241.9,53.8 L243.0,54.1 L244.1,54.5 L245.2,54.9 L246.2,55.4 L247.3,55.8 L248.4,56.3 L249.4,56.8 L250.5,57.3 L251.6,57.8 L252.6,58.3 L253.7,58.9 L254.8,59.5 L255.9,60.0 L256.9,60.7 L258.0,61.3 L259.1,61.9 L260.1,62.6 L261.2,63.3 L262.3,64.0 L263.3,64.7 L264.4,65.4 L265.5,66.2 L266.6,66.9 L267.6,67.7 L268.7,68.5 L269.8,69.3 L270.8,70.2 L271.9,71.0 L273.0,71.9 L274.0,72.8 L275.1,73.7 L276.2,74.7 L277.3,75.6 L278.3,76.6 L279.4,77.6 L280.5,78.6 L281.5,79.6 L282.6,80.6 L283.7,81.7 L284.7,82.8 L285.8,83.8 L286.9,85.0 L288.0,86.1 L289.0,87.2 L290.1,88.4 L291.2,89.6 L292.2,90.8 L293.3,92.0 L294.4,93.2 L295.5,94.5 L296.5,95.7 L297.6,97.0 L298.7,98.3 L299.7,99.7 L300.8,101.0 L301.9,102.4 L302.9,103.7 L304.0,105.1 L305.1,106.6 L306.2,108.0 L307.2,109.4 L308.3,110.9 L309.4,112.4 L310.4,113.9 L311.5,115.4 L312.6,117.0 L313.6,118.5 L314.7,120.1 L315.8,121.7 L316.9,123.3 L317.9,124.9 L319.0,126.6 L320.1,128.2 L321.1,129.9 L322.2,131.6 L323.3,133.3 L324.3,135.1 L325.4,136.8 L326.5,138.6 L327.6,140.4 L328.6,142.2 L329.7,144.0 L330.8,145.9 L331.8,147.7 L332.9,149.6 L334.0,151.5 L335.0,153.4 L336.1,155.3 L337.2,157.3 L338.3,159.3 L339.3,161.2 L340.4,163.3 L341.5,165.3 L342.5,167.3 L343.6,169.4 L344.7,171.5 L345.8,173.5 L346.8,175.7 L347.9,177.8 L349.0,179.9 L350.0,182.1 L351.1,184.3 L352.2,186.5 L353.2,188.7 L354.3,190.9 L355.4,193.2 L356.5,195.5 L357.5,197.8 L358.6,200.1 L359.7,202.4 L360.7,204.7 L361.8,207.1 L362.9,209.5 L363.9,211.9 L365.0,214.3 L366.1,216.7 L367.2,219.2 L368.2,221.7 L369.3,224.1 L370.4,226.6 L371.4,229.2 L372.5,231.7 L373.6,234.3 L374.6,236.8 L375.7,239.4 L376.8,242.1 L377.9,244.7 L378.9,247.3 L380.0,250.0" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="9 5"/><text x="410.0" y="125.0" font-size="17" fill="var(--accent)" text-anchor="start" font-weight="700">G</text><line x1="406.0" y1="120.0" x2="339.0" y2="153.4" stroke="var(--accent)" stroke-width="1.3"/><polygon points="339.0,153.4 344.9,146.6 348.0,152.8" fill="var(--accent)"/><path d="M60.0,250.0 L61.1,248.7 L62.1,247.3 L63.2,246.0 L64.3,244.6 L65.4,243.3 L66.4,242.0 L67.5,240.6 L68.6,239.3 L69.6,238.0 L70.7,236.6 L71.8,235.3 L72.8,233.9 L73.9,232.6 L75.0,231.3 L76.1,229.9 L77.1,228.6 L78.2,227.3 L79.3,225.9 L80.3,224.6 L81.4,223.2 L82.5,221.9 L83.5,220.6 L84.6,219.2 L85.7,217.9 L86.8,216.6 L87.8,215.2 L88.9,213.9 L90.0,212.5 L91.0,211.2 L92.1,209.9 L93.2,208.5 L94.2,207.2 L95.3,205.9 L96.4,204.5 L97.5,203.2 L98.5,201.8 L99.6,200.5 L100.7,199.2 L101.7,197.8 L102.8,196.5 L103.9,195.2 L105.0,193.8 L106.0,192.5 L107.1,191.1 L108.2,189.8 L109.2,188.5 L110.3,187.1 L111.4,185.8 L112.4,184.4 L113.5,183.1 L114.6,181.8 L115.7,180.4 L116.7,179.1 L117.8,177.8 L118.9,176.4 L119.9,175.1 L121.0,173.7 L122.1,172.4 L123.1,171.1 L124.2,169.7 L125.3,168.4 L126.4,167.1 L127.4,165.7 L128.5,164.4 L129.6,163.0 L130.6,161.7 L131.7,160.4 L132.8,159.0 L133.8,157.7 L134.9,156.4 L136.0,155.0 L137.1,153.7 L138.1,152.3 L139.2,151.0 L140.3,149.7 L141.3,148.3 L142.4,147.0 L143.5,145.7 L144.5,144.3 L145.6,143.0 L146.7,141.6 L147.8,140.3 L148.8,139.0 L149.9,137.6 L151.0,136.3 L152.0,134.9 L153.1,133.6 L154.2,132.3 L155.3,130.9 L156.3,129.6 L157.4,128.3 L158.5,126.9 L159.5,125.6 L160.6,124.2 L161.7,122.9 L162.7,121.6 L163.8,120.2 L164.9,118.9 L166.0,117.6 L167.0,116.2 L168.1,114.9 L169.2,113.5 L170.2,112.2 L171.3,110.9 L172.4,109.5 L173.4,108.2 L174.5,106.9 L175.6,105.5 L176.7,104.2 L177.7,102.8 L178.8,101.5 L179.9,100.2 L180.9,98.8 L182.0,97.5 L183.1,96.2 L184.1,94.8 L185.2,93.5 L186.3,92.1 L187.4,90.8 L188.4,89.5 L189.5,88.1 L190.6,86.8 L191.6,85.5 L192.7,84.1 L193.8,82.8 L194.8,81.4 L195.9,80.1 L197.0,78.8 L198.1,77.4 L199.1,76.1 L200.2,74.7 L201.3,73.4 L202.3,72.1 L203.4,70.7 L204.5,69.4 L205.6,68.1 L206.6,66.7 L207.7,65.4 L208.8,64.0 L209.8,62.7 L210.9,61.4 L212.0,60.0 L213.0,58.7 L214.1,57.4 L215.2,56.0 L216.3,54.7 L217.3,53.3 L218.4,52.0 L219.5,50.7 L220.5,50.7 L221.6,52.0 L222.7,53.3 L223.7,54.7 L224.8,56.0 L225.9,57.4 L227.0,58.7 L228.0,60.0 L229.1,61.4 L230.2,62.7 L231.2,64.0 L232.3,65.4 L233.4,66.7 L234.4,68.1 L235.5,69.4 L236.6,70.7 L237.7,72.1 L238.7,73.4 L239.8,74.7 L240.9,76.1 L241.9,77.4 L243.0,78.8 L244.1,80.1 L245.2,81.4 L246.2,82.8 L247.3,84.1 L248.4,85.5 L249.4,86.8 L250.5,88.1 L251.6,89.5 L252.6,90.8 L253.7,92.1 L254.8,93.5 L255.9,94.8 L256.9,96.2 L258.0,97.5 L259.1,98.8 L260.1,100.2 L261.2,101.5 L262.3,102.8 L263.3,104.2 L264.4,105.5 L265.5,106.9 L266.6,108.2 L267.6,109.5 L268.7,110.9 L269.8,112.2 L270.8,113.5 L271.9,114.9 L273.0,116.2 L274.0,117.6 L275.1,118.9 L276.2,120.2 L277.3,121.6 L278.3,122.9 L279.4,124.2 L280.5,125.6 L281.5,126.9 L282.6,128.3 L283.7,129.6 L284.7,130.9 L285.8,132.3 L286.9,133.6 L288.0,134.9 L289.0,136.3 L290.1,137.6 L291.2,139.0 L292.2,140.3 L293.3,141.6 L294.4,143.0 L295.5,144.3 L296.5,145.7 L297.6,147.0 L298.7,148.3 L299.7,149.7 L300.8,151.0 L301.9,152.3 L302.9,153.7 L304.0,155.0 L305.1,156.4 L306.2,157.7 L307.2,159.0 L308.3,160.4 L309.4,161.7 L310.4,163.0 L311.5,164.4 L312.6,165.7 L313.6,167.1 L314.7,168.4 L315.8,169.7 L316.9,171.1 L317.9,172.4 L319.0,173.7 L320.1,175.1 L321.1,176.4 L322.2,177.8 L323.3,179.1 L324.3,180.4 L325.4,181.8 L326.5,183.1 L327.6,184.4 L328.6,185.8 L329.7,187.1 L330.8,188.5 L331.8,189.8 L332.9,191.1 L334.0,192.5 L335.0,193.8 L336.1,195.2 L337.2,196.5 L338.3,197.8 L339.3,199.2 L340.4,200.5 L341.5,201.8 L342.5,203.2 L343.6,204.5 L344.7,205.9 L345.8,207.2 L346.8,208.5 L347.9,209.9 L349.0,211.2 L350.0,212.5 L351.1,213.9 L352.2,215.2 L353.2,216.6 L354.3,217.9 L355.4,219.2 L356.5,220.6 L357.5,221.9 L358.6,223.2 L359.7,224.6 L360.7,225.9 L361.8,227.3 L362.9,228.6 L363.9,229.9 L365.0,231.3 L366.1,232.6 L367.2,233.9 L368.2,235.3 L369.3,236.6 L370.4,238.0 L371.4,239.3 L372.5,240.6 L373.6,242.0 L374.6,243.3 L375.7,244.6 L376.8,246.0 L377.9,247.3 L378.9,248.7 L380.0,250.0" fill="none" stroke="var(--err)" stroke-width="3" stroke-dasharray="3 4"/><text x="410.0" y="175.0" font-size="17" fill="var(--err)" text-anchor="start" font-weight="700">E</text><line x1="406.0" y1="170.0" x2="351.9" y2="209.9" stroke="var(--err)" stroke-width="1.3"/><polygon points="351.9,209.9 356.5,202.1 360.6,207.8" fill="var(--err)"/><text x="60.0" y="294.0" font-size="13" fill="var(--err)" text-anchor="middle">best case</text><text x="220.0" y="294.0" font-size="13" fill="var(--err)" text-anchor="middle">worst case</text><text x="380.0" y="294.0" font-size="13" fill="var(--err)" text-anchor="middle">best case</text>
+</svg>
+<figcaption>Figure 2. The three impurity measures for two classes, against <math alttext="p equals p hat sub m 1"><mrow><mi>p</mi><mo>=</mo><msub><mover><mi>p</mi><mo>^</mo></mover><mrow><mi>m</mi><mn>1</mn></mrow></msub></mrow></math>: zero (best case) at <math alttext="p equals 0"><mrow><mi>p</mi><mo>=</mo><mn>0</mn></mrow></math> and 1, largest (worst case) at <math alttext="p equals .5"><mrow><mi>p</mi><mo>=</mo><mn>.5</mn></mrow></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 2</summary>
+  <p>The horizontal axis is <math alttext="p"><mi>p</mi></math>, from 0 to 1 with .5 marked; the vertical axis is marked at .5. Three curves start at zero at <math alttext="p equals 0"><mrow><mi>p</mi><mo>=</mo><mn>0</mn></mrow></math>, rise to a peak of .5 at <math alttext="p equals .5"><mrow><mi>p</mi><mo>=</mo><mn>.5</mn></mrow></math>, and return to zero at <math alttext="p equals 1"><mrow><mi>p</mi><mo>=</mo><mn>1</mn></mrow></math>. Classification error <math alttext="E"><mi>E</mi></math> (dotted) is a tent of two straight lines. The Gini index <math alttext="G"><mi>G</mi></math> (dashed) is a smooth arch above it, and the entropy <math alttext="D"><mi>D</mi></math> (solid) is a slightly fuller arch above that. Both ends are labelled “best case” and the middle “worst case”.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> In the plot the entropy is scaled so that all three curves peak at .5, as in ESL Figure 9.3. Unscaled, its peak is <math alttext="log 2, about .69"><mrow><mi>log</mi><mn>2</mn><mo>≈</mo><mn>.69</mn></mrow></math>, which is the <math alttext="minus log .5"><mrow><mo>−</mo><mi>log</mi><mn>.5</mn></mrow></math> above.</p>
+</div>
+
+<p>Use Gini or entropy (<math alttext="D"><mi>D</mi></math>) because they tend to prefer pure nodes.</p>
+
+<figure>
+<svg viewBox="0 0 580 250" role="img" aria-labelledby="fig3-t fig3-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig3-t">Two ways to split the same 800 observations, with the impurity of each split</title>
+  <desc id="fig3-d">Two trees side by side, each with a parent node of 800 observations. On the left, the children hold 300 of class 1 and 100 of class 2, and 100 of class 1 and 300 of class 2; below it, E equals .25, G equals .375 and D equals .562. On the right, the children hold 200 of class 1 and 400 of class 2, and 200 of class 1 only, a child labelled pure; below it, E equals .25, G equals .33 and D equals .48.</desc>
+  <line x1="102" y1="52" x2="63" y2="98" stroke="currentColor" stroke-width="2"/><line x1="138" y1="52" x2="177" y2="98" stroke="currentColor" stroke-width="2"/><ellipse cx="120" cy="34" rx="48.0" ry="18.0" fill="none" stroke="currentColor" stroke-width="2"/><text x="120.0" y="39.0" font-size="14" fill="currentColor" text-anchor="middle">n<tspan baseline-shift="sub" font-size="11">t</tspan> = 800</text><ellipse cx="55" cy="120" rx="39.0" ry="22.0" fill="none" stroke="currentColor" stroke-width="2"/><text x="55.0" y="116.5" font-size="14" fill="currentColor" text-anchor="middle">1: 300</text><text x="55.0" y="133.5" font-size="14" fill="currentColor" text-anchor="middle">2: 100</text><ellipse cx="185" cy="120" rx="39.0" ry="22.0" fill="none" stroke="currentColor" stroke-width="2"/><text x="185.0" y="116.5" font-size="14" fill="currentColor" text-anchor="middle">1: 100</text><text x="185.0" y="133.5" font-size="14" fill="currentColor" text-anchor="middle">2: 300</text><line x1="392" y1="52" x2="353" y2="98" stroke="currentColor" stroke-width="2"/><line x1="428" y1="52" x2="467" y2="98" stroke="currentColor" stroke-width="2"/><ellipse cx="410" cy="34" rx="48.0" ry="18.0" fill="none" stroke="currentColor" stroke-width="2"/><text x="410.0" y="39.0" font-size="14" fill="currentColor" text-anchor="middle">n<tspan baseline-shift="sub" font-size="11">t</tspan> = 800</text><ellipse cx="345" cy="120" rx="39.0" ry="22.0" fill="none" stroke="currentColor" stroke-width="2"/><text x="345.0" y="116.5" font-size="14" fill="currentColor" text-anchor="middle">1: 200</text><text x="345.0" y="133.5" font-size="14" fill="currentColor" text-anchor="middle">2: 400</text><ellipse cx="475" cy="120" rx="39.0" ry="22.0" fill="none" stroke="currentColor" stroke-width="2"/><text x="475.0" y="125.0" font-size="14" fill="currentColor" text-anchor="middle">1: 200</text><text x="535.0" y="92.0" font-size="15" fill="var(--pop)" text-anchor="middle">pure</text><line x1="520.0" y1="98.0" x2="505.0" y2="108.0" stroke="var(--pop)" stroke-width="1.3"/><polygon points="505.0,108.0 510.0,100.5 513.8,106.3" fill="var(--pop)"/><text x="120.0" y="180.0" font-size="15" fill="var(--pop)" text-anchor="middle">E = .25</text><text x="120.0" y="202.0" font-size="15" fill="var(--pop)" text-anchor="middle">G = .375</text><text x="120.0" y="224.0" font-size="15" fill="var(--pop)" text-anchor="middle">D = .562</text><text x="410.0" y="180.0" font-size="15" fill="var(--pop)" text-anchor="middle">E = .25</text><text x="410.0" y="202.0" font-size="15" fill="var(--pop)" text-anchor="middle">G = .33</text><text x="410.0" y="224.0" font-size="15" fill="var(--pop)" text-anchor="middle">D = .48</text>
+</svg>
+<figcaption>Figure 3. Two ways to split the same 800 observations. Classification error rates them equally; Gini and entropy prefer the right-hand split, which has a pure node.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 3</summary>
+  <p>Two trees side by side, each with a parent node of <math alttext="n sub t equals 800"><mrow><msub><mi>n</mi><mi>t</mi></msub><mo>=</mo><mn>800</mn></mrow></math>. On the left the children hold 300 of class 1 and 100 of class 2, and 100 of class 1 and 300 of class 2; beneath, <math alttext="E equals .25"><mrow><mi>E</mi><mo>=</mo><mn>.25</mn></mrow></math>, <math alttext="G equals .375"><mrow><mi>G</mi><mo>=</mo><mn>.375</mn></mrow></math>, <math alttext="D equals .562"><mrow><mi>D</mi><mo>=</mo><mn>.562</mn></mrow></math>. On the right the children hold 200 of class 1 and 400 of class 2, and 200 of class 1 only, labelled “pure”; beneath, <math alttext="E equals .25"><mrow><mi>E</mi><mo>=</mo><mn>.25</mn></mrow></math>, <math alttext="G equals .33"><mrow><mi>G</mi><mo>=</mo><mn>.33</mn></mrow></math>, <math alttext="D equals .48"><mrow><mi>D</mi><mo>=</mo><mn>.48</mn></mrow></math>.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Transcription note</span> In the original, the two equal <math alttext="E"><mi>E</mi></math> values are highlighted in one colour and the smaller <math alttext="G"><mi>G</mi></math> and <math alttext="D"><mi>D</mi></math> on the right in another.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> Both splits misclassify 200 of the 800 points, so <math alttext="E"><mi>E</mi></math> can’t tell them apart. <math alttext="G"><mi>G</mi></math> and <math alttext="D"><mi>D</mi></math> are curved (Figure 2), so they reward the split that makes one node pure.</p>
+</div>
+
+<h3 id="stopping">1.3 Stopping</h3>
+
+<table>
+  <caption>Stopping rules</caption>
+  <thead><tr><th scope="col">Rule</th><th scope="col">A node is not split when…</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Depth</th><td>it is at depth <math alttext="d"><mi>d</mi></math></td></tr>
+    <tr><th scope="row">Node size</th><td>it has fewer than <math alttext="n sub min"><msub><mi>n</mi><mtext>min</mtext></msub></math> points</td></tr>
+    <tr><th scope="row">Leaf size</th><td>it results in child nodes with fewer than <math alttext="k"><mi>k</mi></math> points</td></tr>
+    <tr><th scope="row"># of leaves</th><td>there are <math alttext="L"><mi>L</mi></math> leaves (grow best split first)</td></tr>
+    <tr><th scope="row">Improvement (do not use)</th><td>its best split reduces the loss by less than a threshold</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--err)">Annotation</span> The improvement rule is highlighted and marked <strong>do not use</strong>.</p>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--accent)">Commentary</span> A split that helps little can set up a very good split below it, so stopping on small improvements can miss it. That is why trees are grown large and then pruned (ISL 8.1.1).</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 260 155" role="img" aria-labelledby="fig4-t fig4-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig4-t">A tree of depth 2: the root at the top, its two children at depth 1, and four leaves at depth 2</title>
+  <desc id="fig4-d">A root node with two children, labelled d equals 1; each child has two children of its own, labelled d equals 2.</desc>
+  <line x1="120" y1="20" x2="75" y2="75" stroke="currentColor" stroke-width="2"/><line x1="120" y1="20" x2="165" y2="75" stroke="currentColor" stroke-width="2"/><line x1="75" y1="75" x2="50" y2="135" stroke="currentColor" stroke-width="2"/><line x1="75" y1="75" x2="100" y2="135" stroke="currentColor" stroke-width="2"/><line x1="165" y1="75" x2="145" y2="135" stroke="currentColor" stroke-width="2"/><line x1="165" y1="75" x2="190" y2="135" stroke="currentColor" stroke-width="2"/><circle cx="120" cy="20" r="7" fill="currentColor"/><circle cx="75" cy="75" r="7" fill="currentColor"/><circle cx="165" cy="75" r="7" fill="currentColor"/><circle cx="50" cy="135" r="7" fill="currentColor"/><circle cx="100" cy="135" r="7" fill="currentColor"/><circle cx="145" cy="135" r="7" fill="currentColor"/><circle cx="190" cy="135" r="7" fill="currentColor"/><text x="182.0" y="80.0" font-size="14" fill="currentColor" text-anchor="start">d = 1</text><text x="205.0" y="140.0" font-size="14" fill="currentColor" text-anchor="start">d = 2</text>
+</svg>
+<figcaption>Figure 4. Depth: the root’s children are at depth <math alttext="d equals 1"><mrow><mi>d</mi><mo>=</mo><mn>1</mn></mrow></math> and theirs at <math alttext="d equals 2"><mrow><mi>d</mi><mo>=</mo><mn>2</mn></mrow></math>.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 4</summary>
+  <p>A root node with two children, labelled <math alttext="d equals 1"><mrow><mi>d</mi><mo>=</mo><mn>1</mn></mrow></math>; each child has two children of its own, labelled <math alttext="d equals 2"><mrow><mi>d</mi><mo>=</mo><mn>2</mn></mrow></math>.</p>
+</details>
+
+<figure>
+<svg viewBox="0 0 260 180" role="img" aria-labelledby="fig5-t fig5-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig5-t">Growing best split first: of the two candidate splits, only the better one is made</title>
+  <desc id="fig5-d">A root with two children. Each child has a candidate split drawn below it. The left one is marked first; the right one is crossed out.</desc>
+  <line x1="130" y1="20" x2="80" y2="75" stroke="currentColor" stroke-width="2"/><line x1="130" y1="20" x2="180" y2="75" stroke="currentColor" stroke-width="2"/><circle cx="130" cy="20" r="7" fill="currentColor"/><circle cx="80" cy="75" r="7" fill="currentColor"/><circle cx="180" cy="75" r="7" fill="currentColor"/><line x1="80" y1="75" x2="55" y2="130" stroke="var(--est)" stroke-width="2"/><circle cx="55" cy="130" r="5" fill="var(--est)"/><line x1="80" y1="75" x2="105" y2="130" stroke="var(--est)" stroke-width="2"/><circle cx="105" cy="130" r="5" fill="var(--est)"/><line x1="180" y1="75" x2="160" y2="130" stroke="var(--est)" stroke-width="2"/><circle cx="160" cy="130" r="5" fill="var(--est)"/><line x1="180" y1="75" x2="205" y2="130" stroke="var(--est)" stroke-width="2"/><circle cx="205" cy="130" r="5" fill="var(--est)"/><line x1="148" y1="112" x2="228" y2="148" stroke="var(--err)" stroke-width="2.5"/><line x1="150" y1="146" x2="214" y2="108" stroke="var(--err)" stroke-width="2.5"/><text x="80.0" y="172.0" font-size="14" fill="var(--err)" text-anchor="middle">first</text><line x1="80.0" y1="158.0" x2="80.0" y2="140.0" stroke="var(--err)" stroke-width="1.3"/><polygon points="80.0,140.0 83.5,148.3 76.5,148.3" fill="var(--err)"/>
+</svg>
+<figcaption>Figure 5. Growing best split first: check all nodes, and split the best one.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 5</summary>
+  <p>A root with two children. Each child has a candidate split drawn beneath it. The left one is marked “first”; the right one is crossed out.</p>
+</details>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--est)">Annotation</span> Check all nodes, split the best one.</p>
+</div>
+
+<h3 id="pruning">1.4 Cost-complexity pruning</h3>
+
+<p>Grow a very large tree (<math alttext="T sub 0"><msub><mi>T</mi><mn>0</mn></msub></math>), then prune leaf nodes. Find a subtree <math alttext="T subset of or equal to T sub 0"><mrow><mi>T</mi><mo>⊆</mo><msub><mi>T</mi><mn>0</mn></msub></mrow></math> that minimizes</p>
+
+<div class="eq">
+<math display="block" alttext="C sub alpha of T equals RSS of T plus alpha times the number of leaves of T">
+  <mrow><msub><mi>C</mi><mi>α</mi></msub><mo>(</mo><mi>T</mi><mo>)</mo><mo>=</mo><mtext>RSS</mtext><mo>(</mo><mi>T</mi><mo>)</mo><mo>+</mo><mi>α</mi><mrow><mo>|</mo><mi>T</mi><mo>|</mo></mrow></mrow>
+</math>
+</div>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> <math alttext="alpha times the number of leaves of T"><mrow><mi>α</mi><mrow><mo>|</mo><mi>T</mi><mo>|</mo></mrow></mrow></math>: penalty on the size of the tree (# of leaves).</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 310 240" role="img" aria-labelledby="fig6-t fig6-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig6-t">A large tree with eight leaves, with four leaf branches marked with crosses for pruning</title>
+  <desc id="fig6-d">A tree with a root, two nodes below it, four below those, and eight leaves at the bottom, labelled T equals 8. The branches to the two leftmost leaves and to the two rightmost leaves are each marked with a cross.</desc>
+  <line x1="160" y1="18" x2="100" y2="70" stroke="currentColor" stroke-width="2"/><line x1="160" y1="18" x2="220" y2="70" stroke="currentColor" stroke-width="2"/><line x1="100" y1="70" x2="60" y2="125" stroke="currentColor" stroke-width="2"/><line x1="100" y1="70" x2="130" y2="125" stroke="currentColor" stroke-width="2"/><line x1="220" y1="70" x2="190" y2="125" stroke="currentColor" stroke-width="2"/><line x1="220" y1="70" x2="250" y2="125" stroke="currentColor" stroke-width="2"/><line x1="60" y1="125" x2="40" y2="190" stroke="currentColor" stroke-width="2"/><line x1="60" y1="125" x2="80" y2="190" stroke="currentColor" stroke-width="2"/><line x1="130" y1="125" x2="115" y2="190" stroke="currentColor" stroke-width="2"/><line x1="130" y1="125" x2="145" y2="190" stroke="currentColor" stroke-width="2"/><line x1="190" y1="125" x2="175" y2="190" stroke="currentColor" stroke-width="2"/><line x1="190" y1="125" x2="205" y2="190" stroke="currentColor" stroke-width="2"/><line x1="250" y1="125" x2="235" y2="190" stroke="currentColor" stroke-width="2"/><line x1="250" y1="125" x2="265" y2="190" stroke="currentColor" stroke-width="2"/><circle cx="160" cy="18" r="5" fill="currentColor"/><circle cx="100" cy="70" r="5" fill="currentColor"/><circle cx="220" cy="70" r="5" fill="currentColor"/><circle cx="60" cy="125" r="5" fill="currentColor"/><circle cx="130" cy="125" r="5" fill="currentColor"/><circle cx="190" cy="125" r="5" fill="currentColor"/><circle cx="250" cy="125" r="5" fill="currentColor"/><circle cx="40" cy="190" r="5" fill="currentColor"/><circle cx="80" cy="190" r="5" fill="currentColor"/><circle cx="115" cy="190" r="5" fill="currentColor"/><circle cx="145" cy="190" r="5" fill="currentColor"/><circle cx="175" cy="190" r="5" fill="currentColor"/><circle cx="205" cy="190" r="5" fill="currentColor"/><circle cx="235" cy="190" r="5" fill="currentColor"/><circle cx="265" cy="190" r="5" fill="currentColor"/><line x1="44.0" y1="159.5" x2="56.0" y2="171.5" stroke="var(--err)" stroke-width="2.5"/><line x1="44.0" y1="171.5" x2="56.0" y2="159.5" stroke="var(--err)" stroke-width="2.5"/><line x1="64.0" y1="159.5" x2="76.0" y2="171.5" stroke="var(--err)" stroke-width="2.5"/><line x1="64.0" y1="171.5" x2="76.0" y2="159.5" stroke="var(--err)" stroke-width="2.5"/><line x1="236.5" y1="159.5" x2="248.5" y2="171.5" stroke="var(--err)" stroke-width="2.5"/><line x1="236.5" y1="171.5" x2="248.5" y2="159.5" stroke="var(--err)" stroke-width="2.5"/><line x1="251.5" y1="159.5" x2="263.5" y2="171.5" stroke="var(--err)" stroke-width="2.5"/><line x1="251.5" y1="171.5" x2="263.5" y2="159.5" stroke="var(--err)" stroke-width="2.5"/><text x="160.0" y="225.0" font-size="16" fill="currentColor" text-anchor="middle">|T| = 8</text>
+</svg>
+<figcaption>Figure 6. A large tree with <math alttext="the number of leaves of T equals 8"><mrow><mrow><mo>|</mo><mi>T</mi><mo>|</mo></mrow><mo>=</mo><mn>8</mn></mrow></math>; crosses mark leaf branches to prune.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 6</summary>
+  <p>A tree with a root, two nodes below it, four below those, and eight leaves at the bottom, labelled <math alttext="the number of leaves of T equals 8"><mrow><mrow><mo>|</mo><mi>T</mi><mo>|</mo></mrow><mo>=</mo><mn>8</mn></mrow></math>. The branches to the two leftmost leaves and to the two rightmost leaves are each marked with a cross.</p>
+</details>
+
+<ul>
+  <li><math alttext="alpha equals 0"><mrow><mi>α</mi><mo>=</mo><mn>0</mn></mrow></math> ⇒ <math alttext="T sub 0"><msub><mi>T</mi><mn>0</mn></msub></math></li>
+  <li><math alttext="alpha goes to infinity"><mrow><mi>α</mi><mo>→</mo><mi>∞</mi></mrow></math> ⇒ root node only</li>
+</ul>
+
+<table>
+  <caption>As <math alttext="alpha"><mi>α</mi></math> increases (written in a second colour)</caption>
+  <thead><tr><th scope="col">Quantity</th><th scope="col">Change</th></tr></thead>
+  <tbody>
+    <tr><th scope="row"><math alttext="the number of leaves of T"><mrow><mo>|</mo><mi>T</mi><mo>|</mo></mrow></math></th><td>decreases ↘</td></tr>
+    <tr><th scope="row">bias</th><td>increases ↗</td></tr>
+    <tr><th scope="row">variance</th><td>decreases ↘</td></tr>
+    <tr><th scope="row">training error</th><td>increases ↗</td></tr>
+    <tr><th scope="row">test error</th><td>decreases, then increases ↘ ↗</td></tr>
+  </tbody>
+</table>
+
+<h3 id="summary">1.5 Summary</h3>
+<ul>
+  <li><strong>Categorical predictors:</strong> encode them first.</li>
+  <li><strong>Missing values:</strong> in the training set, send to the best child node; a new point is sent to the larger of <math alttext="n sub L"><msub><mi>n</mi><mi>L</mi></msub></math> or <math alttext="n sub R"><msub><mi>n</mi><mi>R</mi></msub></math>.</li>
+  <li>Ties go to the first best split.</li>
+  <li>Both child nodes can predict the same thing (classification).</li>
+</ul>
+
+<p><strong>Pros</strong> (written in a second colour):</p>
+<ul>
+  <li>No need to transform predictors</li>
+  <li>All splits down the tree are “interactions” with the splits above</li>
+  <li>Nonlinear</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 340 135" role="img" aria-labelledby="fig7-t fig7-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig7-t">Two density curves on one axis: a tall, right-skewed one and a lower, more symmetric one</title>
+  <desc id="fig7-d">Two curves over a horizontal axis. A solid curve rises steeply to a tall peak near the left and then falls off into a long right tail. A dashed curve has a lower, broader and more symmetric peak a little to its right.</desc>
+  <line x1="20" y1="120" x2="320" y2="120" stroke="currentColor" stroke-width="2"/><path d="M20.0,120.0 L21.5,119.5 L22.9,118.0 L24.4,115.8 L25.8,113.0 L27.3,109.7 L28.7,105.9 L30.2,101.9 L31.7,97.6 L33.1,93.2 L34.6,88.7 L36.0,84.2 L37.5,79.7 L38.9,75.3 L40.4,70.9 L41.9,66.7 L43.3,62.7 L44.8,58.8 L46.2,55.1 L47.7,51.6 L49.1,48.4 L50.6,45.3 L52.1,42.5 L53.5,39.9 L55.0,37.5 L56.4,35.3 L57.9,33.4 L59.3,31.7 L60.8,30.2 L62.3,28.9 L63.7,27.8 L65.2,26.9 L66.6,26.2 L68.1,25.6 L69.5,25.3 L71.0,25.0 L72.5,25.0 L73.9,25.1 L75.4,25.3 L76.8,25.7 L78.3,26.2 L79.7,26.8 L81.2,27.5 L82.7,28.3 L84.1,29.2 L85.6,30.2 L87.0,31.3 L88.5,32.4 L89.9,33.6 L91.4,34.8 L92.9,36.1 L94.3,37.5 L95.8,38.9 L97.2,40.3 L98.7,41.8 L100.2,43.2 L101.6,44.7 L103.1,46.3 L104.5,47.8 L106.0,49.4 L107.4,50.9 L108.9,52.5 L110.4,54.0 L111.8,55.6 L113.3,57.1 L114.7,58.7 L116.2,60.2 L117.6,61.7 L119.1,63.2 L120.6,64.7 L122.0,66.2 L123.5,67.6 L124.9,69.1 L126.4,70.5 L127.8,71.9 L129.3,73.3 L130.8,74.6 L132.2,76.0 L133.7,77.3 L135.1,78.5 L136.6,79.8 L138.0,81.0 L139.5,82.2 L141.0,83.4 L142.4,84.5 L143.9,85.7 L145.3,86.8 L146.8,87.8 L148.2,88.9 L149.7,89.9 L151.2,90.9 L152.6,91.8 L154.1,92.8 L155.5,93.7 L157.0,94.6 L158.4,95.5 L159.9,96.3 L161.4,97.1 L162.8,97.9 L164.3,98.7 L165.7,99.4 L167.2,100.2 L168.6,100.9 L170.1,101.5 L171.6,102.2 L173.0,102.8 L174.5,103.5 L175.9,104.1 L177.4,104.7 L178.8,105.2 L180.3,105.8 L181.8,106.3 L183.2,106.8 L184.7,107.3 L186.1,107.8 L187.6,108.2 L189.0,108.7 L190.5,109.1 L192.0,109.5 L193.4,109.9 L194.9,110.3 L196.3,110.7 L197.8,111.0 L199.2,111.4 L200.7,111.7 L202.2,112.0 L203.6,112.4 L205.1,112.7 L206.5,112.9 L208.0,113.2 L209.4,113.5 L210.9,113.7 L212.4,114.0 L213.8,114.2 L215.3,114.5 L216.7,114.7 L218.2,114.9 L219.6,115.1 L221.1,115.3 L222.6,115.5 L224.0,115.7 L225.5,115.9 L226.9,116.0 L228.4,116.2 L229.8,116.3 L231.3,116.5 L232.8,116.6 L234.2,116.8 L235.7,116.9 L237.1,117.0 L238.6,117.2 L240.1,117.3 L241.5,117.4 L243.0,117.5 L244.4,117.6 L245.9,117.7 L247.3,117.8 L248.8,117.9 L250.3,118.0 L251.7,118.1 L253.2,118.2 L254.6,118.2 L256.1,118.3 L257.5,118.4 L259.0,118.4 L260.5,118.5 L261.9,118.6 L263.4,118.6 L264.8,118.7 L266.3,118.8 L267.7,118.8 L269.2,118.9 L270.7,118.9 L272.1,119.0 L273.6,119.0 L275.0,119.0 L276.5,119.1 L277.9,119.1 L279.4,119.2 L280.9,119.2 L282.3,119.2 L283.8,119.3 L285.2,119.3 L286.7,119.3 L288.1,119.4 L289.6,119.4 L291.1,119.4 L292.5,119.4 L294.0,119.5 L295.4,119.5 L296.9,119.5 L298.3,119.5 L299.8,119.6 L301.3,119.6 L302.7,119.6 L304.2,119.6 L305.6,119.6 L307.1,119.6 L308.5,119.7 L310.0,119.7" fill="none" stroke="var(--est)" stroke-width="3"/><path d="M20.0,113.8 L21.5,113.3 L22.9,112.8 L24.4,112.3 L25.8,111.7 L27.3,111.1 L28.7,110.5 L30.2,109.9 L31.7,109.2 L33.1,108.5 L34.6,107.7 L36.0,106.9 L37.5,106.1 L38.9,105.2 L40.4,104.4 L41.9,103.4 L43.3,102.5 L44.8,101.5 L46.2,100.4 L47.7,99.4 L49.1,98.3 L50.6,97.2 L52.1,96.0 L53.5,94.8 L55.0,93.6 L56.4,92.3 L57.9,91.1 L59.3,89.8 L60.8,88.4 L62.3,87.1 L63.7,85.7 L65.2,84.3 L66.6,82.9 L68.1,81.5 L69.5,80.1 L71.0,78.7 L72.5,77.3 L73.9,75.9 L75.4,74.4 L76.8,73.0 L78.3,71.6 L79.7,70.3 L81.2,68.9 L82.7,67.5 L84.1,66.2 L85.6,64.9 L87.0,63.7 L88.5,62.4 L89.9,61.3 L91.4,60.1 L92.9,59.0 L94.3,58.0 L95.8,57.0 L97.2,56.0 L98.7,55.2 L100.2,54.3 L101.6,53.6 L103.1,52.9 L104.5,52.3 L106.0,51.7 L107.4,51.3 L108.9,50.9 L110.4,50.5 L111.8,50.3 L113.3,50.1 L114.7,50.0 L116.2,50.0 L117.6,50.1 L119.1,50.2 L120.6,50.4 L122.0,50.7 L123.5,51.1 L124.9,51.6 L126.4,52.1 L127.8,52.7 L129.3,53.3 L130.8,54.1 L132.2,54.9 L133.7,55.7 L135.1,56.6 L136.6,57.6 L138.0,58.6 L139.5,59.7 L141.0,60.9 L142.4,62.0 L143.9,63.2 L145.3,64.5 L146.8,65.8 L148.2,67.1 L149.7,68.4 L151.2,69.8 L152.6,71.2 L154.1,72.6 L155.5,74.0 L157.0,75.4 L158.4,76.8 L159.9,78.2 L161.4,79.6 L162.8,81.1 L164.3,82.5 L165.7,83.9 L167.2,85.3 L168.6,86.6 L170.1,88.0 L171.6,89.3 L173.0,90.6 L174.5,91.9 L175.9,93.2 L177.4,94.4 L178.8,95.6 L180.3,96.8 L181.8,97.9 L183.2,99.0 L184.7,100.1 L186.1,101.1 L187.6,102.1 L189.0,103.1 L190.5,104.0 L192.0,104.9 L193.4,105.8 L194.9,106.6 L196.3,107.4 L197.8,108.2 L199.2,108.9 L200.7,109.6 L202.2,110.3 L203.6,110.9 L205.1,111.5 L206.5,112.1 L208.0,112.6 L209.4,113.1 L210.9,113.6 L212.4,114.1 L213.8,114.5 L215.3,114.9 L216.7,115.3 L218.2,115.6 L219.6,116.0 L221.1,116.3 L222.6,116.6 L224.0,116.8 L225.5,117.1 L226.9,117.3 L228.4,117.6 L229.8,117.8 L231.3,118.0 L232.8,118.1 L234.2,118.3 L235.7,118.4 L237.1,118.6 L238.6,118.7 L240.1,118.8 L241.5,118.9 L243.0,119.0 L244.4,119.1 L245.9,119.2 L247.3,119.3 L248.8,119.4 L250.3,119.4 L251.7,119.5 L253.2,119.5 L254.6,119.6 L256.1,119.6 L257.5,119.7 L259.0,119.7 L260.5,119.7 L261.9,119.8 L263.4,119.8 L264.8,119.8 L266.3,119.8 L267.7,119.8 L269.2,119.9 L270.7,119.9 L272.1,119.9 L273.6,119.9 L275.0,119.9 L276.5,119.9 L277.9,119.9 L279.4,119.9 L280.9,119.9 L282.3,120.0 L283.8,120.0 L285.2,120.0 L286.7,120.0 L288.1,120.0 L289.6,120.0 L291.1,120.0 L292.5,120.0 L294.0,120.0 L295.4,120.0 L296.9,120.0 L298.3,120.0 L299.8,120.0 L301.3,120.0 L302.7,120.0 L304.2,120.0 L305.6,120.0 L307.1,120.0 L308.5,120.0 L310.0,120.0" fill="none" stroke="var(--pop)" stroke-width="3" stroke-dasharray="9 5"/>
+</svg>
+<figcaption>Figure 7. Two density curves, drawn beside “No need to transform predictors”.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 7</summary>
+  <p>Two curves over a horizontal axis. A solid curve rises steeply to a tall peak near the left and falls off into a long right tail. A dashed curve has a lower, broader and more symmetric peak a little to its right.</p>
+</details>
+
+<p><strong>Cons</strong> (written in a third colour):</p>
+<ul>
+  <li>High variance: a new split near the top changes the entire tree. (Bagging)</li>
+  <li>Not smooth. (Bagging) — RF</li>
+  <li>Can’t model additive structure. (Boosting)</li>
+</ul>
+
+<div class="note">
+  <p><span class="tag" style="color:var(--pop)">Annotation</span> The words in parentheses, and “RF”, are added beside the cons: the methods that address each one.</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 240 180" role="img" aria-labelledby="fig8-t fig8-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig8-t">A tree whose root split on X 1 is crossed out and replaced by a split on x m</title>
+  <desc id="fig8-d">A tree with a root, two children and four grandchildren. The root's label X 1 is crossed out, and x m is written beside it.</desc>
+  <line x1="120" y1="40" x2="75" y2="100" stroke="var(--est)" stroke-width="2"/><line x1="120" y1="40" x2="165" y2="100" stroke="var(--est)" stroke-width="2"/><line x1="75" y1="100" x2="50" y2="160" stroke="var(--est)" stroke-width="2"/><line x1="75" y1="100" x2="95" y2="160" stroke="var(--est)" stroke-width="2"/><line x1="165" y1="100" x2="145" y2="160" stroke="var(--est)" stroke-width="2"/><line x1="165" y1="100" x2="190" y2="160" stroke="var(--est)" stroke-width="2"/><circle cx="75" cy="100" r="5" fill="var(--est)"/><circle cx="165" cy="100" r="5" fill="var(--est)"/><circle cx="50" cy="160" r="5" fill="var(--est)"/><circle cx="95" cy="160" r="5" fill="var(--est)"/><circle cx="145" cy="160" r="5" fill="var(--est)"/><circle cx="190" cy="160" r="5" fill="var(--est)"/><circle cx="120" cy="40" r="6" fill="currentColor"/><text x="112.0" y="26.0" font-size="16" fill="currentColor" text-anchor="end">X<tspan baseline-shift="sub" font-size="11">1</tspan></text><line x1="90" y1="10" x2="116" y2="32" stroke="var(--pop)" stroke-width="2.5"/><line x1="90" y1="32" x2="116" y2="10" stroke="var(--pop)" stroke-width="2.5"/><text x="132.0" y="26.0" font-size="16" fill="var(--pop)" text-anchor="start">x<tspan baseline-shift="sub" font-size="11">m</tspan></text>
+</svg>
+<figcaption>Figure 8. High variance: the root split on <math alttext="X sub 1"><msub><mi>X</mi><mn>1</mn></msub></math> is crossed out and replaced by <math alttext="x sub m"><msub><mi>x</mi><mi>m</mi></msub></math>, which changes everything below it.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 8</summary>
+  <p>A tree with a root, two children and four grandchildren. The root’s label <math alttext="X sub 1"><msub><mi>X</mi><mn>1</mn></msub></math> is crossed out, and <math alttext="x sub m"><msub><mi>x</mi><mi>m</mi></msub></math> is written beside it.</p>
+</details>
+
+<figure>
+<svg viewBox="0 0 400 230" role="img" aria-labelledby="fig9-t fig9-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig9-t">A regression tree fit on one predictor: a step function, flat between dotted split lines</title>
+  <desc id="fig9-d">Axes y and x 1. Data points rise from left to right with some waviness. Dotted vertical lines mark six splits, and the fit is a horizontal segment at the mean of the points in each region, so it jumps at every split instead of changing smoothly.</desc>
+  <line x1="40" y1="200" x2="360" y2="200" stroke="currentColor" stroke-width="2"/><polygon points="360,200 352,196 352,204" fill="currentColor"/><text x="366.0" y="205.0" font-size="15" fill="currentColor" text-anchor="start">x<tspan baseline-shift="sub" font-size="11">1</tspan></text><line x1="40" y1="200" x2="40" y2="20" stroke="currentColor" stroke-width="2"/><polygon points="40,20 36,28 44,28" fill="currentColor"/><text x="50.0" y="26.0" font-size="15" fill="currentColor" text-anchor="start">y</text><line x1="114.0" y1="28" x2="114.0" y2="212" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="2 3"/><line x1="150.0" y1="28" x2="150.0" y2="212" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="2 3"/><line x1="186.0" y1="28" x2="186.0" y2="212" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="2 3"/><line x1="216.0" y1="28" x2="216.0" y2="212" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="2 3"/><line x1="270.0" y1="28" x2="270.0" y2="212" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="2 3"/><line x1="306.0" y1="28" x2="306.0" y2="212" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="2 3"/><line x1="49.0" y1="127.8" x2="113.0" y2="127.8" stroke="var(--accent)" stroke-width="3"/><line x1="115.0" y1="137.9" x2="149.0" y2="137.9" stroke="var(--accent)" stroke-width="3"/><line x1="151.0" y1="132.7" x2="185.0" y2="132.7" stroke="var(--accent)" stroke-width="3"/><line x1="187.0" y1="95.8" x2="215.0" y2="95.8" stroke="var(--accent)" stroke-width="3"/><line x1="217.0" y1="72.6" x2="269.0" y2="72.6" stroke="var(--accent)" stroke-width="3"/><line x1="271.0" y1="86.1" x2="305.0" y2="86.1" stroke="var(--accent)" stroke-width="3"/><line x1="307.0" y1="83.7" x2="347.0" y2="83.7" stroke="var(--accent)" stroke-width="3"/><g fill="currentColor"><circle cx="57.1" cy="139.8" r="2.4"/><circle cx="71.6" cy="108.3" r="2.4"/><circle cx="83.8" cy="119.1" r="2.4"/><circle cx="91.8" cy="123.0" r="2.4"/><circle cx="107.1" cy="121.6" r="2.4"/><circle cx="110.7" cy="136.1" r="2.4"/><circle cx="111.4" cy="144.9" r="2.4"/><circle cx="113.9" cy="129.3" r="2.4"/><circle cx="116.4" cy="139.5" r="2.4"/><circle cx="130.0" cy="136.3" r="2.4"/><circle cx="153.3" cy="134.8" r="2.4"/><circle cx="154.0" cy="133.4" r="2.4"/><circle cx="163.3" cy="155.4" r="2.4"/><circle cx="169.8" cy="116.5" r="2.4"/><circle cx="185.9" cy="123.3" r="2.4"/><circle cx="197.7" cy="111.2" r="2.4"/><circle cx="203.6" cy="90.6" r="2.4"/><circle cx="211.3" cy="85.5" r="2.4"/><circle cx="216.9" cy="85.0" r="2.4"/><circle cx="235.2" cy="56.6" r="2.4"/><circle cx="238.6" cy="60.0" r="2.4"/><circle cx="257.5" cy="84.8" r="2.4"/><circle cx="269.3" cy="76.9" r="2.4"/><circle cx="292.0" cy="87.4" r="2.4"/><circle cx="292.7" cy="79.7" r="2.4"/><circle cx="300.7" cy="89.5" r="2.4"/><circle cx="301.5" cy="95.6" r="2.4"/><circle cx="304.2" cy="78.5" r="2.4"/><circle cx="317.6" cy="99.5" r="2.4"/><circle cx="326.9" cy="80.8" r="2.4"/><circle cx="329.5" cy="72.2" r="2.4"/><circle cx="334.1" cy="82.2" r="2.4"/></g>
+</svg>
+<figcaption>Figure 9. Not smooth: a tree fit on one predictor is a step function.</figcaption>
+</figure>
+<details>
+  <summary>Long description of Figure 9</summary>
+  <p>Axes <math alttext="y"><mi>y</mi></math> and <math alttext="x sub 1"><msub><mi>x</mi><mn>1</mn></msub></math>. The data points rise from left to right with some waviness. Dotted vertical lines mark several splits, and the fit is a horizontal segment at the mean of the points in each region, so it jumps at every split instead of changing smoothly.</p>
+</details>
+
+</main>
+
+<footer>
+  <p>Transcribed from the handwritten notes <em>ML_week_6_day_1.pdf</em> (7 pages). Equations are MathML; figures are inline SVG with title, description, and an expandable long description. Figure 2 plots the exact impurity curves; the data in Figure 9 are simulated. Conforms to WCAG 2.2 Level AA.</p>
+</footer>
+</div>
+</body>
+</html>
