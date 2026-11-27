@@ -1,4 +1,4 @@
-// Bagging regression trees on Example B (lecture notes: Bagging and Random Forests, §1–§4).
+// Bagging regression trees on Example B.
 // f(x) = sin(12(x + 0.2)) / (x + 0.2), x ~ U[0, 1], noise variance 1, n = 100.
 // Every tree is an actual fully grown CART regression tree (sklearn's DecisionTreeRegressor()
 // with its defaults: split until a node is pure or all its x values are equal, cutpoints halfway

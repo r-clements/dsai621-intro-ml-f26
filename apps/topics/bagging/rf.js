@@ -1,4 +1,4 @@
-// Random forests on Example C (lecture notes: Bagging and Random Forests, §6).
+// Random forests on Example C.
 // y = x1 + x2 + x3 + noise, x1..x3 standard normal with correlation 0.8, x4, x5 pure noise,
 // n = 200, B = 100 trees. The fits were computed with scikit-learn (RandomForestRegressor with
 // max_features = m and min_samples_leaf = leaf size; DecisionTreeRegressor for the single tree)

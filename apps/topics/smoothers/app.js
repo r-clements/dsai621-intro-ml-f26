@@ -9,8 +9,8 @@
 // df(λ) = Σρ_k, and f̂ = Σ ρ_k (u_kᵀy) u_k. The fitted curve between the x_i is the natural cubic
 // spline through f̂ with second derivatives γ = R⁻¹Qᵀf̂, linear outside [x_1, x_n].
 //
-// LOOCV uses the shortcut mean((y_i − f̂_i)/(1 − S_ii))², exact for the smoothing spline (notes
-// §4.1). SE band: Var f̂(t) = σ² Σ_k ρ_k² g_k(t)², where g_k is the natural spline interpolating u_k
+// LOOCV uses the shortcut mean((y_i − f̂_i)/(1 − S_ii))², exact for the smoothing spline.
+// SE band: Var f̂(t) = σ² Σ_k ρ_k² g_k(t)², where g_k is the natural spline interpolating u_k
 // (so f̂(t) = Σ ρ_k (u_kᵀy) g_k(t)), with σ² estimated by RSS/(n − df).
 // Bias–variance panel (fixed x, at the training x_i): bias² = (1/n)‖(S − I)f‖² = (1/n)Σ(1 − ρ_k)²(u_kᵀf)²,
 // variance = (σ²/n) tr(S²) = (σ²/n)Σρ_k², expected test error = σ² + bias² + variance.

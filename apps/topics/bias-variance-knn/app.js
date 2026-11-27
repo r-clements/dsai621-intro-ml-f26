@@ -1,4 +1,4 @@
-// Bias–variance tradeoff for KNN regression (lecture notes §4.3, ESL eq. 7.10).
+// Bias–variance tradeoff for KNN regression (ESL eq. 7.10).
 // f(x) = sin(2πx), σ = 0.3, n = 100 fixed training inputs. All the error numbers are the
 // exact expectations from the boxed formula, with the x's held fixed:
 //   Err(x0) = σ² + [f(x0) − mean of f over the K neighbours]² + σ²/K

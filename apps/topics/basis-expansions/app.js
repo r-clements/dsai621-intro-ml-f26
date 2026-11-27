@@ -154,7 +154,7 @@ function makeBasis(method, p, knots) {
         for (let k = 0; k < Kp - 2; k++) o[k + 2] = dk(x, k) - dk(x, Kp - 2);
         return o;
       },
-      describe: j => ["constant (the intercept)", "linear term b₁(x) = x", "natural-spline term b₂(x) = d₀(x) − d₁(x) (lecture Result 5.1)"][j] };
+      describe: j => ["constant (the intercept)", "linear term b₁(x) = x", "natural-spline term b₂(x) = d₀(x) − d₁(x)"][j] };
   }
   // Only B_0..B_2 have nonzero f'' at 0 and only B_{nb−3}..B_{nb−1} at 1, and the three values
   // at each end sum to 0 (the B-splines sum to 1). So B_0 + B_1 + B_2 and c_2B_1 − c_1B_2 are

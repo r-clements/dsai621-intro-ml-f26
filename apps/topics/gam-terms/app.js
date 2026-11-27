@@ -1,4 +1,4 @@
-// Generalized additive models with four kinds of term (ISL 7.7, ESL 9.1; lecture notes §2–§5).
+// Generalized additive models with four kinds of term (ISL 7.7, ESL 9.1).
 //
 //   log price = β0 + f1(age) + β2·size + γ(type) + f4(east, north) + ε
 //
@@ -6,11 +6,11 @@
 // residual r = y − ȳ − Σ_{k≠j} f̂_k and centering it. The four smoothers:
 //   age      cubic P-spline: K_A uniform cubic B-splines, penalty λ‖D₂θ‖² (second differences), so the fit is
 //            θ = (BᵀB + λP)⁻¹Bᵀr. This is the penalized-regression-spline approximation to the smoothing spline.
-//   size     simple linear regression on centered size (a projection, notes Result 4.2).
+//   size     simple linear regression on centered size (a projection).
 //   type     group means (also a projection).
 //   location tensor-product cubic P-spline, K_L × K_L basis b_i(east)b_j(north), penalty
 //            λ(P_K ⊗ I + I ⊗ P_K): second differences along each axis. Its null space is the bilinear functions.
-// Term df = tr(S) − 1 (the constant belongs to β0; notes §5). For a P-spline, tr(S) = tr((A + λP)⁻¹A),
+// Term df = tr(S) − 1 (the constant belongs to β0). For a P-spline, tr(S) = tr((A + λP)⁻¹A),
 // A = BᵀB, which the Demmler–Reinsch form makes cheap: with A = LLᵀ and L⁻¹PL⁻ᵀ = UΛUᵀ,
 // tr(S) = Σ_k 1/(1 + λΛ_k). λ for a target df is found by bisection on that sum.
 // Backfitting is run to convergence once per data set and df setting; every update's coefficients are
